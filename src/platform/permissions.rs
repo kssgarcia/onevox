@@ -7,8 +7,10 @@ use tracing::info;
 /// Permission type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
-    /// Accessibility permissions (for hotkeys and text injection)
+    /// Accessibility permissions (for text injection)
     Accessibility,
+    /// Input Monitoring (for global hotkeys)
+    InputMonitoring,
     /// Microphone access
     Microphone,
     /// Screen recording (for some accessibility features)
@@ -48,21 +50,46 @@ pub fn prompt_accessibility_permission() {
     println!("\n⚠️  Accessibility Permission Required");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("\nVox needs accessibility permissions to:");
-    println!("  • Register global hotkeys (Cmd+Shift+Space)");
     println!("  • Inject transcribed text into applications");
     println!("\nTo grant permission:");
-    println!("  1. Open System Preferences → Security & Privacy");
-    println!("  2. Go to the Privacy tab");
-    println!("  3. Select 'Accessibility' from the list");
-    println!("  4. Click the lock icon and enter your password");
-    println!("  5. Add 'vox' or your terminal app to the list");
-    println!("  6. Check the box next to the app");
+    println!("  1. Open System Settings → Privacy & Security");
+    println!("  2. Select 'Accessibility' from the list");
+    println!("  3. Click the lock icon and enter your password");
+    println!("  4. Click the '+' button and add your Terminal app");
+    println!("  5. Make sure the toggle is ON (blue)");
     println!("\nAfter granting permission, restart Vox.");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 }
 
 #[cfg(not(target_os = "macos"))]
 pub fn prompt_accessibility_permission() {
+    // Not needed on other platforms
+}
+
+/// Prompt user to grant Input Monitoring permission (macOS)
+#[cfg(target_os = "macos")]
+pub fn prompt_input_monitoring_permission() {
+    println!("\n⚠️  Input Monitoring Permission Required");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("\nVox needs Input Monitoring permissions to:");
+    println!("  • Listen for global hotkeys (Cmd+Shift+Space)");
+    println!("  • Detect when you press and release the hotkey");
+    println!("\nTo grant permission:");
+    println!("  1. Open System Settings → Privacy & Security");
+    println!("  2. Scroll down and select 'Input Monitoring' from the list");
+    println!("  3. Click the lock icon and enter your password");
+    println!("  4. Find your Terminal app in the list");
+    println!("  5. Make sure the toggle is ON (blue)");
+    println!("\n📝 If your Terminal app is not in the list:");
+    println!("  1. Click the '+' button");
+    println!("  2. Navigate to /Applications/Utilities/Terminal.app");
+    println!("  3. Select it and click Open");
+    println!("\nAfter granting permission, restart Vox.");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn prompt_input_monitoring_permission() {
     // Not needed on other platforms
 }
 
@@ -83,6 +110,28 @@ pub fn open_accessibility_settings() -> crate::Result<()> {
 
 #[cfg(not(target_os = "macos"))]
 pub fn open_accessibility_settings() -> crate::Result<()> {
+    Err(crate::Error::Platform(
+        "Not supported on this platform".to_string(),
+    ))
+}
+
+/// Open System Preferences to Input Monitoring settings (macOS)
+#[cfg(target_os = "macos")]
+pub fn open_input_monitoring_settings() -> crate::Result<()> {
+    use std::process::Command;
+
+    info!("Opening Input Monitoring settings");
+
+    Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
+        .spawn()
+        .map_err(|e| crate::Error::Platform(format!("Failed to open system preferences: {}", e)))?;
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn open_input_monitoring_settings() -> crate::Result<()> {
     Err(crate::Error::Platform(
         "Not supported on this platform".to_string(),
     ))
@@ -113,6 +162,12 @@ pub fn verify_permissions() -> crate::Result<()> {
                     prompt_accessibility_permission();
                     return Err(crate::Error::Platform(
                         "Accessibility permission required".to_string(),
+                    ));
+                }
+                Permission::InputMonitoring => {
+                    prompt_input_monitoring_permission();
+                    return Err(crate::Error::Platform(
+                        "Input Monitoring permission required".to_string(),
                     ));
                 }
                 Permission::Microphone => {

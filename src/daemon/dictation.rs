@@ -95,6 +95,19 @@ impl DictationEngine {
 
         info!("✅ Hotkey registered: {}", hotkey_str);
 
+        // Take ownership of hotkey_manager to start the listener
+        // (it consumes self and moves into the listener thread)
+        let hotkey_manager = std::mem::replace(
+            &mut self.hotkey_manager,
+            HotkeyManager::new().unwrap(), // Temporary placeholder
+        );
+        
+        hotkey_manager
+            .start_listener()
+            .context("Failed to start hotkey listener")?;
+
+        info!("✅ Hotkey listener started");
+
         // Start hotkey event loop
         self.run_event_loop(event_rx).await?;
 
@@ -124,13 +137,13 @@ impl DictationEngine {
     async fn handle_hotkey_event(&mut self, event: HotkeyEvent) {
         match event {
             HotkeyEvent::Pressed => {
-                debug!("Hotkey pressed - starting dictation");
+                info!("🎹 Hotkey pressed - starting dictation");
                 if let Err(e) = self.start_dictation().await {
                     error!("Failed to start dictation: {}", e);
                 }
             }
             HotkeyEvent::Released => {
-                debug!("Hotkey released - stopping dictation");
+                info!("🎹 Hotkey released - stopping dictation");
                 if let Err(e) = self.stop_dictation().await {
                     error!("Failed to stop dictation: {}", e);
                 }

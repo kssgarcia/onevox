@@ -74,12 +74,22 @@ enum Commands {
         #[arg(short, long, default_value = "10")]
         duration: u64,
     },
+
+    /// Test hotkey detection (dev tool)
+    TestHotkey {
+        /// Hotkey combination (e.g., "Cmd+Shift+Space")
+        #[arg(short, long, default_value = "Cmd+Shift+Space")]
+        hotkey: String,
+    },
 }
 
 #[derive(Subcommand)]
 enum ConfigAction {
     /// Show current configuration
     Show,
+
+    /// Initialize default configuration file
+    Init,
 
     /// Set a configuration value
     Set {
@@ -195,6 +205,23 @@ async fn main() -> Result<()> {
                 println!("📝 Current configuration:\n");
                 println!("{}", config_str);
                 println!("\nConfig file: {:?}", Config::default_path());
+                Ok(())
+            }
+            ConfigAction::Init => {
+                let config_path = Config::default_path();
+                
+                if config_path.exists() {
+                    println!("⚠️  Config file already exists at: {:?}", config_path);
+                    println!("Delete it first if you want to reinitialize.");
+                    return Ok(());
+                }
+
+                let default_config = Config::default();
+                default_config.save_default()?;
+                
+                println!("✅ Created default config at: {:?}", config_path);
+                println!("\n📝 Default hotkey: Cmd+Shift+1");
+                println!("Edit the file to customize settings.");
                 Ok(())
             }
             ConfigAction::Set { key, value } => {
@@ -434,6 +461,60 @@ async fn main() -> Result<()> {
             println!("  Total transcriptions: {}", transcription_count);
 
             Ok(())
+        }
+
+        Commands::TestHotkey { hotkey } => {
+            println!("🎹 Testing hotkey detection...");
+            println!("Hotkey: {}", hotkey);
+            println!("\nPress the hotkey combination to test.");
+            println!("Press Ctrl+C to exit.\n");
+
+            // Parse hotkey config
+            use vox::platform::{HotkeyConfig, HotkeyManager};
+            
+            let hotkey_config = HotkeyConfig::from_string(&hotkey)?;
+            println!("Parsed config: {:?}\n", hotkey_config);
+
+            // Create hotkey manager
+            let mut manager = HotkeyManager::new()?;
+            
+            // Register hotkey
+            let mut event_rx = manager.register(hotkey_config)?;
+            println!("✅ Hotkey registered successfully");
+            
+            // Start listener
+            manager.start_listener()?;
+            println!("✅ Listener started");
+            println!("\n👂 Waiting for hotkey events...");
+            println!("\n⚠️  If nothing happens when you press the hotkey:");
+            println!("   You need to grant 'Input Monitoring' permission!");
+            println!("   Go to: System Settings → Privacy & Security → Input Monitoring");
+            println!("   Add your Terminal app and toggle it ON\n");
+
+            let start = std::time::Instant::now();
+            let mut event_count = 0;
+
+            // Listen for events for 30 seconds, or until user quits
+            loop {
+                if let Ok(event) = event_rx.try_recv() {
+                    event_count += 1;
+                    match event {
+                        vox::platform::HotkeyEvent::Pressed => {
+                            println!("🟢 PRESSED  - Hotkey detected! (event #{})", event_count);
+                        }
+                        vox::platform::HotkeyEvent::Released => {
+                            println!("🔴 RELEASED - Hotkey released! (event #{})", event_count);
+                        }
+                    }
+                }
+                
+                // Show a reminder every 10 seconds if no events received
+                if event_count == 0 && start.elapsed().as_secs() % 10 == 0 && start.elapsed().as_secs() > 0 {
+                    println!("💡 Still waiting... Make sure you've granted Input Monitoring permission!");
+                }
+                
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
         }
     }
 }

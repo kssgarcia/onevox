@@ -2,13 +2,10 @@
 //!
 //! System-wide hotkey registration and handling for push-to-talk.
 
-use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
-    GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
-};
-use std::sync::Arc;
+use handy_keys::{Hotkey as HandyHotkey, HotkeyManager as HandyHotkeyManager, Key, Modifiers};
+
 use tokio::sync::mpsc;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 /// Hotkey event
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,16 +55,16 @@ impl HotkeyConfig {
         Ok(Self { modifiers, key })
     }
 
-    /// Convert to global-hotkey HotKey
-    fn to_hotkey(&self) -> crate::Result<HotKey> {
+    /// Convert to handy-keys Hotkey
+    fn to_hotkey(&self) -> crate::Result<HandyHotkey> {
         // Parse modifiers
         let mut mods = Modifiers::empty();
         for modifier in &self.modifiers {
             match modifier.to_lowercase().as_str() {
-                "cmd" | "super" | "meta" => mods |= Modifiers::SUPER,
+                "cmd" | "super" | "meta" => mods |= Modifiers::CMD,
                 "shift" => mods |= Modifiers::SHIFT,
-                "alt" | "option" => mods |= Modifiers::ALT,
-                "ctrl" | "control" => mods |= Modifiers::CONTROL,
+                "alt" | "option" => mods |= Modifiers::OPT,
+                "ctrl" | "control" => mods |= Modifiers::CTRL,
                 _ => {
                     warn!("Unknown modifier: {}", modifier);
                 }
@@ -75,107 +72,115 @@ impl HotkeyConfig {
         }
 
         // Parse key code
-        let code = self.parse_key_code(&self.key)?;
+        let key = self.parse_key(&self.key)?;
 
-        Ok(HotKey::new(Some(mods), code))
+        HandyHotkey::new(mods, key)
+            .map_err(|e| crate::Error::Platform(format!("Failed to create hotkey: {}", e)))
     }
 
-    /// Parse key code from string
-    fn parse_key_code(&self, key: &str) -> crate::Result<Code> {
-        let code = match key.to_lowercase().as_str() {
-            "space" => Code::Space,
-            "enter" | "return" => Code::Enter,
-            "tab" => Code::Tab,
-            "backspace" => Code::Backspace,
-            "escape" | "esc" => Code::Escape,
-            "delete" => Code::Delete,
-            "home" => Code::Home,
-            "end" => Code::End,
-            "pageup" => Code::PageUp,
-            "pagedown" => Code::PageDown,
-            "insert" => Code::Insert,
-            "left" => Code::ArrowLeft,
-            "right" => Code::ArrowRight,
-            "up" => Code::ArrowUp,
-            "down" => Code::ArrowDown,
+    /// Parse key from string
+    fn parse_key(&self, key_str: &str) -> crate::Result<Key> {
+        let key = match key_str.to_lowercase().as_str() {
+            "space" => Key::Space,
+            "enter" | "return" => Key::Return,
+            "tab" => Key::Tab,
+            "escape" | "esc" => Key::Escape,
+            "delete" => Key::Delete,
+            "forwarddelete" => Key::ForwardDelete,
+            "home" => Key::Home,
+            "end" => Key::End,
+            "pageup" => Key::PageUp,
+            "pagedown" => Key::PageDown,
+            "left" => Key::LeftArrow,
+            "right" => Key::RightArrow,
+            "up" => Key::UpArrow,
+            "down" => Key::DownArrow,
             // Function keys
-            "f1" => Code::F1,
-            "f2" => Code::F2,
-            "f3" => Code::F3,
-            "f4" => Code::F4,
-            "f5" => Code::F5,
-            "f6" => Code::F6,
-            "f7" => Code::F7,
-            "f8" => Code::F8,
-            "f9" => Code::F9,
-            "f10" => Code::F10,
-            "f11" => Code::F11,
-            "f12" => Code::F12,
+            "f1" => Key::F1,
+            "f2" => Key::F2,
+            "f3" => Key::F3,
+            "f4" => Key::F4,
+            "f5" => Key::F5,
+            "f6" => Key::F6,
+            "f7" => Key::F7,
+            "f8" => Key::F8,
+            "f9" => Key::F9,
+            "f10" => Key::F10,
+            "f11" => Key::F11,
+            "f12" => Key::F12,
+            "f13" => Key::F13,
+            "f14" => Key::F14,
+            "f15" => Key::F15,
+            "f16" => Key::F16,
+            "f17" => Key::F17,
+            "f18" => Key::F18,
+            "f19" => Key::F19,
+            "f20" => Key::F20,
             // Letters
-            "a" => Code::KeyA,
-            "b" => Code::KeyB,
-            "c" => Code::KeyC,
-            "d" => Code::KeyD,
-            "e" => Code::KeyE,
-            "f" => Code::KeyF,
-            "g" => Code::KeyG,
-            "h" => Code::KeyH,
-            "i" => Code::KeyI,
-            "j" => Code::KeyJ,
-            "k" => Code::KeyK,
-            "l" => Code::KeyL,
-            "m" => Code::KeyM,
-            "n" => Code::KeyN,
-            "o" => Code::KeyO,
-            "p" => Code::KeyP,
-            "q" => Code::KeyQ,
-            "r" => Code::KeyR,
-            "s" => Code::KeyS,
-            "t" => Code::KeyT,
-            "u" => Code::KeyU,
-            "v" => Code::KeyV,
-            "w" => Code::KeyW,
-            "x" => Code::KeyX,
-            "y" => Code::KeyY,
-            "z" => Code::KeyZ,
+            "a" => Key::A,
+            "b" => Key::B,
+            "c" => Key::C,
+            "d" => Key::D,
+            "e" => Key::E,
+            "f" => Key::F,
+            "g" => Key::G,
+            "h" => Key::H,
+            "i" => Key::I,
+            "j" => Key::J,
+            "k" => Key::K,
+            "l" => Key::L,
+            "m" => Key::M,
+            "n" => Key::N,
+            "o" => Key::O,
+            "p" => Key::P,
+            "q" => Key::Q,
+            "r" => Key::R,
+            "s" => Key::S,
+            "t" => Key::T,
+            "u" => Key::U,
+            "v" => Key::V,
+            "w" => Key::W,
+            "x" => Key::X,
+            "y" => Key::Y,
+            "z" => Key::Z,
             // Numbers
-            "0" => Code::Digit0,
-            "1" => Code::Digit1,
-            "2" => Code::Digit2,
-            "3" => Code::Digit3,
-            "4" => Code::Digit4,
-            "5" => Code::Digit5,
-            "6" => Code::Digit6,
-            "7" => Code::Digit7,
-            "8" => Code::Digit8,
-            "9" => Code::Digit9,
+            "0" => Key::Num0,
+            "1" => Key::Num1,
+            "2" => Key::Num2,
+            "3" => Key::Num3,
+            "4" => Key::Num4,
+            "5" => Key::Num5,
+            "6" => Key::Num6,
+            "7" => Key::Num7,
+            "8" => Key::Num8,
+            "9" => Key::Num9,
             _ => {
-                return Err(crate::Error::Config(format!("Unknown key: {}", key)));
+                return Err(crate::Error::Config(format!("Unknown key: {}", key_str)));
             }
         };
 
-        Ok(code)
+        Ok(key)
     }
 }
 
 /// Global hotkey manager
 pub struct HotkeyManager {
-    manager: Arc<GlobalHotKeyManager>,
-    hotkey: Option<HotKey>,
+    manager: HandyHotkeyManager,
     event_tx: Option<mpsc::UnboundedSender<HotkeyEvent>>,
+    listener_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl HotkeyManager {
     /// Create a new hotkey manager
     pub fn new() -> crate::Result<Self> {
-        let manager = GlobalHotKeyManager::new().map_err(|e| {
+        let manager = HandyHotkeyManager::new().map_err(|e| {
             crate::Error::Platform(format!("Failed to create hotkey manager: {}", e))
         })?;
 
         Ok(Self {
-            manager: Arc::new(manager),
-            hotkey: None,
+            manager,
             event_tx: None,
+            listener_handle: None,
         })
     }
 
@@ -186,15 +191,13 @@ impl HotkeyManager {
     ) -> crate::Result<mpsc::UnboundedReceiver<HotkeyEvent>> {
         info!("Registering hotkey: {:?}", config);
 
-        // Convert config to HotKey
+        // Convert config to HandyHotkey
         let hotkey = config.to_hotkey()?;
 
         // Register the hotkey
         self.manager
             .register(hotkey)
             .map_err(|e| crate::Error::Platform(format!("Failed to register hotkey: {}", e)))?;
-
-        self.hotkey = Some(hotkey);
 
         // Create event channel
         let (tx, rx) = mpsc::unbounded_channel();
@@ -206,57 +209,47 @@ impl HotkeyManager {
     }
 
     /// Start listening for hotkey events
-    pub fn start_listener(&self) -> crate::Result<()> {
+    ///
+    /// Note: This consumes self because HotkeyManager needs to be moved into the listener thread
+    pub fn start_listener(mut self) -> crate::Result<()> {
         let tx = self
             .event_tx
-            .as_ref()
-            .ok_or_else(|| crate::Error::Platform("No hotkey registered".to_string()))?
-            .clone();
+            .take()
+            .ok_or_else(|| crate::Error::Platform("No hotkey registered".to_string()))?;
 
-        let hotkey_id = self
-            .hotkey
-            .as_ref()
-            .ok_or_else(|| crate::Error::Platform("No hotkey registered".to_string()))?
-            .id();
-
-        // Spawn event listener thread
-        std::thread::spawn(move || {
-            debug!("Hotkey listener thread started");
-
+        // Spawn event listener thread - move the manager into it
+        let handle = std::thread::spawn(move || {
             loop {
-                if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
-                    if event.id() == hotkey_id {
-                        let hotkey_event = match event.state() {
-                            HotKeyState::Pressed => HotkeyEvent::Pressed,
-                            HotKeyState::Released => HotkeyEvent::Released,
+                // Use blocking recv to wait for events
+                match self.manager.recv() {
+                    Ok(event) => {
+                        let hotkey_event = match event.state {
+                            handy_keys::HotkeyState::Pressed => HotkeyEvent::Pressed,
+                            handy_keys::HotkeyState::Released => HotkeyEvent::Released,
                         };
-
-                        debug!("Hotkey event: {:?}", hotkey_event);
 
                         if tx.send(hotkey_event).is_err() {
                             error!("Failed to send hotkey event, receiver dropped");
                             break;
                         }
                     }
+                    Err(e) => {
+                        error!("Error receiving hotkey event: {:?}", e);
+                        break;
+                    }
                 }
-
-                std::thread::sleep(std::time::Duration::from_millis(10));
             }
-
-            debug!("Hotkey listener thread stopped");
         });
+
+        info!("Hotkey listener started");
 
         Ok(())
     }
 
-    /// Unregister the current hotkey
+    /// Unregister all hotkeys
     pub fn unregister(&mut self) -> crate::Result<()> {
-        if let Some(hotkey) = self.hotkey.take() {
-            info!("Unregistering hotkey");
-            self.manager.unregister(hotkey).map_err(|e| {
-                crate::Error::Platform(format!("Failed to unregister hotkey: {}", e))
-            })?;
-        }
+        info!("Unregistering hotkeys");
+        // handy-keys automatically unregisters on drop
         Ok(())
     }
 }
@@ -287,7 +280,7 @@ mod tests {
     #[test]
     fn test_hotkey_config_to_hotkey() {
         let config = HotkeyConfig::default();
-        let hotkey = config.to_hotkey().unwrap();
-        assert_eq!(hotkey.id(), hotkey.id()); // Just verify it was created
+        let hotkey = config.to_hotkey();
+        assert!(hotkey.is_ok());
     }
 }
