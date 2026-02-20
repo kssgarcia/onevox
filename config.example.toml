@@ -1,0 +1,168 @@
+# Vox Configuration Example
+# Copy this file to ~/.config/vox/config.toml (Linux/macOS) or %APPDATA%\vox\config.toml (Windows)
+
+[daemon]
+# Start daemon automatically on system boot
+auto_start = true
+
+# Logging level: trace, debug, info, warn, error
+log_level = "info"
+
+# Log file rotation (in days)
+log_retention_days = 7
+
+[hotkey]
+# Global hotkey combination
+# macOS: "Cmd+Shift+Space", "Ctrl+Option+D", etc.
+# Linux: "Ctrl+Shift+Space", "Alt+D", etc.
+# Windows: "Win+Shift+Space", "Ctrl+Alt+D", etc.
+trigger = "Cmd+Shift+Space"
+
+# Mode: "push-to-talk" (hold to record) or "toggle" (press once to start, again to stop)
+mode = "push-to-talk"
+
+# Minimum hold duration (ms) to prevent accidental triggers
+min_hold_duration_ms = 100
+
+[audio]
+# Audio input device (use "default" or specific device name)
+# Run `vox devices list` to see available devices
+device = "default"
+
+# Sample rate (Hz) - models typically expect 16000
+sample_rate = 16000
+
+# Chunk duration for processing (ms)
+# Smaller = lower latency, but more overhead
+# Recommended: 100-200ms
+chunk_duration_ms = 200
+
+# Audio buffer size (seconds)
+# How much audio to keep in memory before dropping
+buffer_duration_sec = 2
+
+[vad]
+# Enable Voice Activity Detection to filter silence
+enabled = true
+
+# VAD backend: "silero" (accurate, ONNX-based) or "webrtc" (fast, CPU-only)
+backend = "silero"
+
+# Detection threshold (0.0 - 1.0)
+# Lower = more sensitive (may include noise)
+# Higher = less sensitive (may cut off quiet speech)
+threshold = 0.5
+
+# Pre-roll: capture audio before VAD trigger (ms)
+# Ensures you don't miss the beginning of speech
+pre_roll_ms = 300
+
+# Post-roll: continue recording after VAD silence (ms)
+# Prevents cutting off the end of speech
+post_roll_ms = 500
+
+[model]
+# Model backend: "whisper_cpp", "faster_whisper", "onnx", "candle"
+backend = "whisper_cpp"
+
+# Path to model file (absolute or relative to ~/.vox/models/)
+# Download models from: https://huggingface.co/ggerganov/whisper.cpp
+model_path = "ggml-base.en.bin"
+
+# Compute device: "auto", "cpu", "cuda", "metal"
+# "auto" will select GPU if available, otherwise CPU
+device = "auto"
+
+# Language code (ISO 639-1): "en", "es", "fr", "de", etc.
+# Use "auto" for automatic detection (slower)
+language = "en"
+
+# Task: "transcribe" or "translate" (translate to English)
+task = "transcribe"
+
+# Load model at daemon startup (reduces first-transcription latency)
+preload = true
+
+# Model-specific configurations
+[model.whisper_cpp]
+# Number of CPU threads (only used if device = "cpu")
+# 0 = auto-detect, or specify 2, 4, 8, etc.
+n_threads = 0
+
+# Enable GPU acceleration (Metal/CUDA)
+use_gpu = true
+
+# Enable Flash Attention (faster, if supported)
+use_flash_attn = true
+
+[model.faster_whisper]
+# CTranslate2 compute type: "default", "int8", "int8_float16", "float16"
+compute_type = "int8"
+
+# Beam size for decoding (higher = more accurate, slower)
+beam_size = 5
+
+[post_processing]
+# Automatically add punctuation (experimental)
+auto_punctuation = true
+
+# Capitalize first letter of sentences
+auto_capitalize = true
+
+# Remove filler words (um, uh, like, etc.)
+remove_filler_words = false
+
+# Custom word replacements
+# Format: "spoken" = "written"
+[post_processing.replacements]
+# "vox" = "Vox"
+# "github" = "GitHub"
+# "javascript" = "JavaScript"
+
+[injection]
+# Text injection method: "accessibility", "clipboard", "paste"
+# - accessibility: Direct text injection (requires permissions)
+# - clipboard: Copy to clipboard and simulate paste
+# - paste: Simulate typing (slowest, but most compatible)
+method = "accessibility"
+
+# Delay before pasting (ms) - only for clipboard/paste methods
+paste_delay_ms = 50
+
+# Simulate typing speed (chars/sec) - only for paste method
+typing_speed = 100
+
+[tui]
+# Enable TUI (terminal user interface)
+enabled = true
+
+# Update frequency (Hz)
+refresh_rate = 10
+
+# Theme: "dark", "light"
+theme = "dark"
+
+[telemetry]
+# Enable performance metrics collection
+enabled = true
+
+# Metrics retention (days)
+retention_days = 30
+
+# Export format: "json", "csv", "prometheus"
+export_format = "json"
+
+[advanced]
+# Maximum concurrent transcriptions
+# Useful for batch processing, but increases memory usage
+max_concurrent_transcriptions = 1
+
+# Audio chunk queue size
+# Larger = more buffer, but higher latency
+chunk_queue_size = 10
+
+# Model inference timeout (seconds)
+inference_timeout_sec = 30
+
+# Restart daemon on fatal errors
+auto_restart = true

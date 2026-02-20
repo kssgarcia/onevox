@@ -1,0 +1,92 @@
+# Rust build artifacts
+target/
+Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing and coverage
+*.profraw
+*.profdata
+lcov.info
+coverage/
+
+# Benchmarking
+criterion/
+flamegraph.svg
+perf.data
+perf.data.old
+
+# Logs
+*.log
+logs/
+
+# Models (large binary files)
+models/
+*.bin
+*.onnx
+*.ggml
+*.gguf
+
+# Configuration (may contain secrets)
+config.toml
+!config.example.toml
+
+# Audio test files
+*.wav
+*.mp3
+*.flac
+fixtures/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS app bundle
+*.app/
+
+# Thumbnails
+._*
+
+# Linux
+*~
+.directory
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python (for faster-whisper bridge)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Documentation build
+docs/_build/
+site/
+
+# Distribution
+dist/
+*.deb
+*.rpm
+*.tar.gz
+*.zip
+
+# Local development
+.env
+.env.local
