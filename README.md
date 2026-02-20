@@ -35,19 +35,60 @@ It's designed for developers, power users, and anyone who values:
 
 ## 🚀 Quick Start
 
-> **Note**: Vox is currently in active development. This is a planning/documentation phase.
-
 ### Prerequisites
+
+**Rust 1.93+ Required**:
+```bash
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Verify installation
+rustc --version  # Should show 1.93 or higher
+```
 
 **macOS**:
 ```bash
 xcode-select --install
-brew install cmake portaudio
 ```
 
 **Linux (Ubuntu/Debian)**:
 ```bash
-sudo apt-get install build-essential cmake pkg-config \
+sudo apt-get install build-essential cmake pkg-config
+```
+
+### Build & Run
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/vox.git
+cd vox
+
+# Check if it compiles (fast!)
+cargo check
+
+# Run the program
+cargo run -- --help
+
+# Try the config system
+cargo run -- config show
+
+# Build optimized binary
+cargo build --release
+
+# Binary is at: ./target/release/vox
+./target/release/vox --version
+```
+
+### For TypeScript/Node Developers
+
+If you're coming from TypeScript/pnpm, see **[CHEATSHEET.md](CHEATSHEET.md)** for command equivalents!
+
+```bash
+cargo run       # = pnpm dev
+cargo build     # = pnpm install + build
+cargo test      # = pnpm test
+cargo fmt       # = pnpm format
+```
     libasound2-dev libx11-dev portaudio19-dev
 ```
 

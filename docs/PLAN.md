@@ -59,7 +59,8 @@
 
 **Goal**: Establish foundational architecture and module structure
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] Project structure and build system
 - [ ] Core daemon lifecycle (start/stop/reload)
 - [ ] Configuration system (TOML-based)
@@ -67,7 +68,8 @@
 - [ ] Basic IPC protocol definition
 - [ ] Error handling framework
 
-#### Key Modules:
+#### Key Modules
+
 - `daemon/`: Main daemon process
 - `ipc/`: Inter-process communication
 - `platform/`: OS-specific abstractions
@@ -78,7 +80,8 @@
 
 **Goal**: Real-time audio capture with minimal latency
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] Cross-platform microphone capture (via `cpal` or `rodio`)
 - [ ] Audio buffer management and ring buffers
 - [ ] Streaming chunk processor
@@ -86,12 +89,14 @@
 - [ ] Device enumeration and selection
 - [ ] Audio level monitoring
 
-#### Performance Targets:
+#### Performance Targets
+
 - Capture latency: <10ms
 - Buffer size: 100-200ms chunks
 - Format: 16kHz, 16-bit, mono
 
-#### Key Modules:
+#### Key Modules
+
 - `audio/capture.rs`: Microphone input
 - `audio/buffer.rs`: Ring buffer implementation
 - `audio/stream.rs`: Streaming processor
@@ -102,19 +107,22 @@
 
 **Goal**: Intelligent voice activity detection to reduce inference load
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] Integrate Silero VAD or WebRTC VAD
 - [ ] Streaming VAD with sliding window
 - [ ] Configurable sensitivity thresholds
 - [ ] Silence trimming and chunk boundary detection
 - [ ] Pre-roll buffering (capture audio before VAD trigger)
 
-#### Performance Targets:
+#### Performance Targets
+
 - VAD latency: <5ms per chunk
 - Detection accuracy: >95%
 - False positive rate: <1%
 
-#### Key Modules:
+#### Key Modules
+
 - `vad/detector.rs`: VAD core
 - `vad/silero.rs`: Silero backend
 - `vad/webrtc.rs`: WebRTC backend
@@ -125,7 +133,8 @@
 
 **Goal**: Unified abstraction for multiple transcription backends
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] Model trait abstraction
 - [ ] Whisper.cpp integration (GGML/GGUF)
 - [ ] Faster-Whisper integration (CTranslate2)
@@ -134,19 +143,22 @@
 - [ ] Model pooling/caching for hot-swapping
 - [ ] GPU acceleration support (Metal/CUDA/ROCm)
 
-#### Supported Backends:
+#### Supported Backends
+
 1. **whisper.cpp** (GGML) - Fast, quantized models
 2. **faster-whisper** (via Python bridge) - Best accuracy
 3. **ONNX Runtime** - Cross-platform optimization
 4. **Candle** (Rust-native) - Full Rust stack
 
-#### Performance Targets:
+#### Performance Targets
+
 - Model load time: <2s
 - Inference latency (tiny): <100ms per second of audio
 - Inference latency (base): <300ms per second of audio
 - Memory usage: <500MB (tiny), <1.5GB (base)
 
-#### Key Modules:
+#### Key Modules
+
 - `models/trait.rs`: Model abstraction
 - `models/whisper_cpp.rs`: whisper.cpp backend
 - `models/faster_whisper.rs`: Python bridge
@@ -159,7 +171,8 @@
 
 **Goal**: Global hotkey and text injection across platforms
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] macOS: Accessibility API for text injection
 - [ ] macOS: Carbon Events for global hotkey
 - [ ] Linux: X11/Wayland text injection
@@ -168,7 +181,8 @@
 - [ ] Clipboard fallback mechanism
 - [ ] Permission handling and user consent
 
-#### Key Modules:
+#### Key Modules
+
 - `platform/macos/`: macOS-specific code
 - `platform/linux/`: Linux-specific code
 - `platform/windows/`: Windows-specific code (stub)
@@ -180,7 +194,8 @@
 
 **Goal**: Terminal-based monitoring and configuration
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] Real-time transcription display
 - [ ] Audio level meter
 - [ ] Model status and switching
@@ -188,11 +203,13 @@
 - [ ] Performance metrics dashboard
 - [ ] Log viewer
 
-#### Technology:
+#### Technology
+
 - `ratatui` (TUI framework)
 - `crossterm` (terminal backend)
 
-#### Key Modules:
+#### Key Modules
+
 - `tui/app.rs`: Main TUI application
 - `tui/widgets/`: Custom widgets
 - `tui/events.rs`: Event handling
@@ -203,7 +220,8 @@
 
 **Goal**: Performance tuning for production use
 
-#### Focus Areas:
+#### Focus Areas
+
 - [ ] Profile critical paths (flamegraph)
 - [ ] Optimize memory allocations
 - [ ] Thread pool tuning
@@ -211,7 +229,8 @@
 - [ ] Batch processing optimization
 - [ ] Cache warming strategies
 
-#### Benchmarks:
+#### Benchmarks
+
 - End-to-end latency benchmark suite
 - Memory usage profiling
 - CPU usage under load
@@ -223,7 +242,8 @@
 
 **Goal**: Easy installation and system integration
 
-#### Deliverables:
+#### Deliverables
+
 - [ ] macOS: .app bundle + launchd plist
 - [ ] Linux: systemd service + .deb/.rpm packages
 - [ ] Homebrew formula
@@ -236,43 +256,51 @@
 ## Technology Stack
 
 ### Core Language
+
 - **Rust** (2021 edition, stable toolchain)
 
 ### Key Dependencies
 
 #### Audio Processing
+
 - `cpal` - Cross-platform audio I/O
 - `hound` - WAV encoding/decoding
 - `rubato` - Sample rate conversion
 
 #### Model Inference
+
 - `whisper-rs` - Rust bindings for whisper.cpp
 - `candle-core` - Rust ML framework
 - `ort` - ONNX Runtime bindings
 - `pyo3` - Python interop (for faster-whisper)
 
 #### Platform Integration
+
 - `global-hotkey` - Cross-platform hotkey handling
 - `enigo` - Cross-platform text injection
 - `accessibility-sys` (macOS) - Accessibility APIs
 - `x11-clipboard` (Linux) - X11 integration
 
 #### Daemon & IPC
+
 - `tokio` - Async runtime
 - `serde` - Serialization
 - `bincode` / `rmp-serde` - Binary IPC protocol
 - `interprocess` - Unix sockets / Named pipes
 
 #### TUI
+
 - `ratatui` - Terminal UI framework
 - `crossterm` - Terminal backend
 
 #### Configuration & Logging
+
 - `toml` - Configuration format
 - `tracing` - Structured logging
 - `tracing-subscriber` - Log output
 
 #### Utilities
+
 - `anyhow` / `thiserror` - Error handling
 - `clap` - CLI argument parsing
 - `dirs` - Platform directories
@@ -282,6 +310,7 @@
 ## Configuration Design
 
 ### Config File Location
+
 - macOS: `~/Library/Application Support/vox/config.toml`
 - Linux: `~/.config/vox/config.toml`
 - Windows: `%APPDATA%\vox\config.toml`
@@ -335,10 +364,12 @@ paste_delay_ms = 50
 ## IPC Protocol
 
 ### Communication Method
+
 - **Unix Domain Sockets** (macOS/Linux)
 - **Named Pipes** (Windows)
 
 ### Message Format
+
 Binary protocol using `bincode` or MessagePack
 
 ### Commands
@@ -350,20 +381,20 @@ enum DaemonCommand {
     Stop,
     Reload,
     GetStatus,
-    
+
     // Configuration
     SetConfig(Config),
     GetConfig,
-    
+
     // Model Management
     LoadModel { backend: String, path: String },
     UnloadModel,
     ListModels,
-    
+
     // Transcription
     StartDictation,
     StopDictation,
-    
+
     // Monitoring
     GetMetrics,
     StreamLogs,
@@ -385,18 +416,19 @@ enum DaemonResponse {
 
 ### Latency Budget (Push-to-Talk → Text Injection)
 
-| Stage | Target | Critical Path |
-|-------|--------|---------------|
-| Hotkey detection | <5ms | ✓ |
-| Audio capture start | <10ms | ✓ |
-| VAD detection | <5ms/chunk | ✓ |
-| Audio buffering | 100-200ms | ✓ |
-| Model inference (tiny) | <100ms/sec | ✓ |
-| Post-processing | <10ms | ✓ |
-| Text injection | <20ms | ✓ |
-| **Total (1 sec audio)** | **<350ms** | |
+| Stage                   | Target     | Critical Path |
+| ----------------------- | ---------- | ------------- |
+| Hotkey detection        | <5ms       | ✓             |
+| Audio capture start     | <10ms      | ✓             |
+| VAD detection           | <5ms/chunk | ✓             |
+| Audio buffering         | 100-200ms  | ✓             |
+| Model inference (tiny)  | <100ms/sec | ✓             |
+| Post-processing         | <10ms      | ✓             |
+| Text injection          | <20ms      | ✓             |
+| **Total (1 sec audio)** | **<350ms** |               |
 
 ### Resource Limits
+
 - **Memory**: <500MB idle, <1.5GB during inference
 - **CPU**: <5% idle, burst to 100% during inference
 - **Disk**: <200MB (excluding models)
@@ -406,20 +438,24 @@ enum DaemonResponse {
 ## Testing Strategy
 
 ### Unit Tests
+
 - Each module with >80% coverage
 - Mock platform APIs for testing
 
 ### Integration Tests
+
 - End-to-end pipeline tests
 - Model loading/inference tests
 - IPC communication tests
 
 ### Benchmarks
+
 - `criterion.rs` for micro-benchmarks
 - End-to-end latency benchmarks
 - Memory profiling with `valgrind`/`heaptrack`
 
 ### Manual Testing
+
 - Dogfooding: Use vox daily for development
 - Test in various applications (browsers, IDEs, terminals)
 - Multi-language testing
@@ -440,14 +476,14 @@ enum DaemonResponse {
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Model inference too slow | High | Use quantized models, GPU acceleration, model pooling |
-| Global hotkey conflicts | Medium | Allow custom keybindings, detect conflicts |
-| Accessibility permissions denial | High | Clear onboarding, fallback to clipboard |
-| Audio device compatibility | Medium | Support multiple audio backends, device enumeration |
-| Platform API changes | Low | Abstract platform layer, version checks |
-| Memory leaks in long-running daemon | High | Rigorous testing, memory profilers, leak sanitizers |
+| Risk                                | Impact | Mitigation                                            |
+| ----------------------------------- | ------ | ----------------------------------------------------- |
+| Model inference too slow            | High   | Use quantized models, GPU acceleration, model pooling |
+| Global hotkey conflicts             | Medium | Allow custom keybindings, detect conflicts            |
+| Accessibility permissions denial    | High   | Clear onboarding, fallback to clipboard               |
+| Audio device compatibility          | Medium | Support multiple audio backends, device enumeration   |
+| Platform API changes                | Low    | Abstract platform layer, version checks               |
+| Memory leaks in long-running daemon | High   | Rigorous testing, memory profilers, leak sanitizers   |
 
 ---
 
