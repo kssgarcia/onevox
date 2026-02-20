@@ -68,6 +68,10 @@ notify = "7.0"
 # System info
 sysinfo = "0.33"
 
+# Platform integration
+global-hotkey = "0.7"
+enigo = "0.6"  # Keyboard/mouse simulation for text injection
+
 [features]
 default = []  # Start minimal for Phase 1
 

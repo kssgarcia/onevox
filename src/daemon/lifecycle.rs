@@ -3,6 +3,7 @@
 //! Handles daemon startup, shutdown, and lifecycle events.
 
 use crate::config::Config;
+use crate::daemon::dictation::DictationEngine;
 use crate::daemon::state::DaemonState;
 use crate::ipc::{IpcClient, IpcServer};
 use anyhow::{Context, Result};
@@ -71,6 +72,26 @@ impl Lifecycle {
             }
         });
 
+        // Initialize and start dictation engine in the background
+        // We'll use a separate thread since HotkeyManager is not Send
+        let config = self.config.clone();
+        let _dictation_handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                match DictationEngine::new(config) {
+                    Ok(mut engine) => {
+                        info!("✅ Dictation engine initialized");
+                        if let Err(e) = engine.start().await {
+                            error!("Dictation engine error: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to create dictation engine: {}", e);
+                    }
+                }
+            });
+        });
+
         // Wait for shutdown signal
         tokio::select! {
             _ = self.wait_for_shutdown_signal() => {
@@ -88,8 +109,9 @@ impl Lifecycle {
             state.shutdown();
         }
 
-        // Abort IPC server task
+        // Abort tasks
         ipc_handle.abort();
+        // Note: dictation_handle will be cleaned up when the thread exits
 
         info!("✅ Daemon stopped");
         Ok(())
