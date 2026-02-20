@@ -134,6 +134,66 @@ onevox daemon stop
 
 ---
 
+## 🖥️ Terminal User Interface (TUI)
+
+ONEVOX includes a beautiful, interactive terminal interface built with **OpenTUI** and **TypeScript/Bun**.
+
+### Features
+
+- 🎨 **Light-themed, minimalist design** - Clean, borderless interface
+- ⚙️ **Interactive configuration** - All daemon settings in one place
+- 📜 **History viewer** - Browse, copy, export transcriptions
+- 🎤 **Device selection** - Visual audio device picker
+- ⌨️ **Full keyboard navigation** - Efficient workflow
+
+### Quick Start
+
+**Prerequisites:** Install [Bun](https://bun.sh)
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+**Launch TUI:**
+```bash
+# Method 1: Via Rust CLI (recommended)
+onevox tui
+
+# Method 2: Direct launch
+cd tui && bun start
+
+# Method 3: Helper script
+./scripts/run-tui.sh
+```
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Switch tabs (History ↔ Config) |
+| `Ctrl+S` | Save configuration |
+| `?` | Show help overlay |
+| `q` / `Ctrl+C` | Quit |
+
+**Config Panel:**
+- `Tab` / `Shift+Tab` - Navigate fields
+- `Space` - Toggle switches
+- `←` / `→` - Cycle values
+- `Esc` - Return to tabs
+
+**History Panel:**
+- `j` / `k` - Navigate entries
+- `c` - Copy
+- `d` - Delete
+- `Enter` - Expand
+
+### Documentation
+
+- **Full Guide:** [docs/TUI_INTEGRATION.md](docs/TUI_INTEGRATION.md)
+- **Architecture:** [docs/TUI.md](docs/TUI.md)
+- **Quick Start:** [tui/README.md](tui/README.md)
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -185,13 +245,19 @@ See [PLAN.md](docs/PLAN.md) for the complete development roadmap.
 
 ## 🛠️ Technology Stack
 
+### Core (Rust)
 - **Language**: Rust (2021 edition)
 - **Audio**: `cpal` for cross-platform capture
 - **VAD**: Silero VAD (ONNX) or WebRTC VAD
 - **Models**: whisper.cpp, Faster-Whisper, ONNX Runtime, Candle
 - **Platform**: `global-hotkey`, Accessibility APIs, X11/Wayland
-- **TUI**: `ratatui` + `crossterm`
 - **Async**: `tokio`
+
+### Terminal UI (TypeScript)
+- **Framework**: OpenTUI (flex-based TUI)
+- **Runtime**: Bun (TypeScript ESM)
+- **Config**: TOML parsing
+- **Styling**: Light theme, borderless design
 
 See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for full dependency list.
 

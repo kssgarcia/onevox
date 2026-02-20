@@ -39,7 +39,6 @@ enum Commands {
     },
 
     /// Open TUI monitor
-    #[cfg(feature = "tui")]
     Tui,
 
     /// List audio devices
@@ -257,11 +256,8 @@ async fn main() -> Result<()> {
             }
         },
 
-        #[cfg(feature = "tui")]
         Commands::Tui => {
-            println!("🖥️  Opening TUI monitor...");
-            println!("⚠️  Not yet implemented - this is a placeholder");
-            Ok(())
+            onevox::tui::launch()
         }
 
         Commands::Devices { action } => match action {

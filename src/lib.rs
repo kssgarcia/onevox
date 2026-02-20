@@ -11,8 +11,6 @@ pub mod ipc;
 pub mod models;
 pub mod platform;
 pub mod vad;
-
-#[cfg(feature = "tui")]
 pub mod tui;
 
 // Re-export commonly used types

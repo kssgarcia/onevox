@@ -1,0 +1,19 @@
+{
+  "name": "onevox-tui",
+  "version": "0.1.0",
+  "description": "ONEVOX – OpenTUI-based terminal interface for vox speech-to-text",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "dependencies": {
+    "@opentui/core": "latest",
+    "@iarna/toml": "^2.2.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}
