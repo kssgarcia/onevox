@@ -2,7 +2,8 @@
 // Main binary entry point
 
 use clap::{Parser, Subcommand};
-use vox::{Config, Daemon, Result};
+use vox::{Config, Result};
+use toml;
 
 #[derive(Parser)]
 #[command(name = "vox")]
@@ -99,7 +100,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Daemon { dev } => {
+        Commands::Daemon { dev: _ } => {
             tracing::info!("Starting vox daemon...");
             // TODO: Implement daemon startup
             println!("🎙️  Vox daemon starting...");
@@ -115,8 +116,12 @@ async fn main() -> Result<()> {
 
         Commands::Config { action } => match action {
             ConfigAction::Show => {
-                println!("📝 Current configuration:");
-                println!("⚠️  Not yet implemented - this is a placeholder");
+                let config = Config::load_default()?;
+                let config_str = toml::to_string_pretty(&config)
+                    .map_err(|e| vox::Error::Config(format!("Failed to serialize: {}", e)))?;
+                println!("📝 Current configuration:\n");
+                println!("{}", config_str);
+                println!("\nConfig file: {:?}", Config::default_path());
                 Ok(())
             }
             ConfigAction::Set { key, value } => {
