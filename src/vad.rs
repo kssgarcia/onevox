@@ -2,5 +2,11 @@
 //!
 //! Intelligent silence filtering and speech detection.
 
-/// VAD module placeholder
-pub struct VoiceActivityDetector;
+pub mod detector;
+pub mod energy;
+pub mod processor;
+
+// Re-export commonly used types
+pub use detector::{VadDecision, VadDetector};
+pub use energy::{EnergyVad, EnergyVadConfig};
+pub use processor::{SpeechSegment, VadProcessor, VadProcessorConfig};

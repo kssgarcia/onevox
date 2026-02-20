@@ -48,6 +48,9 @@ pub struct VadConfig {
     pub threshold: f32,
     pub pre_roll_ms: u32,
     pub post_roll_ms: u32,
+    pub min_speech_chunks: usize,
+    pub min_silence_chunks: usize,
+    pub adaptive: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,10 +104,13 @@ impl Default for VadConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            backend: "silero".to_string(),
-            threshold: 0.5,
+            backend: "energy".to_string(),
+            threshold: 0.02,
             pre_roll_ms: 300,
             post_roll_ms: 500,
+            min_speech_chunks: 2,
+            min_silence_chunks: 3,
+            adaptive: true,
         }
     }
 }
@@ -180,7 +186,7 @@ impl Config {
         let config_dir = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("vox");
-        
+
         config_dir.join("config.toml")
     }
 
@@ -192,5 +198,26 @@ impl Config {
     /// Save to default location
     pub fn save_default(&self) -> crate::Result<()> {
         self.save(&Self::default_path())
+    }
+}
+
+impl VadConfig {
+    /// Convert to EnergyVadConfig
+    pub fn to_energy_vad_config(&self) -> crate::vad::EnergyVadConfig {
+        crate::vad::EnergyVadConfig {
+            threshold: self.threshold,
+            min_speech_chunks: self.min_speech_chunks,
+            min_silence_chunks: self.min_silence_chunks,
+            adaptive: self.adaptive,
+            adaptive_window_size: 30,
+        }
+    }
+
+    /// Convert to VadProcessorConfig
+    pub fn to_processor_config(&self) -> crate::vad::VadProcessorConfig {
+        crate::vad::VadProcessorConfig {
+            pre_roll_ms: self.pre_roll_ms,
+            post_roll_ms: self.post_roll_ms,
+        }
     }
 }

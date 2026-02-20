@@ -60,6 +60,13 @@ enum Commands {
         #[arg(short, long, default_value = "3")]
         duration: u64,
     },
+
+    /// Test VAD (dev tool)
+    TestVad {
+        /// Duration in seconds
+        #[arg(short, long, default_value = "10")]
+        duration: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -271,6 +278,72 @@ async fn main() -> Result<()> {
             println!("  Total chunks: {}", chunk_count);
             println!("  Total samples: {}", total_samples);
             println!("  Average samples/chunk: {}", if chunk_count > 0 { total_samples / chunk_count } else { 0 });
+
+            Ok(())
+        }
+
+        Commands::TestVad { duration } => {
+            println!("🎤 Testing VAD for {} seconds...", duration);
+            println!("Speak into your microphone to see speech detection!\n");
+
+            // Load config
+            let config = Config::load_default()?;
+
+            // Create audio engine
+            let audio_config = vox::audio::CaptureConfig::default();
+            let mut engine = vox::audio::AudioEngine::new();
+            let mut chunk_rx = engine.start_capture(audio_config)?;
+
+            // Create VAD processor
+            let energy_config = config.vad.to_energy_vad_config();
+            let processor_config = config.vad.to_processor_config();
+            let detector = Box::new(vox::vad::EnergyVad::new(energy_config));
+            let mut vad_processor = vox::vad::VadProcessor::new(processor_config, detector);
+
+            println!("VAD Configuration:");
+            println!("  Detector: {}", vad_processor.detector_name());
+            println!("  Threshold: {}", config.vad.threshold);
+            println!("  Pre-roll: {}ms", config.vad.pre_roll_ms);
+            println!("  Post-roll: {}ms", config.vad.post_roll_ms);
+            println!("  Adaptive: {}\n", config.vad.adaptive);
+
+            let start = std::time::Instant::now();
+            let mut speech_segments = 0;
+            let mut current_state = "🔇 Silence";
+
+            while start.elapsed().as_secs() < duration {
+                if let Ok(chunk) = chunk_rx.try_recv() {
+                    match vad_processor.process(chunk)? {
+                        Some(segment) => {
+                            speech_segments += 1;
+                            println!(
+                                "🎙️  Speech segment #{}: {} chunks, {}ms duration",
+                                speech_segments,
+                                segment.len(),
+                                segment.duration_ms
+                            );
+                            current_state = "🔇 Silence";
+                        }
+                        None => {
+                            let new_state = if vad_processor.is_in_speech() {
+                                "🔴 Speech"
+                            } else {
+                                "🔇 Silence"
+                            };
+                            if new_state != current_state {
+                                println!("{}", new_state);
+                                current_state = new_state;
+                            }
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+
+            engine.stop_capture()?;
+
+            println!("\n✅ VAD test complete!");
+            println!("  Total speech segments: {}", speech_segments);
 
             Ok(())
         }
