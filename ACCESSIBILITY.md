@@ -1,4 +1,4 @@
-# macOS Accessibility Permissions Setup for Vox
+# macOS Accessibility Permissions Setup for Onevox
 
 ## Why This Is Needed
 
@@ -16,7 +16,7 @@ Global hotkeys and text injection require **Accessibility** permissions on macOS
 1. **Run the daemon**:
 
    ```bash
-   ./target/release/vox daemon
+   ./target/release/onevox daemon
    ```
 
 2. **Press your hotkey** (e.g., `Cmd+Shift+Space`)
@@ -35,7 +35,7 @@ Global hotkeys and text injection require **Accessibility** permissions on macOS
 
    ```bash
    # Press Ctrl+C to stop the daemon
-   ./target/release/vox daemon
+   ./target/release/onevox daemon
    ```
 
 ---
@@ -114,7 +114,7 @@ After granting permissions:
 1. **Restart the daemon**:
 
    ```bash
-   ./target/release/vox daemon
+   ./target/release/onevox daemon
    ```
 
 2. **Look for these logs**:
@@ -147,7 +147,7 @@ After granting permissions:
 
 ```bash
 # Create/edit config
-nano ~/.config/vox/config.toml
+nano ~/.config/onevox/config.toml
 
 # Change the trigger line to:
 trigger = "Cmd+Shift+F12"
@@ -155,7 +155,7 @@ trigger = "Cmd+Shift+F12"
 # Save (Ctrl+O, Enter, Ctrl+X)
 
 # Restart daemon
-./target/release/vox daemon
+./target/release/onevox daemon
 ```
 
 Then press `Cmd+Shift+F12`
@@ -180,7 +180,7 @@ On newer macOS versions (Ventura/Sonoma), you might need to:
 3. **Restart your Mac** (yes, really)
 4. **Add it back** to Accessibility list
 5. **Launch terminal** again
-6. **Run vox daemon**
+6. **Run onevox daemon**
 
 ### Using iTerm, Warp, or Another Terminal?
 
@@ -195,11 +195,11 @@ The app name in Accessibility should match your actual terminal:
 
 ## Still Not Working?
 
-Try running vox directly without the daemon first to trigger the permission prompt:
+Try running onevox directly without the daemon first to trigger the permission prompt:
 
 ```bash
 # This might trigger the permission dialog
-./target/release/vox daemon
+./target/release/onevox daemon
 ```
 
 Then press the hotkey immediately. macOS should prompt you.
@@ -215,7 +215,7 @@ To verify accessibility is working, try this test:
 caffeinate -d
 ```
 
-Then press `Cmd+Shift+Space`. If you see logs in the vox daemon, permissions are working!
+Then press `Cmd+Shift+Space`. If you see logs in the onevox daemon, permissions are working!
 
 If you still see nothing, let me know:
 

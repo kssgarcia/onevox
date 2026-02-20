@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Vox is architected as a **modular, event-driven daemon** with strict separation of concerns. The architecture prioritizes **low latency**, **high throughput**, and **platform portability**.
+Onevox is architected as a **modular, event-driven daemon** with strict separation of concerns. The architecture prioritizes **low latency**, **high throughput**, and **platform portability**.
 
 ---
 
@@ -19,7 +19,7 @@ Vox is architected as a **modular, event-driven daemon** with strict separation 
 ## Module Hierarchy
 
 ```
-vox/
+onevox/
 ├── daemon/          # Main daemon process and lifecycle
 │   ├── mod.rs       # Daemon initialization and event loop
 │   ├── lifecycle.rs # Start/stop/reload logic
@@ -247,8 +247,8 @@ enum VoxError {
 
 1. **Command-line arguments** (highest priority)
 2. **Environment variables** (`VOX_*`)
-3. **User config file** (`~/.config/vox/config.toml`)
-4. **System config file** (`/etc/vox/config.toml`)
+3. **User config file** (`~/.config/onevox/config.toml`)
+4. **System config file** (`/etc/onevox/config.toml`)
 5. **Embedded defaults** (lowest priority)
 
 ### Hot Reloading
@@ -348,8 +348,8 @@ trait SpeechModel: Send + Sync {
 ## IPC Protocol Design
 
 ### Transport Layer
-- **Unix Domain Socket** (macOS/Linux): `/tmp/vox.sock`
-- **Named Pipe** (Windows): `\\.\pipe\vox`
+- **Unix Domain Socket** (macOS/Linux): `/tmp/onevox.sock`
+- **Named Pipe** (Windows): `\\.\pipe\onevox`
 
 ### Message Format
 
@@ -384,7 +384,7 @@ enum Payload {
 - **Framework**: `tracing` with structured logging
 - **Levels**: TRACE, DEBUG, INFO, WARN, ERROR
 - **Outputs**:
-  - File: `~/.vox/logs/vox.log` (rotated daily)
+  - File: `~/.onevox/logs/onevox.log` (rotated daily)
   - Syslog: macOS Console.app, Linux journald
   - TUI: Real-time log viewer
 
@@ -485,19 +485,19 @@ struct Metrics {
 ### Installation Layout
 
 ```
-/Applications/Vox.app/              (macOS)
+/Applications/Onevox.app/              (macOS)
   ├── Contents/
-  │   ├── MacOS/vox                 (daemon binary)
+  │   ├── MacOS/onevox                 (daemon binary)
   │   ├── Resources/models/         (bundled models)
   │   └── Info.plist
 
-~/Library/Application Support/vox/  (user data)
+~/Library/Application Support/onevox/  (user data)
   ├── config.toml
   ├── models/                       (user models)
   └── logs/
 
 ~/Library/LaunchAgents/             (autostart)
-  └── com.vox.daemon.plist
+  └── com.onevox.daemon.plist
 ```
 
 ### Autostart Configuration
@@ -509,10 +509,10 @@ struct Metrics {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.vox.daemon</string>
+    <string>com.onevox.daemon</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/Vox.app/Contents/MacOS/vox</string>
+        <string>/Applications/Onevox.app/Contents/MacOS/onevox</string>
         <string>daemon</string>
     </array>
     <key>RunAtLoad</key>
@@ -526,12 +526,12 @@ struct Metrics {
 **Linux (systemd)**:
 ```ini
 [Unit]
-Description=Vox Speech-to-Text Daemon
+Description=Onevox Speech-to-Text Daemon
 After=sound.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/vox daemon
+ExecStart=/usr/bin/onevox daemon
 Restart=on-failure
 
 [Install]

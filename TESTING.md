@@ -1,4 +1,4 @@
-# Testing Vox - Quick Start Guide
+# Testing Onevox - Quick Start Guide
 
 ## Default Hotkey: `Cmd + Shift + 1`
 
@@ -12,13 +12,13 @@ If you want to customize settings before starting:
 
 ```bash
 # Create default config file
-./target/release/vox config init
+./target/release/onevox config init
 
 # View the config
-cat ~/.config/vox/config.toml
+cat ~/.config/onevox/config.toml
 
 # Edit if needed (change hotkey, audio device, etc.)
-nano ~/.config/vox/config.toml
+nano ~/.config/onevox/config.toml
 ```
 
 ### 1. Grant Accessibility Permissions
@@ -28,14 +28,14 @@ nano ~/.config/vox/config.toml
 ### 2. Start the Daemon
 
 ```bash
-./target/release/vox daemon
+./target/release/onevox daemon
 ```
 
 **Expected logs**:
 ```
-🚀 Starting Vox daemon v0.1.0
+🚀 Starting Onevox daemon v0.1.0
 ✅ IPC server started at ...
-✅ Vox daemon is ready
+✅ Onevox daemon is ready
 📡 Starting event loop
 ✅ Dictation engine initialized
 ✅ Hotkey registered: Cmd+Shift+1
@@ -58,13 +58,13 @@ Dictation engine event loop started
 ### 4. Check Status (in another terminal)
 
 ```bash
-./target/release/vox status
+./target/release/onevox status
 ```
 
 ### 5. Stop the Daemon
 
 ```bash
-./target/release/vox stop
+./target/release/onevox stop
 ```
 
 ---
@@ -95,7 +95,7 @@ You can customize the hotkey in config. Supported keys:
 
 ### Change Hotkey
 
-Edit `~/.config/vox/config.toml`:
+Edit `~/.config/onevox/config.toml`:
 
 ```toml
 [hotkey]
@@ -107,10 +107,10 @@ Or create a config file if it doesn't exist:
 
 ```bash
 # Easy way:
-./target/release/vox config init
+./target/release/onevox config init
 
 # Then edit:
-nano ~/.config/vox/config.toml
+nano ~/.config/onevox/config.toml
 ```
 
 ---
@@ -129,13 +129,13 @@ nano ~/.config/vox/config.toml
 - Verify accessibility permissions are granted
 
 ### "Daemon won't start"
-- Check if already running: `./target/release/vox status`
-- Kill existing process: `pkill -f "vox daemon"`
-- Remove stale socket: `rm -f /tmp/vox.sock`
+- Check if already running: `./target/release/onevox status`
+- Kill existing process: `pkill -f "onevox daemon"`
+- Remove stale socket: `rm -f /tmp/onevox.sock`
 
 ### "Audio device not found"
 ```bash
-./target/release/vox devices list
+./target/release/onevox devices list
 # Update config with correct device name
 ```
 

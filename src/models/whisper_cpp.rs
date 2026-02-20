@@ -41,7 +41,7 @@ impl WhisperCpp {
         // Check common locations for GGML models
         let cache_dir = dirs::cache_dir()
             .context("Failed to get cache directory")?
-            .join("vox")
+            .join("onevox")
             .join("models");
 
         // Try different possible locations
@@ -89,7 +89,7 @@ impl ModelRuntime for WhisperCpp {
 
         if !model_path.exists() {
             return Err(crate::Error::Model(format!(
-                "Model file not found: {:?}\nDownload GGML models with: vox models download {}",
+                "Model file not found: {:?}\nDownload GGML models with: onevox models download {}",
                 model_path, config.model_path
             )));
         }

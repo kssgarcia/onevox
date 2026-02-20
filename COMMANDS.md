@@ -36,7 +36,7 @@ reqwest = "0.11"  # Similar to axios
 |------------------|------------------|--------------|
 | `pnpm dev` | `cargo run` | Run in development mode |
 | `pnpm build` | `cargo build --release` | Build optimized production binary |
-| `pnpm start` | `./target/release/vox` | Run production binary |
+| `pnpm start` | `./target/release/onevox` | Run production binary |
 | `tsc --noEmit` | `cargo check` | Type-check without building |
 
 ### Common Build Commands
@@ -57,7 +57,7 @@ cargo run -- daemon
 cargo build --release
 
 # Run production binary
-./target/release/vox --help
+./target/release/onevox --help
 ```
 
 ---
@@ -151,7 +151,7 @@ cargo update
 
 ---
 
-## 🚀 Running Your Vox Project
+## 🚀 Running Your Onevox Project
 
 ### Development Workflow
 
@@ -184,12 +184,12 @@ cargo clippy
 # Build optimized binary (takes ~30s)
 cargo build --release
 
-# Binary is at: ./target/release/vox
+# Binary is at: ./target/release/onevox
 # Size: ~1.3MB
 
 # Run it
-./target/release/vox --version
-./target/release/vox config show
+./target/release/onevox --version
+./target/release/onevox config show
 ```
 
 ---
@@ -206,12 +206,12 @@ cargo clippy         # Lint
 
 # When ready to test production
 cargo build --release
-./target/release/vox
+./target/release/onevox
 ```
 
 ---
 
-## 🔧 Project-Specific Commands (Vox)
+## 🔧 Project-Specific Commands (Onevox)
 
 ```bash
 # Show help
@@ -277,7 +277,7 @@ import { Config } from './config';
 ### Rust
 ```rust
 // Imports
-use vox::Config;
+use onevox::Config;
 ```
 
 ---
@@ -353,7 +353,7 @@ cargo build --release # Production build
 
 # Running
 cargo run -- <args>  # Run with arguments
-./target/release/vox # Run production binary
+./target/release/onevox # Run production binary
 
 # Cleaning
 cargo clean          # Delete build artifacts
@@ -369,7 +369,7 @@ cargo tree           # Show dep tree
 
 ```bash
 # 1. Open project
-cd ~/Documents/vox
+cd ~/Documents/onevox
 
 # 2. Make sure it compiles
 cargo check
@@ -398,7 +398,7 @@ cargo test
 cargo build --release
 
 # 11. Test production binary
-./target/release/vox --version
+./target/release/onevox --version
 ```
 
 ---

@@ -1,4 +1,4 @@
-# 🎉 Vox Project - Setup Complete!
+# 🎉 Onevox Project - Setup Complete!
 
 **Status**: ✅ Ready for Development  
 **Rust Version**: 1.93.1  
@@ -58,7 +58,7 @@ cargo build --release
 ## 🗂️ Project Structure
 
 ```
-vox/
+onevox/
 ├── CHEATSHEET.md      ⭐ ONE-PAGE QUICK REFERENCE
 ├── COMMANDS.md        📘 Complete command guide
 ├── PROGRESS.md        📊 Development tracker
@@ -82,7 +82,7 @@ vox/
 ### 1. Verify Everything Works
 
 ```bash
-cd ~/Documents/vox
+cd ~/Documents/onevox
 
 # Check compilation
 cargo check
@@ -90,7 +90,7 @@ cargo check
 
 # Run the program
 cargo run -- --version
-# Should say: "vox 0.1.0"
+# Should say: "onevox 0.1.0"
 
 # Show config
 cargo run -- config show
@@ -245,7 +245,7 @@ cargo build --release    # Production build (1.3MB)
 
 # Running
 cargo run -- <args>      # Pass arguments
-./target/release/vox     # Run production binary
+./target/release/onevox     # Run production binary
 ```
 
 ---

@@ -333,22 +333,22 @@ Download from [ggerganov/whisper.cpp](https://github.com/ggerganov/whisper.cpp/t
 ```bash
 # Tiny model (75 MB) - Fastest
 curl -L https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin \
-  -o ~/.vox/models/ggml-tiny.en.bin
+  -o ~/.onevox/models/ggml-tiny.en.bin
 
 # Base model (142 MB) - Balanced
 curl -L https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin \
-  -o ~/.vox/models/ggml-base.en.bin
+  -o ~/.onevox/models/ggml-base.en.bin
 
 # Small model (466 MB) - Better accuracy
 curl -L https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin \
-  -o ~/.vox/models/ggml-small.en.bin
+  -o ~/.onevox/models/ggml-small.en.bin
 ```
 
 ### Silero VAD Model (ONNX)
 
 ```bash
 curl -L https://github.com/snakers4/silero-vad/raw/master/files/silero_vad.onnx \
-  -o ~/.vox/models/silero_vad.onnx
+  -o ~/.onevox/models/silero_vad.onnx
 ```
 
 ---

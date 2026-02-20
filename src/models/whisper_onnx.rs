@@ -19,7 +19,7 @@ use anyhow::Result;
 #[cfg(feature = "onnx")]
 use ndarray::{Array1, Array2, Array3, Axis};
 #[cfg(feature = "onnx")]
-use ort::session::{builder::GraphOptimizationLevel, Session};
+use ort::session::{Session, builder::GraphOptimizationLevel};
 #[cfg(feature = "onnx")]
 use ort::value::Tensor;
 #[cfg(feature = "onnx")]
@@ -128,7 +128,7 @@ impl WhisperOnnx {
 
         if !model_dir.exists() {
             anyhow::bail!(
-                "Model not found: {}. Download it with: vox models download {}",
+                "Model not found: {}. Download it with: onevox models download {}",
                 model_id,
                 model_id
             );
@@ -219,7 +219,7 @@ impl WhisperOnnx {
     /// Compute mel spectrogram from audio samples
     fn compute_mel_spectrogram(&self, samples: &[f32]) -> Result<Array3<f32>> {
         use constants::*;
-        use rustfft::{num_complex::Complex, FftPlanner};
+        use rustfft::{FftPlanner, num_complex::Complex};
 
         let filters = self
             .mel_filters

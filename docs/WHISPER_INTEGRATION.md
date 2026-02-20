@@ -125,13 +125,13 @@ Full pipeline testing works with mock model:
 
 ```bash
 # Test audio capture
-./target/release/vox test-audio --duration 3
+./target/release/onevox test-audio --duration 3
 
 # Test VAD
-./target/release/vox test-vad --duration 10
+./target/release/onevox test-vad --duration 10
 
 # Test full pipeline (audio → VAD → mock transcription)
-./target/release/vox test-transcribe --duration 10
+./target/release/onevox test-transcribe --duration 10
 ```
 
 ## Conclusion

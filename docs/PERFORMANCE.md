@@ -175,7 +175,7 @@ perf report
 cargo build --release --profile bench
 
 # Profile with Instruments
-instruments -t "Time Profiler" target/release/vox daemon
+instruments -t "Time Profiler" target/release/onevox daemon
 
 # Or use cargo-instruments
 cargo install cargo-instruments
@@ -185,13 +185,13 @@ cargo instruments --release -t time
 #### Linux (perf)
 ```bash
 # Record profile
-perf record --call-graph dwarf target/release/vox daemon
+perf record --call-graph dwarf target/release/onevox daemon
 # View report
 perf report
 
 # Or use flamegraph
 cargo install flamegraph
-cargo flamegraph --bin vox -- daemon
+cargo flamegraph --bin onevox -- daemon
 ```
 
 ---
@@ -200,19 +200,19 @@ cargo flamegraph --bin vox -- daemon
 
 #### Heaptrack (Linux)
 ```bash
-heaptrack target/release/vox daemon
-heaptrack_gui heaptrack.vox.*.gz
+heaptrack target/release/onevox daemon
+heaptrack_gui heaptrack.onevox.*.gz
 ```
 
 #### Valgrind (Linux)
 ```bash
-valgrind --tool=massif target/release/vox daemon
+valgrind --tool=massif target/release/onevox daemon
 ms_print massif.out.*
 ```
 
 #### macOS (Instruments)
 ```bash
-instruments -t "Allocations" target/release/vox daemon
+instruments -t "Allocations" target/release/onevox daemon
 ```
 
 ---
@@ -347,7 +347,7 @@ let model = WhisperModel::load_with_config(ModelConfig {
 ```bash
 # Use Q5_K quantized models (5-bit weights)
 curl -L https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_k.bin \
-  -o ~/.vox/models/ggml-tiny.en-q5_k.bin
+  -o ~/.onevox/models/ggml-tiny.en-q5_k.bin
 ```
 
 **Gain**: 30-40% faster, minimal accuracy loss

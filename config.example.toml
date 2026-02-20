@@ -1,5 +1,5 @@
-# Vox Configuration Example
-# Copy this file to ~/.config/vox/config.toml (Linux/macOS) or %APPDATA%\vox\config.toml (Windows)
+# Onevox Configuration Example
+# Copy this file to ~/.config/onevox/config.toml (Linux/macOS) or %APPDATA%\onevox\config.toml (Windows)
 
 [daemon]
 # Start daemon automatically on system boot
@@ -26,7 +26,7 @@ min_hold_duration_ms = 100
 
 [audio]
 # Audio input device (use "default" or specific device name)
-# Run `vox devices list` to see available devices
+# Run `onevox devices list` to see available devices
 device = "default"
 
 # Sample rate (Hz) - models typically expect 16000
@@ -65,7 +65,7 @@ post_roll_ms = 500
 # Model backend: "whisper_cpp", "faster_whisper", "onnx", "candle"
 backend = "whisper_cpp"
 
-# Path to model file (absolute or relative to ~/.vox/models/)
+# Path to model file (absolute or relative to ~/.onevox/models/)
 # Download models from: https://huggingface.co/ggerganov/whisper.cpp
 model_path = "ggml-base.en.bin"
 
@@ -115,7 +115,7 @@ remove_filler_words = false
 # Custom word replacements
 # Format: "spoken" = "written"
 [post_processing.replacements]
-# "vox" = "Vox"
+# "onevox" = "Onevox"
 # "github" = "GitHub"
 # "javascript" = "JavaScript"
 

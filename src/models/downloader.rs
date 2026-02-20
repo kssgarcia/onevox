@@ -20,9 +20,9 @@ impl ModelDownloader {
     /// Create a new model downloader
     pub fn new() -> Result<Self> {
         let cache_dir = Self::get_cache_dir()?;
-        
+
         let client = reqwest::Client::builder()
-            .user_agent("vox/0.1.0")
+            .user_agent("onevox/0.1.0")
             .timeout(std::time::Duration::from_secs(300)) // 5 minute timeout
             .build()
             .context("Failed to create HTTP client")?;
@@ -34,7 +34,7 @@ impl ModelDownloader {
     pub fn get_cache_dir() -> Result<PathBuf> {
         let cache_dir = dirs::cache_dir()
             .context("Failed to get cache directory")?
-            .join("vox")
+            .join("onevox")
             .join("models");
         Ok(cache_dir)
     }
@@ -47,7 +47,7 @@ impl ModelDownloader {
     /// Check if a model is already downloaded
     pub async fn is_downloaded(&self, metadata: &ModelMetadata) -> bool {
         let model_dir = self.model_dir(&metadata.id);
-        
+
         // Check if all required files exist
         for file in &metadata.files {
             let file_path = model_dir.join(file);
@@ -55,16 +55,16 @@ impl ModelDownloader {
                 return false;
             }
         }
-        
+
         true
     }
 
     /// Download a model
     pub async fn download(&self, metadata: &ModelMetadata) -> Result<PathBuf> {
         let model_dir = self.model_dir(&metadata.id);
-        
+
         info!("Downloading model: {} to {:?}", metadata.name, model_dir);
-        
+
         // Create model directory
         fs::create_dir_all(&model_dir)
             .await
@@ -74,14 +74,14 @@ impl ModelDownloader {
         let urls = metadata.download_urls();
         for (file, url) in urls {
             let file_path = model_dir.join(&file);
-            
+
             // Create parent directory if it doesn't exist
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)
                     .await
                     .context("Failed to create file parent directory")?;
             }
-            
+
             // Skip if already exists
             if file_path.exists() {
                 info!("File already exists: {}", file);
@@ -121,7 +121,10 @@ impl ModelDownloader {
                 .unwrap()
                 .progress_chars("#>-"),
         );
-        pb.set_message(format!("Downloading {}", dest.file_name().unwrap().to_string_lossy()));
+        pb.set_message(format!(
+            "Downloading {}",
+            dest.file_name().unwrap().to_string_lossy()
+        ));
 
         // Create temporary file
         let temp_path = dest.with_extension("tmp");
@@ -143,7 +146,10 @@ impl ModelDownloader {
             pb.set_position(downloaded);
         }
 
-        pb.finish_with_message(format!("Downloaded {}", dest.file_name().unwrap().to_string_lossy()));
+        pb.finish_with_message(format!(
+            "Downloaded {}",
+            dest.file_name().unwrap().to_string_lossy()
+        ));
 
         // Move temp file to final location
         fs::rename(&temp_path, dest)
@@ -156,7 +162,7 @@ impl ModelDownloader {
     /// Remove a downloaded model
     pub async fn remove(&self, model_id: &str) -> Result<()> {
         let model_dir = self.model_dir(model_id);
-        
+
         if model_dir.exists() {
             info!("Removing model: {} from {:?}", model_id, model_dir);
             fs::remove_dir_all(&model_dir)
@@ -195,7 +201,7 @@ impl ModelDownloader {
     /// Get the size of a downloaded model
     pub async fn model_size(&self, model_id: &str) -> Result<u64> {
         let model_dir = self.model_dir(model_id);
-        
+
         if !model_dir.exists() {
             return Ok(0);
         }
@@ -205,7 +211,9 @@ impl ModelDownloader {
     }
 
     /// Recursively calculate directory size
-    fn dir_size(path: &Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64>> + Send + '_>> {
+    fn dir_size(
+        path: &Path,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64>> + Send + '_>> {
         Box::pin(async move {
             let mut total_size = 0u64;
             let mut entries = fs::read_dir(path).await?;
@@ -237,7 +245,7 @@ mod tests {
     #[test]
     fn test_cache_dir() {
         let cache_dir = ModelDownloader::get_cache_dir().unwrap();
-        assert!(cache_dir.to_string_lossy().contains("vox"));
+        assert!(cache_dir.to_string_lossy().contains("onevox"));
         assert!(cache_dir.to_string_lossy().contains("models"));
     }
 }

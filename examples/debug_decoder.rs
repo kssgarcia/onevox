@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use ndarray::{Array1, Array2, Array3};
-use ort::session::{builder::GraphOptimizationLevel, Session};
+use ort::session::{Session, builder::GraphOptimizationLevel};
 use ort::value::Tensor;
 use std::path::PathBuf;
 
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
     // 3. Load encoder
     println!("📊 Step 3: Loading ONNX encoder");
     let model_dir = PathBuf::from(std::env::var("HOME").unwrap())
-        .join("Library/Caches/vox/models/whisper-tiny.en/onnx");
+        .join("Library/Caches/onevox/models/whisper-tiny.en/onnx");
     let encoder_path = model_dir.join("encoder_model.onnx");
 
     let mut encoder = Session::builder()?

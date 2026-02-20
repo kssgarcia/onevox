@@ -1,8 +1,8 @@
-# Vox - Development Plan
+# Onevox - Development Plan
 
 ## Project Overview
 
-**Vox** is a cross-platform, privacy-first, local speech-to-text daemon designed for ultra-fast transcription optimized for agentic workflows. It provides a system-wide speech inference layer with minimal latency.
+**Onevox** is a cross-platform, privacy-first, local speech-to-text daemon designed for ultra-fast transcription optimized for agentic workflows. It provides a system-wide speech inference layer with minimal latency.
 
 ### Key Objectives
 
@@ -311,9 +311,9 @@
 
 ### Config File Location
 
-- macOS: `~/Library/Application Support/vox/config.toml`
-- Linux: `~/.config/vox/config.toml`
-- Windows: `%APPDATA%\vox\config.toml`
+- macOS: `~/Library/Application Support/onevox/config.toml`
+- Linux: `~/.config/onevox/config.toml`
+- Windows: `%APPDATA%\onevox\config.toml`
 
 ### Example Configuration
 
@@ -340,7 +340,7 @@ post_roll_ms = 500
 
 [model]
 backend = "whisper_cpp"  # or "faster_whisper", "onnx", "candle"
-model_path = "~/.vox/models/ggml-base.en.bin"
+model_path = "~/.onevox/models/ggml-base.en.bin"
 device = "auto"  # "cpu", "cuda", "metal", "auto"
 language = "en"
 task = "transcribe"  # or "translate"
@@ -456,7 +456,7 @@ enum DaemonResponse {
 
 ### Manual Testing
 
-- Dogfooding: Use vox daily for development
+- Dogfooding: Use onevox daily for development
 - Test in various applications (browsers, IDEs, terminals)
 - Multi-language testing
 

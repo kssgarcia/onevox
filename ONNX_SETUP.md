@@ -1,4 +1,4 @@
-# Vox - ONNX Runtime Setup Guide
+# Onevox - ONNX Runtime Setup Guide
 
 ## ✅ Current Status
 
@@ -16,13 +16,13 @@ brew install onnxruntime
 
 ```bash
 # List available models
-./target/release/vox models list
+./target/release/onevox models list
 
 # Download the tiny English model (144 MB)
-./target/release/vox models download whisper-tiny.en
+./target/release/onevox models download whisper-tiny.en
 
 # Or download a larger model for better accuracy
-./target/release/vox models download whisper-base.en
+./target/release/onevox models download whisper-base.en
 ```
 
 ### 3. Start the Daemon
@@ -32,7 +32,7 @@ brew install onnxruntime
 cargo build --release
 
 # Start the daemon (auto-detects ONNX Runtime)
-./target/release/vox daemon
+./target/release/onevox daemon
 ```
 
 The daemon will automatically:
@@ -88,7 +88,7 @@ The current implementation loads the models but returns placeholder transcriptio
 
 The configuration file is located at:
 ```
-~/Library/Application Support/vox/config.toml
+~/Library/Application Support/onevox/config.toml
 ```
 
 Current model settings:
@@ -114,43 +114,43 @@ brew install onnxruntime
 Or manually set the library path:
 ```bash
 export ORT_DYLIB_PATH=/opt/homebrew/lib/libonnxruntime.dylib
-./target/release/vox daemon
+./target/release/onevox daemon
 ```
 
 ### "Model not found"
 
 Download the model first:
 ```bash
-./target/release/vox models download whisper-tiny.en
+./target/release/onevox models download whisper-tiny.en
 ```
 
 ### Check daemon status
 
 ```bash
 # View recent logs
-tail -f /tmp/vox-test.log
+tail -f /tmp/onevox-test.log
 
 # Check if daemon is running
-pgrep -f "vox daemon"
+pgrep -f "onevox daemon"
 ```
 
 ## Model Management Commands
 
 ```bash
 # List all available models
-./target/release/vox models list
+./target/release/onevox models list
 
 # Show downloaded models
-./target/release/vox models downloaded
+./target/release/onevox models downloaded
 
 # Download a specific model
-./target/release/vox models download whisper-base.en
+./target/release/onevox models download whisper-base.en
 
 # Show model details
-./target/release/vox models info whisper-tiny.en
+./target/release/onevox models info whisper-tiny.en
 
 # Remove a downloaded model
-./target/release/vox models remove whisper-tiny.en
+./target/release/onevox models remove whisper-tiny.en
 ```
 
 ## Available Models

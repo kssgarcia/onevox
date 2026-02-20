@@ -1,21 +1,21 @@
 [package]
-name = "vox"
+name = "onevox"
 version = "0.1.0"
 edition = "2024"
 authors = ["Your Name <your.email@example.com>"]
 description = "Ultra-fast, privacy-first local speech-to-text daemon"
 license = "MIT"
-repository = "https://github.com/yourusername/vox"
+repository = "https://github.com/yourusername/onevox"
 keywords = ["speech-to-text", "whisper", "dictation", "accessibility", "daemon"]
 categories = ["accessibility", "multimedia::audio", "command-line-utilities"]
 rust-version = "1.93"
 
 [lib]
-name = "vox"
+name = "onevox"
 path = "src/lib.rs"
 
 [[bin]]
-name = "vox"
+name = "onevox"
 path = "src/main.rs"
 
 [dependencies]

@@ -1,9 +1,9 @@
 // Test the WhisperCppCli backend with real captured audio
 
 use hound::WavReader;
-use vox::models::{ModelConfig, ModelRuntime, WhisperCppCli};
+use onevox::models::{ModelConfig, ModelRuntime, WhisperCppCli};
 
-fn main() -> vox::Result<()> {
+fn main() -> onevox::Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
@@ -12,7 +12,7 @@ fn main() -> vox::Result<()> {
     println!("Testing WhisperCppCli backend...\n");
 
     // Find a captured audio file
-    let audio_file = std::fs::read_dir(dirs::cache_dir().unwrap().join("vox/debug"))?
+    let audio_file = std::fs::read_dir(dirs::cache_dir().unwrap().join("onevox/debug"))?
         .filter_map(|e| e.ok())
         .find(|e| {
             e.path()
@@ -21,13 +21,15 @@ fn main() -> vox::Result<()> {
                 .map(|s| s == "wav")
                 .unwrap_or(false)
         })
-        .ok_or_else(|| vox::Error::Model("No audio files found in debug directory".to_string()))?;
+        .ok_or_else(|| {
+            onevox::Error::Model("No audio files found in debug directory".to_string())
+        })?;
 
     println!("Using audio file: {}", audio_file.path().display());
 
     // Read the WAV file
     let mut reader = WavReader::open(audio_file.path())
-        .map_err(|e| vox::Error::Audio(format!("Failed to open WAV file: {}", e)))?;
+        .map_err(|e| onevox::Error::Audio(format!("Failed to open WAV file: {}", e)))?;
     let samples: Vec<f32> = reader
         .samples::<i16>()
         .map(|s| s.unwrap() as f32 / i16::MAX as f32)
@@ -42,7 +44,7 @@ fn main() -> vox::Result<()> {
     // Create model config
     let model_path = dirs::cache_dir()
         .unwrap()
-        .join("vox/models/ggml-base.en/ggml-base.en.bin");
+        .join("onevox/models/ggml-base.en/ggml-base.en.bin");
 
     let config = ModelConfig {
         model_path: model_path.to_string_lossy().to_string(),

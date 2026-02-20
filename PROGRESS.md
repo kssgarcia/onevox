@@ -1,4 +1,4 @@
-# Vox Development Progress
+# Onevox Development Progress
 
 **Last Updated**: Feb 20, 2026  
 **Rust Version**: 1.93.1 (latest)  

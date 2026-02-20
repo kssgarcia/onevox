@@ -1,11 +1,11 @@
-// Vox - Local Speech-to-Text Daemon
+// Onevox - Local Speech-to-Text Daemon
 // Main binary entry point
 
 use clap::{Parser, Subcommand};
-use vox::{Config, Result};
+use onevox::{Config, Result};
 
 #[derive(Parser)]
-#[command(name = "vox")]
+#[command(name = "onevox")]
 #[command(about = "Ultra-fast local speech-to-text daemon", long_about = None)]
 #[command(version)]
 struct Cli {
@@ -20,7 +20,7 @@ enum Commands {
         /// Run in development mode
         #[arg(long)]
         dev: bool,
-        
+
         /// Run in foreground (don't daemonize)
         #[arg(long)]
         foreground: bool,
@@ -32,7 +32,7 @@ enum Commands {
     /// Check daemon status
     Status,
 
-    /// Configure vox
+    /// Configure onevox
     Config {
         #[command(subcommand)]
         action: ConfigAction,
@@ -153,31 +153,31 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Daemon { dev, foreground } => {
-            tracing::info!("Starting vox daemon...");
-            
+            tracing::info!("Starting onevox daemon...");
+
             // Load configuration
             let config = Config::load_default()?;
-            
+
             if dev {
                 tracing::info!("Running in development mode");
             }
-            
+
             if !foreground {
-                println!("🎙️  Starting Vox daemon in background...");
-                println!("    Use 'vox status' to check status");
-                println!("    Use 'vox stop' to stop the daemon");
+                println!("🎙️  Starting Onevox daemon in background...");
+                println!("    Use 'onevox status' to check status");
+                println!("    Use 'onevox stop' to stop the daemon");
             }
-            
+
             // Create and start daemon
-            let mut daemon = vox::Daemon::new(config);
+            let mut daemon = onevox::Daemon::new(config);
             daemon.start().await?;
-            
+
             Ok(())
         }
 
         Commands::Stop => {
-            println!("🛑 Stopping Vox daemon...");
-            match vox::Daemon::stop().await {
+            println!("🛑 Stopping Onevox daemon...");
+            match onevox::Daemon::stop().await {
                 Ok(_) => {
                     println!("✅ Daemon stopped successfully");
                     Ok(())
@@ -189,34 +189,40 @@ async fn main() -> Result<()> {
             }
         }
 
-        Commands::Status => {
-            match vox::Daemon::status().await {
-                Ok(status) => {
-                    println!("📊 Vox Daemon Status\n");
-                    println!("  Version:     {}", status.version);
-                    println!("  PID:         {}", status.pid);
-                    println!("  State:       {}", status.state);
-                    println!("  Uptime:      {}s", status.uptime_secs);
-                    println!("  Model:       {}", 
-                        status.model_name.unwrap_or_else(|| "None".to_string()));
-                    println!("  Dictating:   {}", if status.is_dictating { "Yes" } else { "No" });
-                    println!("  Memory:      {} MB", status.memory_usage_bytes / 1_000_000);
-                    println!("  CPU:         {:.1}%", status.cpu_usage_percent);
-                    Ok(())
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to get daemon status: {}", e);
-                    eprintln!("💡 Is the daemon running? Try: vox daemon --foreground");
-                    std::process::exit(1);
-                }
+        Commands::Status => match onevox::Daemon::status().await {
+            Ok(status) => {
+                println!("📊 Onevox Daemon Status\n");
+                println!("  Version:     {}", status.version);
+                println!("  PID:         {}", status.pid);
+                println!("  State:       {}", status.state);
+                println!("  Uptime:      {}s", status.uptime_secs);
+                println!(
+                    "  Model:       {}",
+                    status.model_name.unwrap_or_else(|| "None".to_string())
+                );
+                println!(
+                    "  Dictating:   {}",
+                    if status.is_dictating { "Yes" } else { "No" }
+                );
+                println!(
+                    "  Memory:      {} MB",
+                    status.memory_usage_bytes / 1_000_000
+                );
+                println!("  CPU:         {:.1}%", status.cpu_usage_percent);
+                Ok(())
             }
-        }
+            Err(e) => {
+                eprintln!("❌ Failed to get daemon status: {}", e);
+                eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                std::process::exit(1);
+            }
+        },
 
         Commands::Config { action } => match action {
             ConfigAction::Show => {
                 let config = Config::load_default()?;
                 let config_str = toml::to_string_pretty(&config)
-                    .map_err(|e| vox::Error::Config(format!("Failed to serialize: {}", e)))?;
+                    .map_err(|e| onevox::Error::Config(format!("Failed to serialize: {}", e)))?;
                 println!("📝 Current configuration:\n");
                 println!("{}", config_str);
                 println!("\nConfig file: {:?}", Config::default_path());
@@ -224,7 +230,7 @@ async fn main() -> Result<()> {
             }
             ConfigAction::Init => {
                 let config_path = Config::default_path();
-                
+
                 if config_path.exists() {
                     println!("⚠️  Config file already exists at: {:?}", config_path);
                     println!("Delete it first if you want to reinitialize.");
@@ -233,7 +239,7 @@ async fn main() -> Result<()> {
 
                 let default_config = Config::default();
                 default_config.save_default()?;
-                
+
                 println!("✅ Created default config at: {:?}", config_path);
                 println!("\n📝 Default hotkey: Cmd+Shift+1");
                 println!("Edit the file to customize settings.");
@@ -261,7 +267,7 @@ async fn main() -> Result<()> {
         Commands::Devices { action } => match action {
             DeviceAction::List => {
                 println!("🎤 Available audio input devices:\n");
-                let audio_engine = vox::audio::AudioEngine::new();
+                let audio_engine = onevox::audio::AudioEngine::new();
                 match audio_engine.list_devices() {
                     Ok(devices) => {
                         if devices.is_empty() {
@@ -283,133 +289,157 @@ async fn main() -> Result<()> {
 
         Commands::Models { action } => match action {
             ModelAction::List => {
-                use vox::models::ModelRegistry;
-                
+                use onevox::models::ModelRegistry;
+
                 println!("🤖 Available Whisper Models\n");
-                
+
                 let registry = ModelRegistry::new();
                 let models = registry.list_models();
-                
+
                 for model in models {
                     println!("📦 {}", model.name);
                     println!("   ID: {}", model.id);
-                    println!("   Size: {:.1} MB", model.size_bytes as f64 / 1024.0 / 1024.0);
+                    println!(
+                        "   Size: {:.1} MB",
+                        model.size_bytes as f64 / 1024.0 / 1024.0
+                    );
                     println!("   Speed: {}x real-time", model.speed_factor);
                     println!("   Memory: {} MB", model.memory_mb);
                     println!("   {}", model.description);
                     println!();
                 }
-                
+
                 println!("💡 Recommended: whisper-base.en (good balance of speed and accuracy)");
-                println!("💡 Download with: vox models download <model-id>");
-                
+                println!("💡 Download with: onevox models download <model-id>");
+
                 Ok(())
             }
-            
+
             ModelAction::Downloaded => {
-                use vox::models::ModelDownloader;
-                
+                use onevox::models::ModelDownloader;
+
                 println!("📂 Downloaded Models\n");
-                
-                let downloader = ModelDownloader::new()
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
-                let downloaded = downloader.list_downloaded().await
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
-                
+
+                let downloader =
+                    ModelDownloader::new().map_err(|e| onevox::Error::Other(e.to_string()))?;
+                let downloaded = downloader
+                    .list_downloaded()
+                    .await
+                    .map_err(|e| onevox::Error::Other(e.to_string()))?;
+
                 if downloaded.is_empty() {
                     println!("No models downloaded yet.");
-                    println!("💡 Download a model with: vox models download <model-id>");
+                    println!("💡 Download a model with: onevox models download <model-id>");
                 } else {
                     for model_id in downloaded {
-                        let size = downloader.model_size(&model_id).await
-                            .map_err(|e| vox::Error::Other(e.to_string()))?;
+                        let size = downloader
+                            .model_size(&model_id)
+                            .await
+                            .map_err(|e| onevox::Error::Other(e.to_string()))?;
                         println!("✅ {} ({:.1} MB)", model_id, size as f64 / 1024.0 / 1024.0);
                     }
                 }
-                
+
                 Ok(())
             }
-            
+
             ModelAction::Download { model_id } => {
-                use vox::models::{ModelDownloader, ModelRegistry};
-                
+                use onevox::models::{ModelDownloader, ModelRegistry};
+
                 println!("📥 Downloading model: {}\n", model_id);
-                
+
                 let registry = ModelRegistry::new();
-                let metadata = registry.get_model(&model_id)
-                    .ok_or_else(|| vox::Error::Config(format!("Model not found: {}", model_id)))?;
-                
-                let downloader = ModelDownloader::new()
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
-                
+                let metadata = registry.get_model(&model_id).ok_or_else(|| {
+                    onevox::Error::Config(format!("Model not found: {}", model_id))
+                })?;
+
+                let downloader =
+                    ModelDownloader::new().map_err(|e| onevox::Error::Other(e.to_string()))?;
+
                 // Check if already downloaded
                 if downloader.is_downloaded(metadata).await {
                     println!("✅ Model already downloaded!");
                     println!("💡 Location: {:?}", downloader.model_dir(&model_id));
                     return Ok(());
                 }
-                
+
                 println!("Model: {}", metadata.name);
-                println!("Size: {:.1} MB", metadata.size_bytes as f64 / 1024.0 / 1024.0);
+                println!(
+                    "Size: {:.1} MB",
+                    metadata.size_bytes as f64 / 1024.0 / 1024.0
+                );
                 println!("Files: {} files", metadata.files.len());
                 println!();
-                
+
                 // Download
-                let model_dir = downloader.download(metadata).await
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
-                
+                let model_dir = downloader
+                    .download(metadata)
+                    .await
+                    .map_err(|e| onevox::Error::Other(e.to_string()))?;
+
                 println!("\n✅ Model downloaded successfully!");
                 println!("📂 Location: {:?}", model_dir);
                 println!("💡 Update your config to use this model");
-                
+
                 Ok(())
             }
-            
+
             ModelAction::Remove { model_id } => {
-                use vox::models::ModelDownloader;
-                
+                use onevox::models::ModelDownloader;
+
                 println!("🗑️  Removing model: {}", model_id);
-                
-                let downloader = ModelDownloader::new()
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
-                downloader.remove(&model_id).await
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
-                
+
+                let downloader =
+                    ModelDownloader::new().map_err(|e| onevox::Error::Other(e.to_string()))?;
+                downloader
+                    .remove(&model_id)
+                    .await
+                    .map_err(|e| onevox::Error::Other(e.to_string()))?;
+
                 println!("✅ Model removed successfully");
-                
+
                 Ok(())
             }
-            
+
             ModelAction::Info { model_id } => {
-                use vox::models::{ModelDownloader, ModelRegistry};
-                
+                use onevox::models::{ModelDownloader, ModelRegistry};
+
                 let registry = ModelRegistry::new();
-                let metadata = registry.get_model(&model_id)
-                    .ok_or_else(|| vox::Error::Config(format!("Model not found: {}", model_id)))?;
-                
+                let metadata = registry.get_model(&model_id).ok_or_else(|| {
+                    onevox::Error::Config(format!("Model not found: {}", model_id))
+                })?;
+
                 println!("📦 {}\n", metadata.name);
                 println!("ID:          {}", metadata.id);
-                println!("Size:        {:.1} MB", metadata.size_bytes as f64 / 1024.0 / 1024.0);
+                println!(
+                    "Size:        {:.1} MB",
+                    metadata.size_bytes as f64 / 1024.0 / 1024.0
+                );
                 println!("Speed:       {}x real-time", metadata.speed_factor);
                 println!("Memory:      {} MB RAM required", metadata.memory_mb);
                 println!("Repository:  {}", metadata.hf_repo);
                 println!("Files:       {}", metadata.files.len());
                 println!("\nDescription:");
                 println!("  {}", metadata.description);
-                
+
                 // Check if downloaded
-                let downloader = ModelDownloader::new()
-                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                let downloader =
+                    ModelDownloader::new().map_err(|e| onevox::Error::Other(e.to_string()))?;
                 if downloader.is_downloaded(metadata).await {
-                    let size = downloader.model_size(&model_id).await
-                        .map_err(|e| vox::Error::Other(e.to_string()))?;
-                    println!("\n✅ Downloaded ({:.1} MB on disk)", size as f64 / 1024.0 / 1024.0);
+                    let size = downloader
+                        .model_size(&model_id)
+                        .await
+                        .map_err(|e| onevox::Error::Other(e.to_string()))?;
+                    println!(
+                        "\n✅ Downloaded ({:.1} MB on disk)",
+                        size as f64 / 1024.0 / 1024.0
+                    );
                     println!("📂 {:?}", downloader.model_dir(&model_id));
                 } else {
                     println!("\n❌ Not downloaded");
-                    println!("💡 Download with: vox models download {}", model_id);
+                    println!("💡 Download with: onevox models download {}", model_id);
                 }
-                
+
                 Ok(())
             }
         },
@@ -418,8 +448,8 @@ async fn main() -> Result<()> {
             println!("🎤 Testing audio capture for {} seconds...", duration);
             println!("Speak into your microphone!\n");
 
-            let config = vox::audio::CaptureConfig::default();
-            let mut engine = vox::audio::AudioEngine::new();
+            let config = onevox::audio::CaptureConfig::default();
+            let mut engine = onevox::audio::AudioEngine::new();
 
             let mut chunk_rx = engine.start_capture(config)?;
 
@@ -446,7 +476,14 @@ async fn main() -> Result<()> {
             println!("\n✅ Capture test complete!");
             println!("  Total chunks: {}", chunk_count);
             println!("  Total samples: {}", total_samples);
-            println!("  Average samples/chunk: {}", if chunk_count > 0 { total_samples / chunk_count } else { 0 });
+            println!(
+                "  Average samples/chunk: {}",
+                if chunk_count > 0 {
+                    total_samples / chunk_count
+                } else {
+                    0
+                }
+            );
 
             Ok(())
         }
@@ -459,15 +496,15 @@ async fn main() -> Result<()> {
             let config = Config::load_default()?;
 
             // Create audio engine
-            let audio_config = vox::audio::CaptureConfig::default();
-            let mut engine = vox::audio::AudioEngine::new();
+            let audio_config = onevox::audio::CaptureConfig::default();
+            let mut engine = onevox::audio::AudioEngine::new();
             let mut chunk_rx = engine.start_capture(audio_config)?;
 
             // Create VAD processor
             let energy_config = config.vad.to_energy_vad_config();
             let processor_config = config.vad.to_processor_config();
-            let detector = Box::new(vox::vad::EnergyVad::new(energy_config));
-            let mut vad_processor = vox::vad::VadProcessor::new(processor_config, detector);
+            let detector = Box::new(onevox::vad::EnergyVad::new(energy_config));
+            let mut vad_processor = onevox::vad::VadProcessor::new(processor_config, detector);
 
             println!("VAD Configuration:");
             println!("  Detector: {}", vad_processor.detector_name());
@@ -518,14 +555,17 @@ async fn main() -> Result<()> {
         }
 
         Commands::TestTranscribe { duration } => {
-            println!("🎤 Testing full transcription pipeline for {} seconds...", duration);
+            println!(
+                "🎤 Testing full transcription pipeline for {} seconds...",
+                duration
+            );
             println!("Speak into your microphone to see real-time transcription!\n");
 
             // Load config
             let config = Config::load_default()?;
 
             // Create and load model
-            use vox::models::{ModelConfig, ModelRuntime, MockModel};
+            use onevox::models::{MockModel, ModelConfig, ModelRuntime};
             let mut model = MockModel::new();
             let model_config = ModelConfig::default();
             model.load(model_config)?;
@@ -534,15 +574,15 @@ async fn main() -> Result<()> {
             println!("Model info: {:?}\n", model.info());
 
             // Create audio engine
-            let audio_config = vox::audio::CaptureConfig::default();
-            let mut engine = vox::audio::AudioEngine::new();
+            let audio_config = onevox::audio::CaptureConfig::default();
+            let mut engine = onevox::audio::AudioEngine::new();
             let mut chunk_rx = engine.start_capture(audio_config)?;
 
             // Create VAD processor
             let energy_config = config.vad.to_energy_vad_config();
             let processor_config = config.vad.to_processor_config();
-            let detector = Box::new(vox::vad::EnergyVad::new(energy_config));
-            let mut vad_processor = vox::vad::VadProcessor::new(processor_config, detector);
+            let detector = Box::new(onevox::vad::EnergyVad::new(energy_config));
+            let mut vad_processor = onevox::vad::VadProcessor::new(processor_config, detector);
 
             println!("VAD Configuration:");
             println!("  Detector: {}", vad_processor.detector_name());
@@ -566,7 +606,10 @@ async fn main() -> Result<()> {
                             // Transcribe the segment
                             let transcription = model.transcribe_segment(&segment)?;
                             println!("  📝 Transcription: \"{}\"", transcription.text);
-                            println!("  ⏱️  Processing time: {}ms", transcription.processing_time_ms);
+                            println!(
+                                "  ⏱️  Processing time: {}ms",
+                                transcription.processing_time_ms
+                            );
                             if let Some(conf) = transcription.confidence {
                                 println!("  📊 Confidence: {:.2}%", conf * 100.0);
                             }
@@ -605,18 +648,18 @@ async fn main() -> Result<()> {
             println!("Press Ctrl+C to exit.\n");
 
             // Parse hotkey config
-            use vox::platform::{HotkeyConfig, HotkeyManager};
-            
+            use onevox::platform::{HotkeyConfig, HotkeyManager};
+
             let hotkey_config = HotkeyConfig::from_string(&hotkey)?;
             println!("Parsed config: {:?}\n", hotkey_config);
 
             // Create hotkey manager
             let mut manager = HotkeyManager::new()?;
-            
+
             // Register hotkey
             let mut event_rx = manager.register(hotkey_config)?;
             println!("✅ Hotkey registered successfully");
-            
+
             // Start listener
             manager.start_listener()?;
             println!("✅ Listener started");
@@ -634,20 +677,25 @@ async fn main() -> Result<()> {
                 if let Ok(event) = event_rx.try_recv() {
                     event_count += 1;
                     match event {
-                        vox::platform::HotkeyEvent::Pressed => {
+                        onevox::platform::HotkeyEvent::Pressed => {
                             println!("🟢 PRESSED  - Hotkey detected! (event #{})", event_count);
                         }
-                        vox::platform::HotkeyEvent::Released => {
+                        onevox::platform::HotkeyEvent::Released => {
                             println!("🔴 RELEASED - Hotkey released! (event #{})", event_count);
                         }
                     }
                 }
-                
+
                 // Show a reminder every 10 seconds if no events received
-                if event_count == 0 && start.elapsed().as_secs() % 10 == 0 && start.elapsed().as_secs() > 0 {
-                    println!("💡 Still waiting... Make sure you've granted Input Monitoring permission!");
+                if event_count == 0
+                    && start.elapsed().as_secs() % 10 == 0
+                    && start.elapsed().as_secs() > 0
+                {
+                    println!(
+                        "💡 Still waiting... Make sure you've granted Input Monitoring permission!"
+                    );
                 }
-                
+
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }

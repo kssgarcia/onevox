@@ -6,7 +6,7 @@
 - Initialized Rust project with `cargo init`
 - Created comprehensive directory structure:
   ```
-  vox/
+  onevox/
   ├── docs/           # Documentation
   ├── src/            # Source code
   │   ├── audio/      # Audio processing
@@ -108,12 +108,12 @@
 
 #### **src/main.rs** (Binary Entry Point)
 - CLI interface with `clap`:
-  - `vox daemon` - Start daemon
-  - `vox status` - Check status
-  - `vox config` - Configuration management
-  - `vox tui` - Terminal UI
-  - `vox devices` - List audio devices
-  - `vox models` - Model management
+  - `onevox daemon` - Start daemon
+  - `onevox status` - Check status
+  - `onevox config` - Configuration management
+  - `onevox tui` - Terminal UI
+  - `onevox devices` - List audio devices
+  - `onevox models` - Model management
 - Async runtime setup with tokio
 - Logging initialization
 

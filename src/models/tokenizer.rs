@@ -21,7 +21,7 @@ impl SimpleTokenizer {
         // Default path to vocab.json
         let vocab_path = dirs::home_dir()
             .expect("Failed to get home directory")
-            .join("Library/Caches/vox/models/whisper-tiny.en/onnx/vocab.json");
+            .join("Library/Caches/onevox/models/whisper-tiny.en/onnx/vocab.json");
 
         Self::from_file(&vocab_path).unwrap_or_else(|e| {
             warn!("Failed to load vocab.json: {}. Using minimal fallback.", e);

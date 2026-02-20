@@ -1,4 +1,4 @@
-# Vox - Quick Command Reference
+# Onevox - Quick Command Reference
 
 ## 🚀 Most Important Commands
 
@@ -18,7 +18,7 @@ cargo check
 cargo build --release
 
 # Run production binary
-./target/release/vox
+./target/release/onevox
 ```
 
 ---
@@ -82,7 +82,7 @@ cargo test
 
 ---
 
-## 🎪 Your Vox Commands
+## 🎪 Your Onevox Commands
 
 ```bash
 # Show all commands

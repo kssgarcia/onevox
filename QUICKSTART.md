@@ -29,31 +29,31 @@ cargo clippy
 
 ```bash
 # Show version
-./target/release/vox --version
+./target/release/onevox --version
 
 # Show help
-./target/release/vox --help
+./target/release/onevox --help
 
 # Show configuration
-./target/release/vox config show
+./target/release/onevox config show
 
 # Start daemon (placeholder)
-./target/release/vox daemon
+./target/release/onevox daemon
 
 # Check status (placeholder)
-./target/release/vox status
+./target/release/onevox status
 
 # List devices (placeholder)
-./target/release/vox devices list
+./target/release/onevox devices list
 
 # List models (placeholder)
-./target/release/vox models list
+./target/release/onevox models list
 ```
 
 ## Project Structure
 
 ```
-vox/
+onevox/
 ├── docs/              # Documentation
 │   ├── PLAN.md        # 14-week development plan
 │   ├── ARCHITECTURE.md # System design
@@ -93,7 +93,7 @@ vox/
 
 ## Configuration
 
-Config file location: `~/.config/vox/config.toml`
+Config file location: `~/.config/onevox/config.toml`
 
 View current config:
 ```bash
@@ -102,7 +102,7 @@ cargo run -- config show
 
 Create config from example:
 ```bash
-cp config.example.toml ~/.config/vox/config.toml
+cp config.example.toml ~/.config/onevox/config.toml
 ```
 
 ## Development Workflow

@@ -1,4 +1,4 @@
-// Vox - Local Speech-to-Text Daemon
+// Onevox - Local Speech-to-Text Daemon
 // Main library entry point
 
 #![warn(clippy::all)]
@@ -19,10 +19,10 @@ pub mod tui;
 pub use config::Config;
 pub use daemon::Daemon;
 
-/// Result type alias for vox operations
+/// Result type alias for onevox operations
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Main error type for vox
+/// Main error type for onevox
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Audio error: {0}")]

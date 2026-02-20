@@ -57,7 +57,7 @@ pub fn prompt_accessibility_permission() {
     println!("  3. Click the lock icon and enter your password");
     println!("  4. Click the '+' button and add your Terminal app");
     println!("  5. Make sure the toggle is ON (blue)");
-    println!("\nAfter granting permission, restart Vox.");
+    println!("\nAfter granting permission, restart Onevox.");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 }
 
@@ -84,7 +84,7 @@ pub fn prompt_input_monitoring_permission() {
     println!("  1. Click the '+' button");
     println!("  2. Navigate to /Applications/Utilities/Terminal.app");
     println!("  3. Select it and click Open");
-    println!("\nAfter granting permission, restart Vox.");
+    println!("\nAfter granting permission, restart Onevox.");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 }
 

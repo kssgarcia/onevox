@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vox Daemon Runner
+# Onevox Daemon Runner
 # Automatically sets the ONNX Runtime library path
 
 # Find ONNX Runtime library
@@ -18,4 +18,4 @@ fi
 echo "✅ Using ONNX Runtime: $ORT_DYLIB_PATH"
 
 # Run the daemon with all arguments passed through
-exec "$(dirname "$0")/../target/release/vox" daemon "$@"
+exec "$(dirname "$0")/../target/release/onevox" daemon "$@"

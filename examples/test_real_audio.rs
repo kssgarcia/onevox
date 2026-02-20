@@ -3,9 +3,9 @@
 //! Loads a saved audio file and runs it through the decoder
 
 use anyhow::Result;
+use onevox::models::runtime::{ModelConfig, ModelRuntime};
+use onevox::models::whisper_onnx::WhisperOnnx;
 use std::path::PathBuf;
-use vox::models::runtime::{ModelConfig, ModelRuntime};
-use vox::models::whisper_onnx::WhisperOnnx;
 
 fn main() -> Result<()> {
     // Set up ONNX Runtime
@@ -16,7 +16,8 @@ fn main() -> Result<()> {
     println!("🎯 Testing Whisper with real captured audio\n");
 
     // Find the latest captured audio file
-    let debug_dir = PathBuf::from(std::env::var("HOME").unwrap()).join("Library/Caches/vox/debug");
+    let debug_dir =
+        PathBuf::from(std::env::var("HOME").unwrap()).join("Library/Caches/onevox/debug");
 
     let audio_files: Vec<_> = std::fs::read_dir(&debug_dir)?
         .filter_map(|e| e.ok())

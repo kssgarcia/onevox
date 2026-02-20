@@ -28,7 +28,7 @@ impl Lifecycle {
 
     /// Start the daemon
     pub async fn start(&mut self) -> Result<()> {
-        info!("🚀 Starting Vox daemon v{}", env!("CARGO_PKG_VERSION"));
+        info!("🚀 Starting Onevox daemon v{}", env!("CARGO_PKG_VERSION"));
 
         // Check if daemon is already running
         if self.is_already_running().await {
@@ -53,7 +53,7 @@ impl Lifecycle {
             state.set_ready();
         }
 
-        info!("✅ Vox daemon is ready");
+        info!("✅ Onevox daemon is ready");
 
         // Run the event loop
         self.run_event_loop(ipc_server).await?;
@@ -121,8 +121,7 @@ impl Lifecycle {
     async fn wait_for_shutdown_signal(&self) {
         #[cfg(unix)]
         {
-            let mut sigterm =
-                signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+            let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
             let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt()).unwrap();
 
             tokio::select! {
@@ -202,7 +201,7 @@ pub fn pid_file_path() -> PathBuf {
     IpcClient::default_socket_path()
         .parent()
         .unwrap()
-        .join("vox.pid")
+        .join("onevox.pid")
 }
 
 /// Write PID file

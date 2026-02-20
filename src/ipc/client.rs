@@ -36,21 +36,21 @@ impl IpcClient {
             dirs::runtime_dir()
                 .or_else(dirs::cache_dir)
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("vox")
-                .join("vox.sock")
+                .join("onevox")
+                .join("onevox.sock")
         }
 
         #[cfg(target_os = "linux")]
         {
             dirs::runtime_dir()
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("vox")
-                .join("vox.sock")
+                .join("onevox")
+                .join("onevox.sock")
         }
 
         #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         {
-            PathBuf::from("/tmp/vox/vox.sock")
+            PathBuf::from("/tmp/onevox/onevox.sock")
         }
     }
 

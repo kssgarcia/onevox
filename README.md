@@ -1,14 +1,14 @@
-# Vox - Local Speech-to-Text Daemon
+# Onevox - Local Speech-to-Text Daemon
 
 > **⚡ Ultra-fast, privacy-first speech recognition for your entire operating system**
 
-Vox is a cross-platform background daemon that provides system-wide speech-to-text capabilities. Press a global hotkey, speak, and watch your words appear in any application—all processed locally with zero network latency.
+Onevox is a cross-platform background daemon that provides system-wide speech-to-text capabilities. Press a global hotkey, speak, and watch your words appear in any application—all processed locally with zero network latency.
 
 ---
 
 ## 🎯 Vision
 
-This is not just another dictation app. Vox is:
+This is not just another dictation app. Onevox is:
 
 > **A Local Speech Inference Layer for the Operating System**
 
@@ -60,8 +60,8 @@ sudo apt-get install build-essential cmake pkg-config
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/vox.git
-cd vox
+git clone https://github.com/yourusername/onevox.git
+cd onevox
 
 # Check if it compiles (fast!)
 cargo check
@@ -75,8 +75,8 @@ cargo run -- config show
 # Build optimized binary
 cargo build --release
 
-# Binary is at: ./target/release/vox
-./target/release/vox --version
+# Binary is at: ./target/release/onevox
+./target/release/onevox --version
 ```
 
 ### For TypeScript/Node Developers
@@ -96,33 +96,33 @@ cargo fmt       # = pnpm format
 
 ```bash
 # Install from source
-cargo install --git https://github.com/yourusername/vox
+cargo install --git https://github.com/yourusername/onevox
 
 # Or via Homebrew (macOS)
-brew install vox
+brew install onevox
 
 # Or download binary
-curl -L https://github.com/yourusername/vox/releases/latest/download/vox-macos.tar.gz | tar xz
+curl -L https://github.com/yourusername/onevox/releases/latest/download/onevox-macos.tar.gz | tar xz
 ```
 
 ### Usage (Planned)
 
 ```bash
 # Start daemon
-vox daemon start
+onevox daemon start
 
 # Check status
-vox status
+onevox status
 
 # Configure
-vox config set hotkey "Cmd+Shift+Space"
-vox config set model whisper-tiny
+onevox config set hotkey "Cmd+Shift+Space"
+onevox config set model whisper-tiny
 
 # Open TUI monitor
-vox tui
+onevox tui
 
 # Stop daemon
-vox daemon stop
+onevox daemon stop
 ```
 
 ---
@@ -210,8 +210,8 @@ See [PERFORMANCE.md](docs/PERFORMANCE.md) for benchmarks and optimization guide.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/vox.git
-cd vox
+git clone https://github.com/yourusername/onevox.git
+cd onevox
 
 # Build
 cargo build --release
@@ -316,8 +316,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📞 Contact & Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/vox/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/vox/discussions)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/onevox/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/onevox/discussions)
 - **Email**: your.email@example.com
 
 ---

@@ -4,8 +4,8 @@
 // This backend wraps the whisper.cpp command-line tool, avoiding
 // the Rust binding build issues with the macOS beta SDK.
 
-use crate::models::runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
 use crate::Result;
+use crate::models::runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::NamedTempFile;
@@ -21,12 +21,12 @@ impl WhisperCppCli {
     /// Create a new WhisperCppCli backend
     ///
     /// # Arguments
-    /// * `binary_path` - Path to whisper-cli binary (default: ~/Library/Caches/vox/bin/whisper-cli)
+    /// * `binary_path` - Path to whisper-cli binary (default: ~/Library/Caches/onevox/bin/whisper-cli)
     pub fn new(binary_path: Option<PathBuf>) -> Self {
         let binary_path = binary_path.unwrap_or_else(|| {
             dirs::cache_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join("vox/bin/whisper-cli")
+                .join("onevox/bin/whisper-cli")
         });
 
         Self {
@@ -96,6 +96,42 @@ impl WhisperCppCli {
 
         Ok(text)
     }
+
+    /// Resolve model path from config.
+    /// Supports absolute/relative file paths and cache-based model lookups.
+    fn resolve_model_path(input: &str) -> PathBuf {
+        let direct = PathBuf::from(input);
+        if direct.exists() {
+            return direct;
+        }
+
+        let cache_root = dirs::cache_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("onevox")
+            .join("models");
+
+        // If input is a model id (e.g. "ggml-base.en"), try <id>/<id>.bin.
+        let by_id = cache_root.join(input).join(format!("{}.bin", input));
+        if by_id.exists() {
+            return by_id;
+        }
+
+        // If input is a file name (e.g. "ggml-base.en.bin"), try <id>/<file>.
+        if let Some(file_name) = direct.file_name().and_then(|s| s.to_str()) {
+            let model_id = file_name.strip_suffix(".bin").unwrap_or(file_name);
+            let nested = cache_root.join(model_id).join(file_name);
+            if nested.exists() {
+                return nested;
+            }
+
+            let flat = cache_root.join(file_name);
+            if flat.exists() {
+                return flat;
+            }
+        }
+
+        direct
+    }
 }
 
 impl ModelRuntime for WhisperCppCli {
@@ -111,15 +147,18 @@ impl ModelRuntime for WhisperCppCli {
         }
 
         // Check if model file exists
-        let model_path = PathBuf::from(&config.model_path);
+        let model_path = Self::resolve_model_path(&config.model_path);
         if !model_path.exists() {
             return Err(crate::Error::Model(format!(
-                "Model file not found: {}\nPlease download it with: vox model download",
+                "Model file not found: {}\nPlease download it with: onevox models download ggml-base.en\nor set [model].model_path to the full file path",
                 model_path.display()
             )));
         }
 
-        self.config = config;
+        self.config = ModelConfig {
+            model_path: model_path.to_string_lossy().to_string(),
+            ..config
+        };
         self.loaded = true;
 
         debug!("Using whisper-cli binary: {}", self.binary_path.display());

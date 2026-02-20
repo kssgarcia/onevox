@@ -185,7 +185,7 @@ impl Config {
     pub fn default_path() -> PathBuf {
         let config_dir = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("vox");
+            .join("onevox");
 
         config_dir.join("config.toml")
     }
