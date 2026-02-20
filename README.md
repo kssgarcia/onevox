@@ -79,6 +79,13 @@ cargo build --release
 ./target/release/onevox --version
 ```
 
+to add command `onevox` (mac):
+
+``` bash
+sudo ln -sf /Users/kevinsepulveda/Documents/onevox/target/release/onevox /usr/local/bin/onevox
+onevox --help
+```
+
 ### For TypeScript/Node Developers
 
 If you're coming from TypeScript/pnpm, see **[CHEATSHEET.md](CHEATSHEET.md)** for command equivalents!

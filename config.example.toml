@@ -6,7 +6,7 @@
 auto_start = true
 
 # Logging level: trace, debug, info, warn, error
-log_level = "info"
+log_level = "debug"
 
 # Log file rotation (in days)
 log_retention_days = 7
@@ -16,7 +16,7 @@ log_retention_days = 7
 # macOS: "Cmd+Shift+Space", "Ctrl+Option+D", etc.
 # Linux: "Ctrl+Shift+Space", "Alt+D", etc.
 # Windows: "Win+Shift+Space", "Ctrl+Alt+D", etc.
-trigger = "Cmd+Shift+Space"
+trigger = "Cmd+Shift+0"
 
 # Mode: "push-to-talk" (hold to record) or "toggle" (press once to start, again to stop)
 mode = "push-to-talk"
@@ -27,7 +27,7 @@ min_hold_duration_ms = 100
 [audio]
 # Audio input device (use "default" or specific device name)
 # Run `onevox devices list` to see available devices
-device = "default"
+device = "HD 4.40BT"
 
 # Sample rate (Hz) - models typically expect 16000
 sample_rate = 16000
@@ -43,15 +43,15 @@ buffer_duration_sec = 2
 
 [vad]
 # Enable Voice Activity Detection to filter silence
-enabled = true
+enabled = false
 
 # VAD backend: "silero" (accurate, ONNX-based) or "webrtc" (fast, CPU-only)
-backend = "silero"
+backend = "energy"
 
 # Detection threshold (0.0 - 1.0)
 # Lower = more sensitive (may include noise)
 # Higher = less sensitive (may cut off quiet speech)
-threshold = 0.5
+threshold = 0.001
 
 # Pre-roll: capture audio before VAD trigger (ms)
 # Ensures you don't miss the beginning of speech
@@ -60,6 +60,9 @@ pre_roll_ms = 300
 # Post-roll: continue recording after VAD silence (ms)
 # Prevents cutting off the end of speech
 post_roll_ms = 500
+
+min_silence_chunks = 3
+adaptive = true
 
 [model]
 # Model backend: "whisper_cpp", "faster_whisper", "onnx", "candle"

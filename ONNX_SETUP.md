@@ -23,6 +23,9 @@ brew install onnxruntime
 
 # Or download a larger model for better accuracy
 ./target/release/onevox models download whisper-base.en
+
+# Download whisper.cpp
+onevox models download ggml-base.en
 ```
 
 ### 3. Start the Daemon

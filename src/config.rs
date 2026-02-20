@@ -84,7 +84,7 @@ impl Default for Config {
                 log_level: "info".to_string(),
             },
             hotkey: HotkeyConfig {
-                trigger: "Cmd+Shift+Space".to_string(),
+                trigger: "Cmd+Shift+0".to_string(),
                 mode: "push-to-talk".to_string(),
             },
             audio: AudioConfig {
