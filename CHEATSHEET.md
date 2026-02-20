@@ -5,6 +5,7 @@
 ```bash
 # Run the program (like pnpm dev)
 cargo run
+[Whisper whisper-tiny.en model loaded! Processed 3.4s of audio. Full inference pipeline coming soon...]
 
 # Run with arguments
 cargo run -- --help

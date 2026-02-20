@@ -114,13 +114,28 @@ enum DeviceAction {
 
 #[derive(Subcommand)]
 enum ModelAction {
-    /// List available models
+    /// List all available models from registry
     List,
+
+    /// Show downloaded models
+    Downloaded,
 
     /// Download a model
     Download {
-        /// Model name (e.g., "tiny.en", "base.en")
-        name: String,
+        /// Model ID (e.g., "whisper-tiny.en", "whisper-base.en")
+        model_id: String,
+    },
+
+    /// Remove a downloaded model
+    Remove {
+        /// Model ID to remove
+        model_id: String,
+    },
+
+    /// Show model information
+    Info {
+        /// Model ID
+        model_id: String,
     },
 }
 
@@ -268,13 +283,133 @@ async fn main() -> Result<()> {
 
         Commands::Models { action } => match action {
             ModelAction::List => {
-                println!("🤖 Available models:");
-                println!("⚠️  Not yet implemented - this is a placeholder");
+                use vox::models::ModelRegistry;
+                
+                println!("🤖 Available Whisper Models\n");
+                
+                let registry = ModelRegistry::new();
+                let models = registry.list_models();
+                
+                for model in models {
+                    println!("📦 {}", model.name);
+                    println!("   ID: {}", model.id);
+                    println!("   Size: {:.1} MB", model.size_bytes as f64 / 1024.0 / 1024.0);
+                    println!("   Speed: {}x real-time", model.speed_factor);
+                    println!("   Memory: {} MB", model.memory_mb);
+                    println!("   {}", model.description);
+                    println!();
+                }
+                
+                println!("💡 Recommended: whisper-base.en (good balance of speed and accuracy)");
+                println!("💡 Download with: vox models download <model-id>");
+                
                 Ok(())
             }
-            ModelAction::Download { name } => {
-                println!("📥 Downloading model: {name}");
-                println!("⚠️  Not yet implemented - this is a placeholder");
+            
+            ModelAction::Downloaded => {
+                use vox::models::ModelDownloader;
+                
+                println!("📂 Downloaded Models\n");
+                
+                let downloader = ModelDownloader::new()
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                let downloaded = downloader.list_downloaded().await
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                
+                if downloaded.is_empty() {
+                    println!("No models downloaded yet.");
+                    println!("💡 Download a model with: vox models download <model-id>");
+                } else {
+                    for model_id in downloaded {
+                        let size = downloader.model_size(&model_id).await
+                            .map_err(|e| vox::Error::Other(e.to_string()))?;
+                        println!("✅ {} ({:.1} MB)", model_id, size as f64 / 1024.0 / 1024.0);
+                    }
+                }
+                
+                Ok(())
+            }
+            
+            ModelAction::Download { model_id } => {
+                use vox::models::{ModelDownloader, ModelRegistry};
+                
+                println!("📥 Downloading model: {}\n", model_id);
+                
+                let registry = ModelRegistry::new();
+                let metadata = registry.get_model(&model_id)
+                    .ok_or_else(|| vox::Error::Config(format!("Model not found: {}", model_id)))?;
+                
+                let downloader = ModelDownloader::new()
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                
+                // Check if already downloaded
+                if downloader.is_downloaded(metadata).await {
+                    println!("✅ Model already downloaded!");
+                    println!("💡 Location: {:?}", downloader.model_dir(&model_id));
+                    return Ok(());
+                }
+                
+                println!("Model: {}", metadata.name);
+                println!("Size: {:.1} MB", metadata.size_bytes as f64 / 1024.0 / 1024.0);
+                println!("Files: {} files", metadata.files.len());
+                println!();
+                
+                // Download
+                let model_dir = downloader.download(metadata).await
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                
+                println!("\n✅ Model downloaded successfully!");
+                println!("📂 Location: {:?}", model_dir);
+                println!("💡 Update your config to use this model");
+                
+                Ok(())
+            }
+            
+            ModelAction::Remove { model_id } => {
+                use vox::models::ModelDownloader;
+                
+                println!("🗑️  Removing model: {}", model_id);
+                
+                let downloader = ModelDownloader::new()
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                downloader.remove(&model_id).await
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                
+                println!("✅ Model removed successfully");
+                
+                Ok(())
+            }
+            
+            ModelAction::Info { model_id } => {
+                use vox::models::{ModelDownloader, ModelRegistry};
+                
+                let registry = ModelRegistry::new();
+                let metadata = registry.get_model(&model_id)
+                    .ok_or_else(|| vox::Error::Config(format!("Model not found: {}", model_id)))?;
+                
+                println!("📦 {}\n", metadata.name);
+                println!("ID:          {}", metadata.id);
+                println!("Size:        {:.1} MB", metadata.size_bytes as f64 / 1024.0 / 1024.0);
+                println!("Speed:       {}x real-time", metadata.speed_factor);
+                println!("Memory:      {} MB RAM required", metadata.memory_mb);
+                println!("Repository:  {}", metadata.hf_repo);
+                println!("Files:       {}", metadata.files.len());
+                println!("\nDescription:");
+                println!("  {}", metadata.description);
+                
+                // Check if downloaded
+                let downloader = ModelDownloader::new()
+                    .map_err(|e| vox::Error::Other(e.to_string()))?;
+                if downloader.is_downloaded(metadata).await {
+                    let size = downloader.model_size(&model_id).await
+                        .map_err(|e| vox::Error::Other(e.to_string()))?;
+                    println!("\n✅ Downloaded ({:.1} MB on disk)", size as f64 / 1024.0 / 1024.0);
+                    println!("📂 {:?}", downloader.model_dir(&model_id));
+                } else {
+                    println!("\n❌ Not downloaded");
+                    println!("💡 Download with: vox models download {}", model_id);
+                }
+                
                 Ok(())
             }
         },

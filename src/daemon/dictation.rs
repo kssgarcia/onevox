@@ -5,7 +5,7 @@
 
 use crate::audio::{AudioEngine, CaptureConfig};
 use crate::config::Config;
-use crate::models::{MockModel, ModelConfig, ModelRuntime};
+use crate::models::{ModelConfig, ModelRuntime, WhisperOnnx};
 use crate::platform::{HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector};
 use crate::vad::{EnergyVad, VadDetector, VadProcessor};
 use anyhow::{Context, Result};
@@ -56,8 +56,10 @@ impl DictationEngine {
         // Create audio engine
         let audio_engine = AudioEngine::new();
 
-        // Create model (using mock for now)
-        let mut model: Box<dyn ModelRuntime> = Box::new(MockModel::new());
+        // Create Whisper ONNX model
+        let mut model: Box<dyn ModelRuntime> = Box::new(
+            WhisperOnnx::new().context("Failed to create Whisper ONNX model")?
+        );
         let model_config = ModelConfig {
             model_path: config.model.model_path.clone(),
             language: config.model.language.clone(),
@@ -171,64 +173,122 @@ impl DictationEngine {
 
         let mut audio_rx = self.audio_engine.start_capture(capture_config)?;
 
-        // Create VAD processor
-        let vad_config = self.config.vad.to_energy_vad_config();
-        let processor_config = self.config.vad.to_processor_config();
-        let detector: Box<dyn VadDetector> = Box::new(EnergyVad::new(vad_config));
-        let mut vad_processor = VadProcessor::new(processor_config, detector);
-
         // Clone needed values for the processing task
         let is_dictating = Arc::clone(&self.is_dictating);
         let injector = self.text_injector.clone();
         let model = self.model_clone();
+        let vad_enabled = self.config.vad.enabled;
 
-        // Spawn audio processing task
-        tokio::spawn(async move {
-            info!("📡 Audio processing task started");
+        if vad_enabled {
+            // VAD-based processing: detect speech segments and transcribe them
+            info!("🔊 VAD enabled - using speech detection");
 
-            while is_dictating.load(Ordering::SeqCst) {
-                // Receive audio chunk
-                match audio_rx.recv().await {
-                    Some(chunk) => {
-                        // Process through VAD
-                        match vad_processor.process(chunk) {
-                            Ok(Some(segment)) => {
-                                info!("🎯 Speech segment detected ({} chunks)", segment.len());
+            // Create VAD processor
+            let vad_config = self.config.vad.to_energy_vad_config();
+            let processor_config = self.config.vad.to_processor_config();
+            let detector: Box<dyn VadDetector> = Box::new(EnergyVad::new(vad_config));
+            let mut vad_processor = VadProcessor::new(processor_config, detector);
 
-                                // Transcribe
-                                match model.transcribe_segment(&segment) {
-                                    Ok(transcript) => {
-                                        info!("📝 Transcription: {}", transcript.text);
+            // Spawn audio processing task
+            tokio::spawn(async move {
+                info!("📡 Audio processing task started (VAD mode)");
 
-                                        // Inject text into active application
-                                        if let Err(e) = injector.inject(&transcript.text) {
-                                            error!("Failed to inject text: {}", e);
-                                        } else {
-                                            info!("✅ Text injected successfully");
+                while is_dictating.load(Ordering::SeqCst) {
+                    // Receive audio chunk
+                    match audio_rx.recv().await {
+                        Some(chunk) => {
+                            // Process through VAD
+                            match vad_processor.process(chunk) {
+                                Ok(Some(segment)) => {
+                                    info!("🎯 Speech segment detected ({} chunks)", segment.len());
+
+                                    // Transcribe
+                                    match model.transcribe_segment(&segment) {
+                                        Ok(transcript) => {
+                                            info!("📝 Transcription: {}", transcript.text);
+
+                                            // Inject text into active application
+                                            if let Err(e) = injector.inject(&transcript.text) {
+                                                error!("Failed to inject text: {}", e);
+                                            } else {
+                                                info!("✅ Text injected successfully");
+                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("Transcription failed: {}", e);
                                         }
                                     }
-                                    Err(e) => {
-                                        error!("Transcription failed: {}", e);
-                                    }
+                                }
+                                Ok(None) => {
+                                    // No complete segment yet
+                                }
+                                Err(e) => {
+                                    error!("VAD processing failed: {}", e);
                                 }
                             }
-                            Ok(None) => {
-                                // No complete segment yet
-                            }
-                            Err(e) => {
-                                error!("VAD processing failed: {}", e);
-                            }
+                        }
+                        None => {
+                            debug!("Audio channel closed");
+                            break;
                         }
                     }
-                    None => {
-                        debug!("Audio channel closed");
-                        break;
+                }
+
+                info!("📡 Audio processing task stopped");
+            });
+        } else {
+            // Non-VAD mode: collect all audio and transcribe when hotkey is released
+            info!("🔇 VAD disabled - transcribing all captured audio");
+
+            // Spawn audio collection task
+            tokio::spawn(async move {
+                info!("📡 Audio collection task started (no VAD)");
+                let mut collected_chunks = Vec::new();
+
+                while is_dictating.load(Ordering::SeqCst) {
+                    // Receive audio chunk
+                    match audio_rx.recv().await {
+                        Some(chunk) => {
+                            debug!("Collected audio chunk: {} samples", chunk.samples.len());
+                            collected_chunks.push(chunk);
+                        }
+                        None => {
+                            debug!("Audio channel closed");
+                            break;
+                        }
                     }
                 }
-            }
 
-            info!("📡 Audio processing task stopped");
-        });
+                // Hotkey released - transcribe all collected audio
+                if !collected_chunks.is_empty() {
+                    info!("🎤 Hotkey released - transcribing {} chunks", collected_chunks.len());
+
+                    // Create a speech segment from all collected chunks
+                    let segment = crate::vad::SpeechSegment::new(collected_chunks);
+                    
+                    // Transcribe
+                    match model.transcribe_segment(&segment) {
+                        Ok(transcript) => {
+                            info!("📝 Transcription: {}", transcript.text);
+
+                            // Inject text into active application
+                            if let Err(e) = injector.inject(&transcript.text) {
+                                error!("Failed to inject text: {}", e);
+                            } else {
+                                info!("✅ Text injected successfully");
+                            }
+                        }
+                        Err(e) => {
+                            error!("Transcription failed: {}", e);
+                        }
+                    }
+                } else {
+                    info!("No audio collected during dictation session");
+                }
+
+                info!("📡 Audio collection task stopped");
+            });
+        }
 
         Ok(())
     }
@@ -252,10 +312,17 @@ impl DictationEngine {
     /// Clone the model (workaround for non-Clone trait)
     /// TODO: Improve this with proper model management
     fn model_clone(&self) -> Box<dyn ModelRuntime> {
-        // For now, create a new mock model
+        // For now, create a new WhisperOnnx model
         // In production, we'd use Arc<Mutex<>> or similar
-        let mut model: Box<dyn ModelRuntime> = Box::new(MockModel::new());
-        let config = ModelConfig::default();
+        let mut model: Box<dyn ModelRuntime> = Box::new(
+            WhisperOnnx::new().expect("Failed to create Whisper ONNX model")
+        );
+        let config = ModelConfig {
+            model_path: self.config.model.model_path.clone(),
+            language: self.config.model.language.clone(),
+            use_gpu: self.config.model.device == "gpu",
+            ..Default::default()
+        };
         let _ = model.load(config);
         model
     }

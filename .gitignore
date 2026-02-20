@@ -27,7 +27,7 @@ perf.data.old
 logs/
 
 # Models (large binary files)
-models/
+./models/
 *.bin
 *.onnx
 *.ggml
