@@ -32,6 +32,11 @@ rubato = "0.15"
 ringbuf = "0.4"
 dasp = "0.11"
 
+# Speech-to-text models
+# whisper-rs = "0.15"  # TODO: Re-enable once build issues resolved
+# Note: Currently using mock model for testing. whisper-rs has build issues
+# with macOS 26.2 SDK and C++ compiler compatibility.
+
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"

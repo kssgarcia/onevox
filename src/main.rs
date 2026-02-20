@@ -67,6 +67,13 @@ enum Commands {
         #[arg(short, long, default_value = "10")]
         duration: u64,
     },
+
+    /// Test full transcription pipeline (dev tool)
+    TestTranscribe {
+        /// Duration in seconds
+        #[arg(short, long, default_value = "10")]
+        duration: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -344,6 +351,87 @@ async fn main() -> Result<()> {
 
             println!("\n✅ VAD test complete!");
             println!("  Total speech segments: {}", speech_segments);
+
+            Ok(())
+        }
+
+        Commands::TestTranscribe { duration } => {
+            println!("🎤 Testing full transcription pipeline for {} seconds...", duration);
+            println!("Speak into your microphone to see real-time transcription!\n");
+
+            // Load config
+            let config = Config::load_default()?;
+
+            // Create and load model
+            use vox::models::{ModelConfig, ModelRuntime, MockModel};
+            let mut model = MockModel::new();
+            let model_config = ModelConfig::default();
+            model.load(model_config)?;
+
+            println!("Model: {}", model.name());
+            println!("Model info: {:?}\n", model.info());
+
+            // Create audio engine
+            let audio_config = vox::audio::CaptureConfig::default();
+            let mut engine = vox::audio::AudioEngine::new();
+            let mut chunk_rx = engine.start_capture(audio_config)?;
+
+            // Create VAD processor
+            let energy_config = config.vad.to_energy_vad_config();
+            let processor_config = config.vad.to_processor_config();
+            let detector = Box::new(vox::vad::EnergyVad::new(energy_config));
+            let mut vad_processor = vox::vad::VadProcessor::new(processor_config, detector);
+
+            println!("VAD Configuration:");
+            println!("  Detector: {}", vad_processor.detector_name());
+            println!("  Threshold: {}", config.vad.threshold);
+            println!("  Pre-roll: {}ms", config.vad.pre_roll_ms);
+            println!("  Post-roll: {}ms\n", config.vad.post_roll_ms);
+
+            let start = std::time::Instant::now();
+            let mut transcription_count = 0;
+            let mut current_state = "🔇 Silence";
+
+            while start.elapsed().as_secs() < duration {
+                if let Ok(chunk) = chunk_rx.try_recv() {
+                    match vad_processor.process(chunk)? {
+                        Some(segment) => {
+                            transcription_count += 1;
+                            println!("\n🎙️  Speech segment #{}:", transcription_count);
+                            println!("  Duration: {}ms", segment.duration_ms);
+                            println!("  Chunks: {}", segment.len());
+
+                            // Transcribe the segment
+                            let transcription = model.transcribe_segment(&segment)?;
+                            println!("  📝 Transcription: \"{}\"", transcription.text);
+                            println!("  ⏱️  Processing time: {}ms", transcription.processing_time_ms);
+                            if let Some(conf) = transcription.confidence {
+                                println!("  📊 Confidence: {:.2}%", conf * 100.0);
+                            }
+
+                            current_state = "🔇 Silence";
+                        }
+                        None => {
+                            let new_state = if vad_processor.is_in_speech() {
+                                "🔴 Speech"
+                            } else {
+                                "🔇 Silence"
+                            };
+                            if new_state != current_state {
+                                println!("{}", new_state);
+                                current_state = new_state;
+                            }
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+
+            engine.stop_capture()?;
+            model.unload();
+
+            println!("\n✅ Transcription test complete!");
+            println!("  Total transcriptions: {}", transcription_count);
 
             Ok(())
         }
