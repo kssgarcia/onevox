@@ -43,12 +43,31 @@ All core infrastructure is now in place. The daemon can:
 
 ---
 
-## Phase 2: Audio Pipeline ⏸️ NOT STARTED
+## Phase 2: Audio Pipeline ✅ COMPLETED
 
-- [ ] Microphone capture
-- [ ] Ring buffer
-- [ ] Audio streaming
-- [ ] Device enumeration
+### ✅ Completed
+- [x] Audio dependencies (cpal, hound, rubato, ringbuf, dasp)
+- [x] **Device Enumeration** (list and select input devices)
+- [x] **Ring Buffer** (lock-free ring buffer for zero-copy streaming)
+- [x] **Microphone Capture** (real-time audio input with cpal)
+- [x] **Audio Streaming** (chunked audio with configurable windows)
+- [x] **Format Conversion** (multi-format support: F32, I16, U16)
+- [x] **AudioEngine API** (high-level interface for audio system)
+- [x] **CLI Integration** (`devices list`, `test-audio` commands)
+- [x] **End-to-end testing** (verified audio capture at 48kHz)
+
+### 🎉 Phase 2 Complete!
+The audio pipeline is fully functional:
+- Captures audio from any input device
+- Real-time streaming with configurable chunk size (default 200ms)
+- Zero-copy ring buffer for efficient data transfer
+- Handles multiple sample formats (F32, I16, U16)
+- Tested and working with MacBook microphone
+
+### 📋 Todo (enhancements)
+- [ ] Resampling (convert 48kHz → 16kHz for model input)
+- [ ] Multi-channel to mono conversion
+- [ ] Audio level monitoring/visualization
 
 ---
 
@@ -103,10 +122,10 @@ All core infrastructure is now in place. The daemon can:
 
 ## Current Status
 
-**Phase**: 1 of 8 ✅ COMPLETED  
-**Overall Progress**: 50% (Phase 1 complete)  
-**Next Phase**: Phase 2 - Audio Pipeline
-**Next Task**: Implement microphone capture with cpal
+**Phase**: 2 of 8 ✅ COMPLETED  
+**Overall Progress**: 65% (Phases 1-2 complete)  
+**Next Phase**: Phase 3 - VAD Integration  
+**Next Task**: Integrate Silero VAD for voice activity detection
 
 ---
 
@@ -116,29 +135,28 @@ All core infrastructure is now in place. The daemon can:
 Rust: 1.93.1 (01f6ddf75 2026-02-11)
 Cargo: 1.93.1 (083ac5135 2025-12-15)
 Edition: 2024
-Debug Binary: ~3MB
-Release Binary: 1.4MB (optimized)
+Debug Binary: ~4MB
+Release Binary: 1.5MB (optimized with audio libs)
 Compilation: ✅ Clean (0 warnings, clippy passed)
-Tests: ✅ All Phase 1 tests passing
+Tests: ✅ All Phase 1-2 tests passing
 ```
 
 ---
 
-## Phase 1 Implementation Summary
+## Phase 2 Implementation Summary
 
 ### New Modules Added
-1. **`ipc/protocol.rs`** - Binary IPC protocol with bincode serialization
-2. **`ipc/server.rs`** - Unix socket server with async request handling
-3. **`ipc/client.rs`** - Client library for CLI-daemon communication
-4. **`daemon/state.rs`** - Centralized state management with atomic shutdown signal
-5. **`daemon/lifecycle.rs`** - Daemon lifecycle with signal handling and graceful shutdown
+1. **`audio/devices.rs`** - Device enumeration and management (117 lines)
+2. **`audio/buffer.rs`** - Ring buffer and audio chunks (144 lines)
+3. **`audio/capture.rs`** - Real-time microphone capture (232 lines)
+4. **`audio.rs`** - AudioEngine public API (updated)
 
 ### Key Features Implemented
-- ✅ Unix domain socket IPC (macOS/Linux compatible)
-- ✅ Binary protocol with bincode (efficient serialization)
-- ✅ Graceful shutdown (SIGTERM, SIGINT, IPC command)
-- ✅ Daemon status reporting (PID, uptime, state)
-- ✅ Configuration management (TOML-based)
-- ✅ CLI commands: `daemon`, `stop`, `status`, `config`
-- ✅ Socket cleanup on exit
-- ✅ Error handling with proper user messages
+- ✅ Cross-platform audio capture with cpal
+- ✅ Lock-free ring buffer (ringbuf 0.4)
+- ✅ Device enumeration and selection
+- ✅ Configurable chunk duration (default 200ms)
+- ✅ Multi-format sample support (F32, I16, U16)
+- ✅ Async chunk streaming with tokio channels
+- ✅ Graceful start/stop with proper cleanup
+- ✅ CLI test command for audio verification

@@ -53,6 +53,13 @@ enum Commands {
         #[command(subcommand)]
         action: ModelAction,
     },
+
+    /// Test audio capture (dev tool)
+    TestAudio {
+        /// Duration in seconds
+        #[arg(short, long, default_value = "3")]
+        duration: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -197,9 +204,24 @@ async fn main() -> Result<()> {
 
         Commands::Devices { action } => match action {
             DeviceAction::List => {
-                println!("🎤 Available audio devices:");
-                println!("⚠️  Not yet implemented - this is a placeholder");
-                Ok(())
+                println!("🎤 Available audio input devices:\n");
+                let audio_engine = vox::audio::AudioEngine::new();
+                match audio_engine.list_devices() {
+                    Ok(devices) => {
+                        if devices.is_empty() {
+                            println!("  No audio input devices found");
+                        } else {
+                            for (i, device) in devices.iter().enumerate() {
+                                println!("  {}. {}", i + 1, device);
+                            }
+                        }
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to list devices: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             }
         },
 
@@ -215,5 +237,42 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
+
+        Commands::TestAudio { duration } => {
+            println!("🎤 Testing audio capture for {} seconds...", duration);
+            println!("Speak into your microphone!\n");
+
+            let config = vox::audio::CaptureConfig::default();
+            let mut engine = vox::audio::AudioEngine::new();
+
+            let mut chunk_rx = engine.start_capture(config)?;
+
+            let start = std::time::Instant::now();
+            let mut chunk_count = 0;
+            let mut total_samples = 0;
+
+            while start.elapsed().as_secs() < duration {
+                if let Ok(chunk) = chunk_rx.try_recv() {
+                    chunk_count += 1;
+                    total_samples += chunk.len();
+                    println!(
+                        "  Chunk {}: {} samples, {:.1}ms",
+                        chunk_count,
+                        chunk.len(),
+                        chunk.duration_ms()
+                    );
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+
+            engine.stop_capture()?;
+
+            println!("\n✅ Capture test complete!");
+            println!("  Total chunks: {}", chunk_count);
+            println!("  Total samples: {}", total_samples);
+            println!("  Average samples/chunk: {}", if chunk_count > 0 { total_samples / chunk_count } else { 0 });
+
+            Ok(())
+        }
     }
 }
