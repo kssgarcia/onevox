@@ -3,6 +3,7 @@
 //! Provides real-time microphone capture, buffering, and streaming audio processing.
 
 /// Audio module placeholder
+#[derive(Default)]
 pub struct AudioEngine;
 
 impl AudioEngine {

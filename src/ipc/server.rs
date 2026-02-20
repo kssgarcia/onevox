@@ -1,0 +1,216 @@
+//! IPC Server Implementation
+//!
+//! Unix socket server for handling daemon commands.
+
+use super::protocol::{Command, Message, Payload, Response};
+use crate::daemon::state::DaemonState as DaemonStateManager;
+use anyhow::Result;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
+
+/// IPC server
+pub struct IpcServer {
+    socket_path: PathBuf,
+    listener: Option<UnixListener>,
+    state: Arc<RwLock<DaemonStateManager>>,
+}
+
+impl IpcServer {
+    /// Create a new IPC server
+    pub fn new(socket_path: PathBuf, state: Arc<RwLock<DaemonStateManager>>) -> Self {
+        Self {
+            socket_path,
+            listener: None,
+            state,
+        }
+    }
+
+    /// Start the IPC server
+    pub async fn start(&mut self) -> Result<()> {
+        // Remove existing socket file if it exists
+        if self.socket_path.exists() {
+            std::fs::remove_file(&self.socket_path)?;
+        }
+
+        // Create parent directory if needed
+        if let Some(parent) = self.socket_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // Bind to socket
+        let listener = UnixListener::bind(&self.socket_path)?;
+        info!("IPC server listening on {:?}", self.socket_path);
+
+        // Set socket permissions (owner only)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            std::fs::set_permissions(&self.socket_path, perms)?;
+        }
+
+        self.listener = Some(listener);
+        Ok(())
+    }
+
+    /// Run the server loop
+    pub async fn run(&mut self) -> Result<()> {
+        let listener = self
+            .listener
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Server not started"))?;
+
+        info!("IPC server accepting connections");
+
+        loop {
+            match listener.accept().await {
+                Ok((stream, _addr)) => {
+                    let state = Arc::clone(&self.state);
+                    tokio::spawn(async move {
+                        if let Err(e) = Self::handle_client(stream, state).await {
+                            error!("Error handling client: {}", e);
+                        }
+                    });
+                }
+                Err(e) => {
+                    error!("Error accepting connection: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Handle a client connection
+    async fn handle_client(
+        mut stream: UnixStream,
+        state: Arc<RwLock<DaemonStateManager>>,
+    ) -> Result<()> {
+        debug!("New IPC client connected");
+
+        // Read message length (4 bytes)
+        let mut len_bytes = [0u8; 4];
+        stream.read_exact(&mut len_bytes).await?;
+        let message_len = u32::from_le_bytes(len_bytes) as usize;
+
+        // Sanity check message size (max 1MB)
+        if message_len > 1_000_000 {
+            warn!("Rejecting oversized message: {} bytes", message_len);
+            return Err(anyhow::anyhow!("Message too large"));
+        }
+
+        // Read message data
+        let mut message_buf = vec![0u8; message_len];
+        stream.read_exact(&mut message_buf).await?;
+
+        // Deserialize message
+        let message: Message = bincode::deserialize(&message_buf)?;
+        debug!("Received message: {:?}", message);
+
+        // Process command
+        let response = match message.payload {
+            Payload::Request(command) => Self::handle_command(command, &state).await,
+            _ => Response::Error("Invalid message type".to_string()),
+        };
+
+        // Send response
+        let response_msg = Message::response(message.id, response);
+        let response_bytes = bincode::serialize(&response_msg)?;
+
+        // Write response length + data
+        let len = response_bytes.len() as u32;
+        stream.write_all(&len.to_le_bytes()).await?;
+        stream.write_all(&response_bytes).await?;
+        stream.flush().await?;
+
+        debug!("Response sent");
+        Ok(())
+    }
+
+    /// Handle a command and generate response
+    async fn handle_command(
+        command: Command,
+        state: &Arc<RwLock<DaemonStateManager>>,
+    ) -> Response {
+        match command {
+            Command::Ping => Response::Pong,
+
+            Command::GetStatus => {
+                let state = state.read().await;
+                Response::Status(state.status())
+            }
+
+            Command::Shutdown => {
+                info!("Shutdown command received");
+                let mut state = state.write().await;
+                state.shutdown();
+                Response::Success
+            }
+
+            Command::ReloadConfig => {
+                info!("Reload config command received");
+                // TODO: Implement config reloading
+                Response::Ok("Config reloaded (not yet implemented)".to_string())
+            }
+
+            Command::GetConfig => {
+                let state = state.read().await;
+                match toml::to_string_pretty(&state.config()) {
+                    Ok(config_str) => Response::Config(config_str),
+                    Err(e) => Response::Error(format!("Failed to serialize config: {}", e)),
+                }
+            }
+
+            Command::StartDictation => {
+                info!("Start dictation command received");
+                // TODO: Implement dictation start
+                Response::Ok("Dictation started (not yet implemented)".to_string())
+            }
+
+            Command::StopDictation => {
+                info!("Stop dictation command received");
+                // TODO: Implement dictation stop
+                Response::Ok("Dictation stopped (not yet implemented)".to_string())
+            }
+
+            Command::ListDevices => {
+                // TODO: Implement device listing
+                Response::List(vec!["default".to_string()])
+            }
+
+            Command::ListModels => {
+                // TODO: Implement model listing
+                Response::List(vec![])
+            }
+
+            Command::LoadModel { backend, path } => {
+                info!("Load model command: {} at {}", backend, path);
+                // TODO: Implement model loading
+                Response::Ok(format!("Model loaded (not yet implemented): {}", path))
+            }
+
+            Command::UnloadModel => {
+                info!("Unload model command received");
+                // TODO: Implement model unloading
+                Response::Ok("Model unloaded (not yet implemented)".to_string())
+            }
+        }
+    }
+
+    /// Stop the server and clean up
+    pub fn stop(&mut self) -> Result<()> {
+        if self.socket_path.exists() {
+            std::fs::remove_file(&self.socket_path)?;
+            info!("IPC socket removed");
+        }
+        Ok(())
+    }
+}
+
+impl Drop for IpcServer {
+    fn drop(&mut self) {
+        let _ = self.stop();
+    }
+}

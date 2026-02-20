@@ -3,7 +3,6 @@
 
 use clap::{Parser, Subcommand};
 use vox::{Config, Result};
-use toml;
 
 #[derive(Parser)]
 #[command(name = "vox")]
@@ -21,7 +20,14 @@ enum Commands {
         /// Run in development mode
         #[arg(long)]
         dev: bool,
+        
+        /// Run in foreground (don't daemonize)
+        #[arg(long)]
+        foreground: bool,
     },
+
+    /// Stop the daemon
+    Stop,
 
     /// Check daemon status
     Status,
@@ -100,18 +106,64 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Daemon { dev: _ } => {
+        Commands::Daemon { dev, foreground } => {
             tracing::info!("Starting vox daemon...");
-            // TODO: Implement daemon startup
-            println!("🎙️  Vox daemon starting...");
-            println!("⚠️  Not yet implemented - this is a placeholder");
+            
+            // Load configuration
+            let config = Config::load_default()?;
+            
+            if dev {
+                tracing::info!("Running in development mode");
+            }
+            
+            if !foreground {
+                println!("🎙️  Starting Vox daemon in background...");
+                println!("    Use 'vox status' to check status");
+                println!("    Use 'vox stop' to stop the daemon");
+            }
+            
+            // Create and start daemon
+            let mut daemon = vox::Daemon::new(config);
+            daemon.start().await?;
+            
             Ok(())
         }
 
+        Commands::Stop => {
+            println!("🛑 Stopping Vox daemon...");
+            match vox::Daemon::stop().await {
+                Ok(_) => {
+                    println!("✅ Daemon stopped successfully");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to stop daemon: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+
         Commands::Status => {
-            println!("📊 Vox daemon status:");
-            println!("⚠️  Not yet implemented - this is a placeholder");
-            Ok(())
+            match vox::Daemon::status().await {
+                Ok(status) => {
+                    println!("📊 Vox Daemon Status\n");
+                    println!("  Version:     {}", status.version);
+                    println!("  PID:         {}", status.pid);
+                    println!("  State:       {}", status.state);
+                    println!("  Uptime:      {}s", status.uptime_secs);
+                    println!("  Model:       {}", 
+                        status.model_name.unwrap_or_else(|| "None".to_string()));
+                    println!("  Dictating:   {}", if status.is_dictating { "Yes" } else { "No" });
+                    println!("  Memory:      {} MB", status.memory_usage_bytes / 1_000_000);
+                    println!("  CPU:         {:.1}%", status.cpu_usage_percent);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to get daemon status: {}", e);
+                    eprintln!("💡 Is the daemon running? Try: vox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
         }
 
         Commands::Config { action } => match action {
