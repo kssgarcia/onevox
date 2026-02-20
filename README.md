@@ -20,16 +20,26 @@ It's designed for developers, power users, and anyone who values:
 
 ---
 
-## ✨ Features (Planned)
+## ✨ Features
 
-- ✅ **Global Hotkey**: System-wide push-to-talk in any application
-- ✅ **Background Daemon**: Runs silently, always ready
-- ✅ **Real-time Transcription**: Low-latency streaming inference
-- ✅ **Voice Activity Detection**: Intelligent silence trimming
-- ✅ **Multiple Model Support**: Whisper, Faster-Whisper, ONNX, GGUF
-- ✅ **GPU Acceleration**: Metal (macOS), CUDA (Linux/Windows)
-- ✅ **Terminal UI**: Monitor and configure via TUI
-- ✅ **Cross-Platform**: macOS, Linux, Windows (future)
+- ✅ **Global Hotkey**: System-wide push-to-talk in any application (macOS)
+- ✅ **Background Daemon**: Runs silently with full lifecycle management
+- ✅ **Real Whisper Transcription**: Working with ggml-base.en and whisper-tiny.en
+- ✅ **Voice Activity Detection**: Energy-based VAD with adaptive threshold
+- ✅ **Model Management**: Download and manage multiple Whisper models
+- ✅ **Text Injection**: Automatic text insertion via accessibility API
+- ✅ **Terminal UI**: Professional TUI with dark/light themes
+- ✅ **Configuration System**: Full TOML-based config with hot-reload
+- 🚧 **Cross-Platform**: macOS complete, Linux/Windows in progress
+
+### 🎉 Currently Working
+
+The app is **fully functional** on macOS! You can:
+- Start the daemon and have it listen for hotkeys
+- Speak and get real-time transcription from Whisper models
+- Inject transcribed text into any application
+- Configure everything via the beautiful terminal UI
+- Manage models (download, list, remove)
 
 ---
 
@@ -112,39 +122,69 @@ brew install onevox
 curl -L https://github.com/yourusername/onevox/releases/latest/download/onevox-macos.tar.gz | tar xz
 ```
 
-### Usage (Planned)
+### Usage
 
 ```bash
-# Start daemon
-onevox daemon start
+# Start daemon in foreground (for testing)
+onevox daemon --foreground
+
+# Start daemon in background
+onevox daemon
 
 # Check status
 onevox status
 
 # Configure
-onevox config set hotkey "Cmd+Shift+Space"
-onevox config set model whisper-tiny
+onevox config show
+onevox config init  # Create default config file
+
+# Download and manage models
+onevox models list       # See all available models
+onevox models download ggml-base.en  # Download a model
+onevox models downloaded # See what you have
+
+# Test the pipeline
+onevox test-audio --duration 5        # Test mic capture
+onevox test-vad --duration 10         # Test voice detection
+onevox test-transcribe --duration 10  # Test full transcription
 
 # Open TUI monitor
 onevox tui
 
 # Stop daemon
-onevox daemon stop
+onevox stop
+```
+
+### Quick Test (Real Transcription)
+
+```bash
+# 1. Make sure you have a model
+cargo run -- models downloaded
+
+# 2. If no models, download one (141 MB)
+cargo run -- models download ggml-base.en
+
+# 3. Test real transcription (speak into your mic!)
+cargo run -- test-transcribe --duration 10
+
+# 4. Open the TUI to configure settings
+cargo run -- tui
 ```
 
 ---
 
 ## 🖥️ Terminal User Interface (TUI)
 
-ONEVOX includes a beautiful, interactive terminal interface built with **OpenTUI** and **TypeScript/Bun**.
+Onevox includes a **production-ready** terminal interface built with **OpenTUI** and **TypeScript/Bun**.
 
 ### Features
 
-- 🎨 **Light-themed, minimalist design** - Clean, borderless interface
-- ⚙️ **Interactive configuration** - All daemon settings in one place
-- 📜 **History viewer** - Browse, copy, export transcriptions
+- 🎨 **Dark/Light themes** - Pure monochrome Vercel-inspired design (toggle with `t`)
+- ⚙️ **Interactive configuration** - All daemon settings editable in real-time
+- 📜 **History viewer** - Browse past transcriptions with timestamps
 - 🎤 **Device selection** - Visual audio device picker
-- ⌨️ **Full keyboard navigation** - Efficient workflow
+- ⌨️ **Full keyboard + mouse support** - Click or use keyboard shortcuts
+- 💾 **Instant persistence** - Config changes save immediately to TOML
 
 ### Quick Start
 
@@ -155,11 +195,11 @@ curl -fsSL https://bun.sh/install | bash
 
 **Launch TUI:**
 ```bash
-# Method 1: Via Rust CLI (recommended)
+# Method 1: Via Rust CLI (recommended - auto-installs dependencies)
 onevox tui
 
 # Method 2: Direct launch
-cd tui && bun start
+cd tui && bun install && bun start
 
 # Method 3: Helper script
 ./scripts/run-tui.sh
@@ -169,7 +209,8 @@ cd tui && bun start
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Switch tabs (History ↔ Config) |
+| `Tab` | Switch tabs (Config ↔ History ↔ Help) |
+| `t` | Toggle dark/light theme |
 | `Ctrl+S` | Save configuration |
 | `?` | Show help overlay |
 | `q` / `Ctrl+C` | Quit |
@@ -177,14 +218,14 @@ cd tui && bun start
 **Config Panel:**
 - `Tab` / `Shift+Tab` - Navigate fields
 - `Space` - Toggle switches
-- `←` / `→` - Cycle values
-- `Esc` - Return to tabs
+- `←` / `→` - Adjust steppers
+- Click any control with mouse!
 
 **History Panel:**
-- `j` / `k` - Navigate entries
-- `c` - Copy
-- `d` - Delete
-- `Enter` - Expand
+- `↑` / `↓` - Navigate entries
+- `c` - Copy transcription
+- `d` - Delete entry
+- `Enter` - Expand details
 
 ### Documentation
 
@@ -225,37 +266,38 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design.
 
 ## 📋 Project Status
 
-### Current Phase: **Planning & Documentation** ✍️
+### Current Phase: **Phase 6/8 Complete - Fully Functional!** 🎉
 
-- [x] Project initialization
-- [x] Architecture design
-- [x] Technology stack selection
-- [ ] Core infrastructure (Phase 1)
-- [ ] Audio pipeline (Phase 2)
-- [ ] VAD integration (Phase 3)
-- [ ] Model runtime (Phase 4)
-- [ ] Platform integration (Phase 5)
-- [ ] TUI interface (Phase 6)
-- [ ] Performance optimization (Phase 7)
-- [ ] Packaging & distribution (Phase 8)
+**What's Working:**
+- ✅ **Phase 1**: Core infrastructure (daemon, IPC, config)
+- ✅ **Phase 2**: Audio pipeline (capture, streaming, device selection)
+- ✅ **Phase 3**: Voice Activity Detection (energy-based VAD)
+- ✅ **Phase 4**: Model runtime (Whisper.cpp CLI, real transcription)
+- ✅ **Phase 5**: Platform integration (global hotkeys, text injection - macOS)
+- ✅ **Phase 6**: Terminal UI (production-ready TUI with themes)
+- 🚧 **Phase 7**: Performance optimization (next up)
+- 🚧 **Phase 8**: Packaging & distribution (planned)
 
-See [PLAN.md](docs/PLAN.md) for the complete development roadmap.
+**You can use Onevox for real dictation on macOS right now!**
+
+See [PROGRESS.md](PROGRESS.md) for detailed implementation status.
 
 ---
 
 ## 🛠️ Technology Stack
 
 ### Core (Rust)
-- **Language**: Rust (2021 edition)
+- **Language**: Rust 1.93+ (Edition 2024)
 - **Audio**: `cpal` for cross-platform capture
-- **VAD**: Silero VAD (ONNX) or WebRTC VAD
-- **Models**: whisper.cpp, Faster-Whisper, ONNX Runtime, Candle
-- **Platform**: `global-hotkey`, Accessibility APIs, X11/Wayland
-- **Async**: `tokio`
+- **VAD**: Energy-based VAD with adaptive thresholding
+- **Models**: Whisper.cpp CLI (ggml models), ONNX Runtime (planned)
+- **Platform**: `rdev` hotkeys (macOS), `enigo` text injection
+- **Async**: `tokio` runtime
+- **IPC**: Unix domain sockets with `bincode`
 
 ### Terminal UI (TypeScript)
-- **Framework**: OpenTUI (flex-based TUI)
-- **Runtime**: Bun (TypeScript ESM)
+- **Framework**: OpenTUI (flexbox-based TUI framework)
+- **Runtime**: Bun (fast TypeScript runtime)
 - **Config**: TOML parsing
 - **Styling**: Light theme, borderless design
 
