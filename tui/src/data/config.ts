@@ -1,10 +1,10 @@
 /**
- * Config data access — reads/writes the vox config.toml file.
+ * Config data access — reads/writes the onevox config.toml file.
  *
  * Platform paths:
- *   Windows: %APPDATA%\vox\config.toml
- *   macOS:   ~/Library/Application Support/vox/config.toml
- *   Linux:   ~/.config/vox/config.toml
+ *   Windows: %APPDATA%\onevox\config.toml
+ *   macOS:   ~/Library/Application Support/onevox/config.toml
+ *   Linux:   ~/.config/onevox/config.toml
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
@@ -15,7 +15,7 @@ import { homedir } from "node:os"
 
 function parseTOML(text: string): Record<string, any> {
   // We shell out to the Rust CLI for reliable TOML handling:
-  //   `vox config show` prints the live config.
+  //   `onevox config show` prints the live config.
   // For direct parsing we use a best-effort regex approach for flat/nested tables.
   const result: Record<string, any> = {}
   let currentSection: Record<string, any> = result
@@ -60,7 +60,7 @@ function parseValue(raw: string): any {
 
 function stringifyTOML(obj: Record<string, any>): string {
   const lines: string[] = []
-  // top-level scalars first (unlikely for vox, but safe)
+  // top-level scalars first (unlikely for onevox, but safe)
   for (const [k, v] of Object.entries(obj)) {
     if (typeof v !== "object" || v === null) {
       lines.push(`${k} = ${formatValue(v)}`)
@@ -164,7 +164,7 @@ export interface VoxConfig {
 export const DEFAULT_CONFIG: VoxConfig = {
   daemon: { auto_start: true, log_level: "info" },
   hotkey: {
-    trigger: "Cmd+Shift+Space",
+    trigger: "Cmd+Shift+0",
     toggle: "Ctrl+Shift+Space",
     mode: "push-to-talk",
   },
@@ -200,14 +200,15 @@ export const DEFAULT_CONFIG: VoxConfig = {
 // ── Path resolution ──────────────────────────────────────────────────────
 
 export function configDir(): string {
+  if (process.env.ONEVOX_CONFIG_DIR) return process.env.ONEVOX_CONFIG_DIR
   if (process.env.VOX_CONFIG_DIR) return process.env.VOX_CONFIG_DIR
   if (process.platform === "win32") {
-    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "vox")
+    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "onevox")
   }
   if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Application Support", "vox")
+    return join(homedir(), "Library", "Application Support", "onevox")
   }
-  return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "vox")
+  return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "onevox")
 }
 
 export function configPath(): string {

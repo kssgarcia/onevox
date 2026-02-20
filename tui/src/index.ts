@@ -5,9 +5,23 @@
  */
 
 import { createCliRenderer } from "@opentui/core"
+import { writeSync } from "node:fs"
 import { loadConfig } from "./data/config.js"
 import { loadHistory } from "./data/history.js"
 import { createApp } from "./app.js"
+
+function restoreTerminalState() {
+  // Ensure stdin isn't left in raw mode.
+  try {
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(false)
+    }
+  } catch {}
+  // Disable mouse tracking modes and alt screen, show cursor, reset styles.
+  const reset = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1015l\x1b[?1049l\x1b[?25h\x1b[0m"
+  try { writeSync(1, reset) } catch {}
+  try { writeSync(2, reset) } catch {}
+}
 
 async function main() {
   // Load data from disk
@@ -24,6 +38,29 @@ async function main() {
 
   // Boot the application
   const app = createApp(renderer, config, history)
+  let exiting = false
+  let exitCode = 0
+
+  const finalizeExit = (code: number) => {
+    if (exiting) return
+    exiting = true
+    restoreTerminalState()
+    process.exit(code)
+  }
+
+  const exitCleanly = (code: number) => {
+    exitCode = code
+    try {
+      renderer.destroy()
+    } catch {
+      finalizeExit(code)
+    }
+  }
+
+  process.on("SIGINT", () => exitCleanly(130))
+  process.on("SIGTERM", () => exitCleanly(143))
+  process.on("uncaughtException", () => exitCleanly(1))
+  process.on("exit", restoreTerminalState)
 
   // Handle clean exit
   renderer.on("destroy", () => {
@@ -36,7 +73,7 @@ async function main() {
         // Best effort
       }
     }
-    process.exit(0)
+    finalizeExit(exitCode)
   })
 }
 

@@ -114,6 +114,7 @@ export function createConfirmPopup(
 
   // ── Keyboard handling via global input handler ────────────────────────
   const handler = (sequence: string) => {
+    if (sequence === "\x03") return false // let Ctrl+C propagate
     if (sequence === "y" || sequence === "Y") {
       destroy()
       onConfirm()

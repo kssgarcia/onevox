@@ -16,8 +16,6 @@ import {
   BoxRenderable,
   TextRenderable,
   ScrollBoxRenderable,
-  SelectRenderable,
-  SelectRenderableEvents,
   type CliRenderer,
   RGBA,
   TextAttributes,
@@ -25,10 +23,11 @@ import {
 
 import type { AppState } from "../app.js"
 import { saveConfig, type VoxConfig } from "../data/config.js"
-import { getModelRegistry, listDevicesWithError } from "../data/cli.js"
+import { getModelRegistry, listDevicesWithError, reloadDaemonConfig } from "../data/cli.js"
 import { createToggle, type ToggleInstance } from "../components/toggle.js"
 import { createKeyCapture, type KeyCaptureInstance } from "../components/key-capture.js"
 import { createStepper, type StepperInstance } from "../components/stepper.js"
+import { createSelectField, type SelectFieldInstance } from "../components/select-field.js"
 
 export interface ConfigPanelCallbacks {
   onDirty: () => void
@@ -155,38 +154,35 @@ export function createConfigPanel(
   const modelContent = createSection("sec-model", "Model Selection")
 
   const models = getModelRegistry()
-  const modelSelect = new SelectRenderable(renderer, {
+
+  // Pre-select current model
+  const currentModelIdx = models.findIndex((m) => {
+    const current = config.model.model_path
+    return (
+      current === m.id ||
+      current === `${m.id}.bin` ||
+      current.includes(m.id) ||
+      current.includes(`${m.id}.bin`)
+    )
+  })
+  const modelField = createSelectField(renderer, {
     id: "model-select",
-    width: "100%" as any,
-    height: 6,
+    label: "Model:",
     options: models.map((m) => ({
       name: `${m.name}  (${m.size})`,
       description: `${m.speedFactor}x speed  •  ${m.memoryMb}MB RAM  •  ${m.description}`,
     })),
-    backgroundColor: RGBA.fromHex(theme.colors.surface),
-    focusedBackgroundColor: RGBA.fromHex(theme.colors.hover),
-    focusedTextColor: RGBA.fromHex(theme.colors.textPrimary),
-    selectedBackgroundColor: RGBA.fromHex(theme.colors.selected),
-    selectedTextColor: RGBA.fromHex(theme.colors.textPrimary),
-    textColor: RGBA.fromHex(theme.colors.textSecondary),
-    descriptionColor: RGBA.fromHex(theme.colors.textMuted),
-    showDescription: true,
+    selectedIndex: currentModelIdx >= 0 ? currentModelIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.model.model_path = `${models[index].id}.bin`
+      markDirty()
+      callbacks.onStatusMessage(`Model → ${models[index].name}`)
+      setTimeout(() => callbacks.onStatusMessage(""), 1500)
+    },
   })
 
-  // Pre-select current model
-  const currentModelIdx = models.findIndex(
-    (m) => config.model.model_path.includes(m.id.split("-").pop()!),
-  )
-  if (currentModelIdx >= 0) modelSelect.setSelectedIndex(currentModelIdx)
-
-  modelSelect.on(SelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
-    config.model.model_path = models[index].id
-    markDirty()
-    callbacks.onStatusMessage(`Model → ${models[index].name}`)
-    setTimeout(() => callbacks.onStatusMessage(""), 1500)
-  })
-
-  modelContent.add(modelSelect)
+  modelContent.add(modelField.root)
 
   // ── 2. Key Bindings ────────────────────────────────────────────────
   const hotkeyContent = createSection("sec-hotkey", "Key Bindings")
@@ -209,45 +205,25 @@ export function createConfigPanel(
     onChange: (combo) => { config.hotkey.toggle = combo; markDirty() },
   })
 
-  // Mode selector
-  const modeLabel = new TextRenderable(renderer, {
-    id: "mode-label",
-    content: "Mode:",
-    fg: theme.colors.textSecondary,
-  })
-  const modeLabelBox = new BoxRenderable(renderer, {
-    id: "mode-label-box",
-    width: "100%" as any,
-    marginTop: 1,
-  })
-  modeLabelBox.add(modeLabel)
-  
-  const modeSelect = new SelectRenderable(renderer, {
+  const modeIdx = config.hotkey.mode === "toggle" ? 1 : 0
+  const modeField = createSelectField(renderer, {
     id: "mode-select",
-    width: 30,
-    height: 3,
+    label: "Hotkey Mode:",
     options: [
       { name: "push-to-talk", description: "Hold key to dictate" },
       { name: "toggle", description: "Press to start/stop" },
     ],
-    showDescription: true,
-    backgroundColor: RGBA.fromHex(theme.colors.surface),
-    focusedBackgroundColor: RGBA.fromHex(theme.colors.hover),
-    focusedTextColor: RGBA.fromHex(theme.colors.textPrimary),
-    selectedBackgroundColor: RGBA.fromHex(theme.colors.selected),
-    textColor: RGBA.fromHex(theme.colors.textSecondary),
-  })
-  const modeIdx = config.hotkey.mode === "toggle" ? 1 : 0
-  modeSelect.setSelectedIndex(modeIdx)
-  modeSelect.on(SelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
-    config.hotkey.mode = index === 0 ? "push-to-talk" : "toggle"
-    markDirty()
+    selectedIndex: modeIdx,
+    theme,
+    onChange: (index) => {
+      config.hotkey.mode = index === 0 ? "push-to-talk" : "toggle"
+      markDirty()
+    },
   })
 
   hotkeyContent.add(triggerCapture.root)
   hotkeyContent.add(toggleCapture.root)
-  hotkeyContent.add(modeLabelBox)
-  hotkeyContent.add(modeSelect)
+  hotkeyContent.add(modeField.root)
 
   // ── 3. Device Selection ────────────────────────────────────────
   const deviceContent = createSection("sec-device", "Device Selection")
@@ -260,6 +236,7 @@ export function createConfigPanel(
   deviceContent.add(deviceLoading)
 
   // Async load devices
+  let deviceFieldRef: SelectFieldInstance | null = null
   listDevicesWithError().then(({ devices, error }) => {
     try { deviceContent.remove("device-loading") } catch {}
 
@@ -275,45 +252,39 @@ export function createConfigPanel(
     if (devices.length === 0) {
       const noDevices = new TextRenderable(renderer, {
         id: "no-devices",
-        content: error ? "Could not list devices — check that `vox` is built" : "No audio input devices found",
+        content: error ? "Could not list devices — check that `onevox` is built" : "No audio input devices found",
         fg: theme.colors.textMuted,
       })
       deviceContent.add(noDevices)
       return
     }
 
-    const deviceSelect = new SelectRenderable(renderer, {
-      id: "device-select",
-      width: "100%" as any,
-      height: Math.min(devices.length + 1, 8),
-      options: devices.map((d) => ({
-        name: `${d.name}${d.isDefault ? " (default)" : ""}`,
-        description: `${d.sampleRate}Hz, ${d.channels}ch`,
-      })),
-      backgroundColor: RGBA.fromHex(theme.colors.surface),
-      focusedBackgroundColor: RGBA.fromHex(theme.colors.hover),
-      focusedTextColor: RGBA.fromHex(theme.colors.textPrimary),
-      selectedBackgroundColor: RGBA.fromHex(theme.colors.selected),
-      textColor: RGBA.fromHex(theme.colors.textSecondary),
-      showDescription: true,
-    })
-
     // Pre-select current device
     const curIdx = devices.findIndex(
       (d) => d.name === config.audio.device || (config.audio.device === "default" && d.isDefault),
     )
-    if (curIdx >= 0) deviceSelect.setSelectedIndex(curIdx)
-
-    deviceSelect.on(SelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
-      config.audio.device = devices[index].name
-      markDirty()
-      callbacks.onStatusMessage(`Device → ${devices[index].name}`)
-      setTimeout(() => callbacks.onStatusMessage(""), 1500)
+    const deviceField = createSelectField(renderer, {
+      id: "device-select",
+      label: "Input Device:",
+      options: devices.map((d) => ({
+        name: `${d.name}${d.isDefault ? " (default)" : ""}`,
+        description: `${d.sampleRate}Hz, ${d.channels}ch`,
+      })),
+      selectedIndex: curIdx >= 0 ? curIdx : 0,
+      theme,
+      onChange: (index) => {
+        config.audio.device = devices[index].name
+        markDirty()
+        callbacks.onStatusMessage(`Device → ${devices[index].name}`)
+        setTimeout(() => callbacks.onStatusMessage(""), 1500)
+      },
     })
+    deviceFieldRef = deviceField
 
-    deviceContent.add(deviceSelect)
+    deviceContent.add(deviceField.root)
     // Register in keyboard focus navigation (inserted before srStepper at index 4)
-    focusables.splice(4, 0, { type: "select", widget: deviceSelect, scrollHint: 20 })
+    focusables.splice(4, 0, { type: "selectfield", instance: deviceField, scrollHint: 20 })
+    bindMouseFocusHandlers()
   })
 
   // ── 4. Audio Settings ──────────────────────────────────────────
@@ -353,39 +324,21 @@ export function createConfigPanel(
     onChange: (v) => { config.vad.enabled = v; markDirty() },
   })
 
-  const vadBackendLabel = new TextRenderable(renderer, {
-    id: "vad-backend-label",
-    content: "Backend:",
-    fg: theme.colors.textSecondary,
-  })
-  const vadBackendLabelBox = new BoxRenderable(renderer, {
-    id: "vad-backend-label-box",
-    width: "100%" as any,
-    marginTop: 1,
-  })
-  vadBackendLabelBox.add(vadBackendLabel)
-  
-  const vadBackendSelect = new SelectRenderable(renderer, {
+  const vadIdx = ["energy", "silero", "webrtc"].indexOf(config.vad.backend)
+  const vadBackendField = createSelectField(renderer, {
     id: "vad-backend-select",
-    width: 30,
-    height: 4,
+    label: "Backend:",
     options: [
       { name: "energy", description: "Simple energy-based detection" },
       { name: "silero", description: "Neural network-based (more accurate)" },
       { name: "webrtc", description: "WebRTC VAD library" },
     ],
-    backgroundColor: RGBA.fromHex(theme.colors.surface),
-    focusedBackgroundColor: RGBA.fromHex(theme.colors.hover),
-    focusedTextColor: RGBA.fromHex(theme.colors.textPrimary),
-    selectedBackgroundColor: RGBA.fromHex(theme.colors.selected),
-    textColor: RGBA.fromHex(theme.colors.textSecondary),
-    showDescription: true,
-  })
-  const vadIdx = ["energy", "silero", "webrtc"].indexOf(config.vad.backend)
-  if (vadIdx >= 0) vadBackendSelect.setSelectedIndex(vadIdx)
-  vadBackendSelect.on(SelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
-    config.vad.backend = ["energy", "silero", "webrtc"][index]
-    markDirty()
+    selectedIndex: vadIdx >= 0 ? vadIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.vad.backend = ["energy", "silero", "webrtc"][index]
+      markDirty()
+    },
   })
 
   // 0.00 – 1.00 in steps of 0.01  (101 values)
@@ -408,8 +361,7 @@ export function createConfigPanel(
   })
 
   vadContent.add(vadEnabled.root)
-  vadContent.add(vadBackendLabelBox)
-  vadContent.add(vadBackendSelect)
+  vadContent.add(vadBackendField.root)
   vadContent.add(vadThresholdStepper.root)
   vadContent.add(vadAdaptive.root)
 
@@ -447,38 +399,21 @@ export function createConfigPanel(
   // ── 7. Injection ───────────────────────────────────────────────
   const injContent = createSection("sec-injection", "Text Injection")
 
-  const injMethodLabel = new TextRenderable(renderer, {
-    id: "inj-method-label",
-    content: "Method:",
-    fg: theme.colors.textSecondary,
-  })
-  const injMethodLabelBox = new BoxRenderable(renderer, {
-    id: "inj-method-label-box",
-    width: "100%" as any,
-  })
-  injMethodLabelBox.add(injMethodLabel)
-  
-  const injMethodSelect = new SelectRenderable(renderer, {
+  const injIdx = ["accessibility", "clipboard", "paste"].indexOf(config.injection.method)
+  const injMethodField = createSelectField(renderer, {
     id: "inj-method-select",
-    width: 35,
-    height: 4,
+    label: "Method:",
     options: [
       { name: "accessibility", description: "OS accessibility API (recommended)" },
       { name: "clipboard", description: "Copy to clipboard" },
       { name: "paste", description: "Simulate paste" },
     ],
-    backgroundColor: RGBA.fromHex(theme.colors.surface),
-    focusedBackgroundColor: RGBA.fromHex(theme.colors.hover),
-    focusedTextColor: RGBA.fromHex(theme.colors.textPrimary),
-    selectedBackgroundColor: RGBA.fromHex(theme.colors.selected),
-    textColor: RGBA.fromHex(theme.colors.textSecondary),
-    showDescription: true,
-  })
-  const injIdx = ["accessibility", "clipboard", "paste"].indexOf(config.injection.method)
-  if (injIdx >= 0) injMethodSelect.setSelectedIndex(injIdx)
-  injMethodSelect.on(SelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
-    config.injection.method = ["accessibility", "clipboard", "paste"][index]
-    markDirty()
+    selectedIndex: injIdx >= 0 ? injIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.injection.method = ["accessibility", "clipboard", "paste"][index]
+      markDirty()
+    },
   })
 
   const DELAY_VALUES = ["0", "10", "20", "30", "50", "75", "100", "150", "200", "300", "500"]
@@ -491,8 +426,7 @@ export function createConfigPanel(
     onChange: (v) => { config.injection.paste_delay_ms = parseInt(v, 10); markDirty() },
   })
 
-  injContent.add(injMethodLabelBox)
-  injContent.add(injMethodSelect)
+  injContent.add(injMethodField.root)
   injContent.add(injDelayStepper.root)
 
   // ── 8. History ─────────────────────────────────────────────────
@@ -524,7 +458,7 @@ export function createConfigPanel(
   // ── Focus management ─────────────────────────────────────────────────
   // scrollHint = approximate top row to scroll to so the widget is visible
   type FocusItem =
-    | { type: "select";     widget: SelectRenderable;                   scrollHint: number }
+    | { type: "selectfield"; instance: SelectFieldInstance;             scrollHint: number }
     | { type: "stepper";    instance: StepperInstance;                  scrollHint: number }
     | { type: "toggle";     instance: ReturnType<typeof createToggle>;  scrollHint: number }
     | { type: "keycapture"; instance: KeyCaptureInstance;               scrollHint: number }
@@ -532,21 +466,21 @@ export function createConfigPanel(
   // Populated after all widget declarations; deviceSelect spliced in async
   // scrollHints are approximate terminal-row offsets for each widget
   let focusables: FocusItem[] = [
-    { type: "select",     widget: modelSelect,          scrollHint: 0  },
+    { type: "selectfield", instance: modelField,         scrollHint: 0  },
     { type: "keycapture", instance: triggerCapture,     scrollHint: 11 },
     { type: "keycapture", instance: toggleCapture,      scrollHint: 12 },
-    { type: "select",     widget: modeSelect,           scrollHint: 14 },
+    { type: "selectfield", instance: modeField,          scrollHint: 14 },
     // index 4 reserved for deviceSelect (inserted asynchronously → scrollHint 20)
     { type: "stepper",    instance: srStepper,          scrollHint: 28 },
     { type: "stepper",    instance: chunkStepper,       scrollHint: 29 },
     { type: "toggle",     instance: vadEnabled,         scrollHint: 34 },
-    { type: "select",     widget: vadBackendSelect,     scrollHint: 36 },
+    { type: "selectfield", instance: vadBackendField,    scrollHint: 36 },
     { type: "stepper",    instance: vadThresholdStepper, scrollHint: 42 },
     { type: "toggle",     instance: vadAdaptive,        scrollHint: 43 },
     { type: "toggle",     instance: ppPunctuation,      scrollHint: 50 },
     { type: "toggle",     instance: ppCapitalize,       scrollHint: 51 },
     { type: "toggle",     instance: ppFiller,           scrollHint: 52 },
-    { type: "select",     widget: injMethodSelect,      scrollHint: 59 },
+    { type: "selectfield", instance: injMethodField,     scrollHint: 59 },
     { type: "stepper",    instance: injDelayStepper,    scrollHint: 64 },
     { type: "toggle",     instance: histEnabled,        scrollHint: 72 },
     { type: "stepper",    instance: histMaxStepper,     scrollHint: 73 },
@@ -557,18 +491,33 @@ export function createConfigPanel(
   function blurCurrent() {
     if (focusedIdx < 0) return
     const cur = focusables[focusedIdx]
+    if (cur.type === "selectfield") cur.instance.blur()
     if (cur.type === "toggle")     cur.instance.blur()
     if (cur.type === "keycapture") cur.instance.blur()
     if (cur.type === "stepper")    cur.instance.blur()
   }
 
+  function ensureFocusedVisible(item: FocusItem) {
+    const currentTop = scrollBox.scrollTop || 0
+    const viewportRows = Math.max(10, (process.stdout.rows || 40) - 14)
+    const visibleBottom = currentTop + viewportRows - 1
+    if (item.scrollHint < currentTop) {
+      scrollBox.scrollTop = item.scrollHint
+      return
+    }
+    if (item.scrollHint > visibleBottom) {
+      scrollBox.scrollTop = Math.max(0, item.scrollHint - viewportRows + 3)
+    }
+  }
+
   function applyFocus(idx: number) {
+    if (idx < 0 || idx >= focusables.length) return
     blurCurrent()
     focusedIdx = idx
     const item = focusables[idx]
-    // Scroll to approximate position of the focused widget
-    scrollBox.scrollTop = item.scrollHint
-    if (item.type === "select") item.widget.focus()
+    // Scroll only when focused widget leaves viewport
+    ensureFocusedVisible(item)
+    if (item.type === "selectfield") item.instance.focus()
     else {
       // Non-Renderable-focusable widgets: clear renderer focus so arrows
       // don't accidentally route to a previously-focused select.
@@ -581,30 +530,81 @@ export function createConfigPanel(
     scrollBox.scrollTop = 0
     if (focusables.length > 0) applyFocus(0)
   }
-  function focusNext()  { applyFocus((focusedIdx + 1 + focusables.length) % focusables.length) }
-  function focusPrev()  { applyFocus((focusedIdx - 1 + focusables.length) % focusables.length) }
+  function focusNext()  { applyFocus(Math.min(focusedIdx + 1, focusables.length - 1)) }
+  function focusPrev()  { applyFocus(Math.max(focusedIdx - 1, 0)) }
   function blurAll()    { blurCurrent(); focusedIdx = -1 }
   function hasFocus()   { return focusedIdx >= 0 }
 
-  // Intercepts Tab / Shift-Tab / Escape / Space-for-toggle / Left-Right-for-stepper
+  function bindMouseFocusHandlers() {
+    for (let i = 0; i < focusables.length; i++) {
+      const item = focusables[i]
+      const rootNode =
+        item.type === "selectfield" ? item.instance.root :
+        item.type === "stepper" ? item.instance.root :
+        item.type === "toggle" ? item.instance.root :
+        item.instance.root
+      if ((rootNode as any).__focusBound) continue
+      const prevMouseDown = (rootNode as any).onMouseDown
+      ;(rootNode as any).onMouseDown = (...args: any[]) => {
+        const idx = focusables.findIndex((f) => {
+          if (f.type === "selectfield") return f.instance.root === rootNode
+          if (f.type === "stepper") return f.instance.root === rootNode
+          if (f.type === "toggle") return f.instance.root === rootNode
+          return f.instance.root === rootNode
+        })
+        if (idx >= 0) applyFocus(idx)
+        if (prevMouseDown) return prevMouseDown(...args)
+      }
+      ;(rootNode as any).__focusBound = true
+    }
+  }
+  bindMouseFocusHandlers()
+
+  // Intercepts arrow keys / hjkl / Enter / Escape / Space-for-toggle / Left-Right-for-stepper
   // before keypress events fire so navigation keys don't bleed into the tab-bar handler.
   const configInputHandler = (seq: string): boolean => {
     if (state.activeTab !== 1 || focusedIdx < 0) return false
     const cur = focusables[focusedIdx]
-    // When a key-capture widget is active, only intercept Tab/Shift-Tab/Escape;
-    // everything else must reach the keypress listener it registered.
+    
+    // When focused on a key-capture widget:
+    // - while popup capture is open, let non-nav keys reach key-capture listener.
+    // - while popup is closed, only intercept nav/open keys; let others propagate.
     if (cur?.type === "keycapture") {
-      if (seq === "\t")      { cur.instance.blur(); focusNext(); return true }
-      if (seq === "\x1b[Z") { cur.instance.blur(); focusPrev(); return true }
-      if (seq === "\x1b")   { cur.instance.blur(); blurAll(); callbacks.onEscape?.(); return true }
-      return false // let the keypress event through to key-capture's own handler
+      // While popup capture is open:
+      // - Esc should cancel capture immediately.
+      // - Ctrl+C must propagate so the app can exit.
+      // - Other keys should pass through to key-capture's keypress listener.
+      if (cur.instance.isCapturing()) {
+        if (seq === "\x1b") { cur.instance.cancelCapture(); return true }
+        if (seq === "\x03") return false
+        return false
+      }
+
+      // Down/j or Up/k to navigate
+      if (seq === "\x1b[B" || seq === "j") { cur.instance.blur(); focusNext(); return true }  // Down
+      if (seq === "\x1b[A" || seq === "k") { cur.instance.blur(); focusPrev(); return true }  // Up
+      if (seq === "\x1b")                   { cur.instance.blur(); blurAll(); callbacks.onEscape?.(); return true }  // Escape
+      if (seq === "\r" || seq === "\n" || seq === " ") { cur.instance.open(); return true } // Enter/Space opens popup
+      return false
     }
-    if (seq === "\t")      { focusNext(); return true }
-    if (seq === "\x1b[Z") { focusPrev(); return true }  // Shift+Tab
-    if (seq === "\x1b")   { blurAll(); callbacks.onEscape?.(); return true }
-    if (seq === " ")       { if (cur?.type === "toggle")  { cur.instance.toggle(); return true } }
-    if (seq === "\x1b[D") { if (cur?.type === "stepper") { cur.instance.prev();   return true } } // Left
-    if (seq === "\x1b[C") { if (cur?.type === "stepper") { cur.instance.next();   return true } } // Right
+    
+    // Down/j: navigate to next widget
+    if (seq === "\x1b[B" || seq === "j") { focusNext(); return true }
+    // Up/k: navigate to previous widget
+    if (seq === "\x1b[A" || seq === "k") { focusPrev(); return true }
+    // Escape: blur all and return to tabs
+    if (seq === "\x1b")                   { blurAll(); callbacks.onEscape?.(); return true }
+    // Space: toggle toggles
+    if (seq === " ")                      { if (cur?.type === "toggle")  { cur.instance.toggle(); return true } }
+    // Enter/Space: open selection popup
+    if (seq === " " || seq === "\r" || seq === "\n") {
+      if (cur?.type === "selectfield") { cur.instance.open(); return true }
+    }
+    // Left/h: previous value for stepper
+    if (seq === "\x1b[D" || seq === "h") { if (cur?.type === "stepper") { cur.instance.prev();   return true } }
+    // Right/l: next value for stepper
+    if (seq === "\x1b[C" || seq === "l") { if (cur?.type === "stepper") { cur.instance.next();   return true } }
+
     return false
   }
   renderer.prependInputHandler(configInputHandler)
@@ -614,6 +614,17 @@ export function createConfigPanel(
     try {
       saveConfig(config)
       callbacks.onSaved()
+      void reloadDaemonConfig().then((result) => {
+        if (result.state === "reloaded") {
+          callbacks.onStatusMessage("✓ Saved and applied to daemon")
+          return
+        }
+        if (result.state === "not_running") {
+          callbacks.onStatusMessage("✓ Saved (daemon not running)")
+          return
+        }
+        callbacks.onStatusMessage(`✓ Saved (reload failed: ${result.message})`)
+      })
     } catch (e) {
       callbacks.onStatusMessage(`✗ Failed to save: ${e}`)
     }
@@ -622,6 +633,11 @@ export function createConfigPanel(
   function destroy() {
     blurAll()
     renderer.removeInputHandler(configInputHandler)
+    modelField.destroy()
+    modeField.destroy()
+    vadBackendField.destroy()
+    injMethodField.destroy()
+    deviceFieldRef?.destroy()
     triggerCapture.destroy()
     toggleCapture.destroy()
   }

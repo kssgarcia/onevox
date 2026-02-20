@@ -33,11 +33,14 @@ import { createConfirmPopup } from "../components/confirm-popup.js"
 
 export interface HistoryPanelCallbacks {
   onStatusMessage: (msg: string) => void
+  onEscape?: () => void
 }
 
 export interface HistoryPanelInstance {
   root: BoxRenderable
   refresh: () => void
+  focusFirst?: () => void
+  blurAll?: () => void
 }
 
 export function createHistoryPanel(
@@ -48,6 +51,7 @@ export function createHistoryPanel(
   let selectedIndex = 0
   let cards: CardInstance[] = []
   let expandedPopup: BoxRenderable | null = null
+  let hasFocus = false
   
   const theme = state.theme
 
@@ -182,6 +186,7 @@ export function createHistoryPanel(
 
       // Make the entire card clickable to select it
       card.root.onMouseDown = () => {
+        hasFocus = true
         selectedIndex = i
         updateSelection()
       }
@@ -189,11 +194,16 @@ export function createHistoryPanel(
       cards.push(card)
       scrollBox.add(card.root)
     }
+    
+    // If we have focus and cards, ensure selection is visible
+    if (hasFocus && cards.length > 0) {
+      updateSelection()
+    }
   }
 
   function updateSelection() {
     for (let i = 0; i < cards.length; i++) {
-      cards[i].setSelected(i === selectedIndex)
+      cards[i].setSelected(i === selectedIndex && hasFocus)
     }
     
     // Smooth scroll to selected card
@@ -378,48 +388,82 @@ export function createHistoryPanel(
   // ── Keyboard handling ────────────────────────────────────────────────
 
   renderer.keyInput.on("keypress", (key: any) => {
-    // Only respond when history tab is active
-    if (state.activeTab !== 0) return
+    // Only respond when history tab is active and we have focus
+    if (state.activeTab !== 0 || !hasFocus) return
     if (expandedPopup) return // Let popup handle input
 
     const entries = newestFirst(state.history)
     if (entries.length === 0) return
 
+    // Navigation: down/j
     if (key.name === "down" || key.name === "j") {
       selectedIndex = Math.min(selectedIndex + 1, entries.length - 1)
       updateSelection()
       return
     }
+    
+    // Navigation: up/k
     if (key.name === "up" || key.name === "k") {
       selectedIndex = Math.max(selectedIndex - 1, 0)
       updateSelection()
       return
     }
-    if (key.name === "c" && !key.ctrl) {
-      const entry = getSelectedEntry()
-      if (entry) copyEntry(entry)
+    
+    // Escape: blur and return to tabs
+    if (key.name === "escape") {
+      hasFocus = false
+      updateSelection()
+      callbacks.onEscape?.()
       return
     }
-    if (key.name === "e" && !key.ctrl) {
-      const entry = getSelectedEntry()
-      if (entry) exportEntry(entry)
-      return
-    }
+    
+    // Enter: expand entry
     if (key.name === "return") {
       const entry = getSelectedEntry()
       if (entry) expandEntry(entry)
       return
     }
+    
+    // c: copy
+    if (key.name === "c" && !key.ctrl) {
+      const entry = getSelectedEntry()
+      if (entry) copyEntry(entry)
+      return
+    }
+    
+    // e: export
+    if (key.name === "e" && !key.ctrl) {
+      const entry = getSelectedEntry()
+      if (entry) exportEntry(entry)
+      return
+    }
+    
+    // d: delete
     if (key.name === "d" && !key.shift) {
       const entry = getSelectedEntry()
       if (entry) deleteEntry(entry)
       return
     }
+    
+    // D (Shift+d): clear all
     if (key.name === "d" && key.shift) {
       clearAll()
       return
     }
   })
+
+  // ── Focus management ─────────────────────────────────────────────────
+  
+  function focusFirst() {
+    hasFocus = true
+    selectedIndex = 0
+    updateSelection()
+  }
+  
+  function blurAll() {
+    hasFocus = false
+    updateSelection()
+  }
 
   // ── Initial render ───────────────────────────────────────────────────
   buildCards()
@@ -427,5 +471,7 @@ export function createHistoryPanel(
   return {
     root,
     refresh: buildCards,
+    focusFirst,
+    blurAll,
   }
 }

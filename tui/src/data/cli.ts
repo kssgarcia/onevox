@@ -1,5 +1,5 @@
 /**
- * CLI wrapper — calls the `vox` binary for runtime operations
+ * CLI wrapper — calls the `onevox` binary for runtime operations
  * that can't be done via file I/O (device listing, model management, etc.)
  */
 
@@ -35,6 +35,11 @@ export interface DaemonStatus {
   isDictating: boolean
 }
 
+export interface ReloadResult {
+  state: "reloaded" | "not_running" | "failed"
+  message: string
+}
+
 // ── Resolve binary path ──────────────────────────────────────────────────
 
 /** Walk upward from `start` until we find a directory containing Cargo.toml */
@@ -49,9 +54,10 @@ function findProjectRoot(start: string): string | null {
   return null
 }
 
-function voxBin(): string | null {
-  if (process.env.VOX_BIN) {
-    return existsSync(process.env.VOX_BIN) ? process.env.VOX_BIN : null
+function onevoxBin(): string | null {
+  const override = process.env.ONEVOX_BIN || process.env.VOX_BIN
+  if (override) {
+    return existsSync(override) ? override : null
   }
   const ext = process.platform === "win32" ? ".exe" : ""
   // Try to locate project root by finding Cargo.toml, searching from the
@@ -62,20 +68,20 @@ function voxBin(): string | null {
   ].filter(Boolean) as string[]
 
   for (const root of candidateRoots) {
-    const release = join(root, "target", "release", `vox${ext}`)
-    const debug   = join(root, "target", "debug",   `vox${ext}`)
+    const release = join(root, "target", "release", `onevox${ext}`)
+    const debug   = join(root, "target", "debug",   `onevox${ext}`)
     if (existsSync(release)) return release
     if (existsSync(debug))   return debug
   }
   // Last-resort: hope it's on PATH
-  return "vox"
+  return "onevox"
 }
 
 // ── Run a CLI command ────────────────────────────────────────────────────
 
 async function run(args: string[]): Promise<string> {
-  const bin = voxBin()
-  if (!bin) throw new Error("vox binary not found")
+  const bin = onevoxBin()
+  if (!bin) throw new Error("onevox binary not found")
   const proc = Bun.spawn([bin, ...args], {
     stdout: "pipe",
     stderr: "pipe",
@@ -86,7 +92,7 @@ async function run(args: string[]): Promise<string> {
   ])
   await proc.exited
   if (proc.exitCode !== 0) {
-    throw new Error(errText.trim() || `vox exited with code ${proc.exitCode}`)
+    throw new Error(errText.trim() || `onevox exited with code ${proc.exitCode}`)
   }
   return text.trim()
 }
@@ -162,43 +168,33 @@ export async function listDevices(): Promise<AudioDevice[]> {
 export function getModelRegistry(): ModelInfo[] {
   return [
     {
-      id: "whisper-tiny.en",
-      name: "Whisper Tiny (English)",
+      id: "ggml-tiny.en",
+      name: "Whisper Tiny English (GGML)",
       size: "~75 MB",
       sizeBytes: 75_000_000,
       speedFactor: 32,
       memoryMb: 200,
-      description: "Fastest model, good for quick dictation",
+      description: "Fastest model using whisper.cpp",
       downloaded: false,
     },
     {
-      id: "whisper-base.en",
-      name: "Whisper Base (English)",
+      id: "ggml-base.en",
+      name: "Whisper Base English (GGML)",
       size: "~140 MB",
       sizeBytes: 140_000_000,
       speedFactor: 16,
       memoryMb: 300,
-      description: "Good balance of speed and accuracy",
+      description: "Best balance of speed and accuracy",
       downloaded: false,
     },
     {
-      id: "whisper-small.en",
-      name: "Whisper Small (English)",
+      id: "ggml-small.en",
+      name: "Whisper Small English (GGML)",
       size: "~470 MB",
       sizeBytes: 470_000_000,
       speedFactor: 8,
       memoryMb: 600,
-      description: "Higher accuracy, suitable for longer recordings",
-      downloaded: false,
-    },
-    {
-      id: "whisper-medium.en",
-      name: "Whisper Medium (English)",
-      size: "~1.5 GB",
-      sizeBytes: 1_500_000_000,
-      speedFactor: 4,
-      memoryMb: 1200,
-      description: "Best accuracy, requires more memory",
+      description: "Higher accuracy, still suitable for dictation",
       downloaded: false,
     },
   ]
@@ -246,5 +242,24 @@ export async function getDaemonStatus(): Promise<DaemonStatus | null> {
     }
   } catch {
     return null
+  }
+}
+
+// ── Daemon control ───────────────────────────────────────────────────────
+
+export async function reloadDaemonConfig(): Promise<ReloadResult> {
+  try {
+    // Current CLI does not expose a dedicated "reload config" subcommand yet.
+    // We still check daemon availability so the TUI can provide accurate feedback.
+    await run(["status"])
+    return {
+      state: "failed",
+      message: "reload command is not implemented by CLI yet",
+    }
+  } catch (e) {
+    return {
+      state: "not_running",
+      message: e instanceof Error ? e.message : String(e),
+    }
   }
 }

@@ -1,10 +1,10 @@
 /**
- * History data access — reads/writes vox history.json.
+ * History data access — reads/writes onevox history.json.
  *
  * Platform paths:
- *   Windows: %APPDATA%\vox\history.json
- *   macOS:   ~/Library/Application Support/vox/history.json
- *   Linux:   ~/.local/share/vox/history.json
+ *   Windows: %APPDATA%\onevox\history.json
+ *   macOS:   ~/Library/Application Support/onevox/history.json
+ *   Linux:   ~/.local/share/onevox/history.json
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
@@ -25,14 +25,15 @@ export interface HistoryEntry {
 // ── Path resolution ──────────────────────────────────────────────────────
 
 export function dataDir(): string {
+  if (process.env.ONEVOX_DATA_DIR) return process.env.ONEVOX_DATA_DIR
   if (process.env.VOX_DATA_DIR) return process.env.VOX_DATA_DIR
   if (process.platform === "win32") {
-    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "vox")
+    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "onevox")
   }
   if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Application Support", "vox")
+    return join(homedir(), "Library", "Application Support", "onevox")
   }
-  return join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "vox")
+  return join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "onevox")
 }
 
 export function historyPath(): string {

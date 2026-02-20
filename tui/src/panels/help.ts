@@ -34,7 +34,7 @@ export function createHelpOverlay(
 
   const popup = new BoxRenderable(renderer, {
     id: "help-popup",
-    width: 55,
+    width: 65,
     backgroundColor: RGBA.fromHex(theme.colors.bg),
     padding: 2,
     flexDirection: "column",
@@ -45,20 +45,28 @@ export function createHelpOverlay(
 
   const sections = [
     {
+      title: "Navigation",
+      keys: [
+        ["← →  or  h l", "Switch between History / Config tabs"],
+        ["↓  or  j", "Enter content area / Move down"],
+        ["↑  or  k", "Move up"],
+        ["Enter", "Select / Activate item"],
+        ["Esc", "Return to tab bar"],
+      ],
+    },
+    {
       title: "Global",
       keys: [
-        ["Tab", "Switch between History / Config tabs"],
         ["t", "Toggle dark/light theme"],
         ["?", "Toggle this help overlay"],
         ["Ctrl+S", "Save config changes"],
-        ["q", "Quit ONEVOX"],
+        ["Ctrl+C  or  q", "Quit ONEVOX"],
       ],
     },
     {
       title: "History Tab",
       keys: [
-        ["↑ / k", "Move selection up"],
-        ["↓ / j", "Move selection down"],
+        ["↑ ↓  or  k j", "Navigate entries"],
         ["Enter", "Expand full transcription text"],
         ["c", "Copy selected entry to clipboard"],
         ["e", "Export selected entry to file"],
@@ -69,15 +77,18 @@ export function createHelpOverlay(
     {
       title: "Config Tab",
       keys: [
-        ["↑ / ↓", "Navigate within selectors"],
-        ["Tab", "Move between input fields"],
+        ["↑ ↓  or  k j", "Navigate between fields"],
+        ["← →  or  h l", "Change stepper values"],
+        ["Space", "Toggle switches"],
+        ["Enter", "Activate dropdown/select"],
       ],
     },
     {
-      title: "Popups",
+      title: "Popups & Dialogs",
       keys: [
         ["y", "Confirm action"],
-        ["n / Esc", "Cancel / close popup"],
+        ["n  or  Esc", "Cancel / close popup"],
+        ["Enter", "Confirm / close"],
       ],
     },
   ]
@@ -101,7 +112,7 @@ export function createHelpOverlay(
 
       const keyText = new TextRenderable(renderer, {
         id: `help-k-${key.replace(/[\s\/]+/g, "-")}`,
-        content: key.padEnd(16),
+        content: key.padEnd(18),
         fg: theme.colors.textPrimary,
         attributes: TextAttributes.BOLD,
       })

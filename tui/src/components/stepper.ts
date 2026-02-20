@@ -58,7 +58,7 @@ export function createStepper(
     height: 1,
     paddingLeft: 1,
     paddingRight: 1,
-    backgroundColor: RGBA.fromHex("transparent"),
+    backgroundColor: RGBA.fromHex(theme.colors.surface),
   })
 
   const labelText = new TextRenderable(renderer, {
@@ -143,7 +143,7 @@ export function createStepper(
     labelText.fg = RGBA.fromHex(theme.colors.textSecondary)
     leftArrow.fg = RGBA.fromHex(theme.colors.textMuted)
     rightArrow.fg = RGBA.fromHex(theme.colors.textMuted)
-    root.backgroundColor = RGBA.fromHex("transparent")
+    root.backgroundColor = RGBA.fromHex(theme.colors.surface)
   }
 
   function updateTheme(newTheme: Theme) {
@@ -152,7 +152,7 @@ export function createStepper(
     valueText.fg = RGBA.fromHex(theme.colors.textPrimary)
     leftArrow.fg = RGBA.fromHex(theme.colors.textMuted)
     rightArrow.fg = RGBA.fromHex(theme.colors.textMuted)
-    root.backgroundColor = RGBA.fromHex("transparent")
+    root.backgroundColor = RGBA.fromHex(theme.colors.surface)
   }
 
   return {

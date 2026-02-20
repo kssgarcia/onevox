@@ -48,7 +48,7 @@ export function createToggle(
     height: 1,
     paddingLeft: 1,
     paddingRight: 1,
-    backgroundColor: RGBA.fromHex("transparent"),
+    backgroundColor: RGBA.fromHex(theme.colors.surface),
   })
 
   const labelText = new TextRenderable(renderer, {
@@ -120,13 +120,13 @@ export function createToggle(
   function blurToggle() {
     labelText.content = label
     labelText.fg = RGBA.fromHex(theme.colors.textPrimary)
-    root.backgroundColor = RGBA.fromHex("transparent")
+    root.backgroundColor = RGBA.fromHex(theme.colors.surface)
   }
 
   function updateTheme(newTheme: Theme) {
     theme = newTheme
     labelText.fg = RGBA.fromHex(theme.colors.textPrimary)
-    root.backgroundColor = RGBA.fromHex("transparent")
+    root.backgroundColor = RGBA.fromHex(theme.colors.surface)
     updateDisplay()
   }
 

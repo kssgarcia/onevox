@@ -127,6 +127,12 @@ export function createApp(
     showUnderline: true,
   })
 
+  // Enable mouse interaction for tabs
+  tabs.onMouseDown = (event: any) => {
+    setFocusMode("tabs")
+    tabs.focus()
+  }
+
   tabBar.add(tabs)
 
   // ── Content area ──────────────────────────────────────────────────────
@@ -149,14 +155,13 @@ export function createApp(
     justifyContent: "space-between",
     paddingLeft: 2,
     paddingRight: 2,
-    paddingTop: 1,
     backgroundColor: RGBA.fromHex(state.theme.colors.statusBar),
   })
 
   const statusLeft = new TextRenderable(renderer, {
     id: "status-left",
-    content: "^c Quit  t Theme  ? Help",
-    fg: state.theme.colors.textSecondary,
+    content: "",
+    fg: state.theme.colors.textPrimary,
   })
 
   const statusCenter = new TextRenderable(renderer, {
@@ -168,7 +173,7 @@ export function createApp(
   const statusRight = new TextRenderable(renderer, {
     id: "status-right",
     content: `● ${state.theme.name === "dark" ? "Dark" : "Light"} Mode`,
-    fg: state.theme.colors.textMuted,
+    fg: state.theme.colors.textSecondary,
   })
 
   statusBar.add(statusLeft)
@@ -186,10 +191,45 @@ export function createApp(
 
   // ── Panel management ──────────────────────────────────────────────────
 
+  // Focus state: "tabs" | "content"
+  let focusMode: "tabs" | "content" = "tabs"
+
+  function refreshStatusHints() {
+    const general = "Esc Top  Enter Open  ↑/↓ j/k Move  ? Help  t Theme  Ctrl+C Quit"
+    if (focusMode === "tabs") {
+      statusLeft.content = `${general}  |  ←/→ h/l Tabs`
+    } else {
+      statusLeft.content = `${general}  |  Esc -> Tabs`
+    }
+    statusRight.content = `● ${state.theme.name === "dark" ? "Dark" : "Light"} Mode`
+  }
+
+  function applyFocusModeStyles() {
+    const tabsFocused = focusMode === "tabs"
+    tabBar.backgroundColor = RGBA.fromHex(state.theme.colors.bg)
+    tabs.backgroundColor = RGBA.fromHex(state.theme.colors.bg)
+    tabs.textColor = RGBA.fromHex(state.theme.colors.textMuted)
+    tabs.selectedBackgroundColor = RGBA.fromHex(tabsFocused ? state.theme.colors.selected : state.theme.colors.bg)
+    tabs.selectedTextColor = RGBA.fromHex(state.theme.colors.textPrimary)
+  }
+
+  function setFocusMode(mode: "tabs" | "content") {
+    focusMode = mode
+    applyFocusModeStyles()
+    refreshStatusHints()
+  }
+  applyFocusModeStyles()
+  refreshStatusHints()
+
   function showHistory() {
     clearContent()
     historyPanel = createHistoryPanel(renderer, state, {
       onStatusMessage: (msg) => { statusCenter.content = msg },
+      onEscape: () => {
+        // Return focus to tabs
+        setFocusMode("tabs")
+        tabs.focus()
+      },
     })
     contentArea.add(historyPanel.root)
   }
@@ -218,12 +258,15 @@ export function createApp(
         statusCenter.content = msg
       },
       onEscape: () => {
-        // Return keyboard focus to the tab bar
+        // Return focus to tabs
+        setFocusMode("tabs")
         tabs.focus()
       },
     })
+    configPanel.root.onMouseDown = () => {
+      setFocusMode("content")
+    }
     contentArea.add(configPanel.root)
-    configPanel.focusFirst()
   }
 
   function clearContent() {
@@ -242,8 +285,14 @@ export function createApp(
 
   tabs.on(TabSelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
     state.activeTab = index
-    if (index === 0) showHistory()
-    else showConfig()
+    setFocusMode("content")
+    if (index === 0) {
+      showHistory()
+      if (historyPanel) historyPanel.focusFirst?.()
+    } else {
+      showConfig()
+      if (configPanel) configPanel.focusFirst()
+    }
   })
 
   // Show initial tab
@@ -266,16 +315,13 @@ export function createApp(
     asciiTitle.color = [RGBA.fromHex(state.theme.colors.accent), RGBA.fromHex(state.theme.colors.textSecondary)] as any
     versionText.fg = RGBA.fromHex(state.theme.colors.textMuted)
     
-    tabs.backgroundColor = RGBA.fromHex(state.theme.colors.bg)
-    tabs.textColor = RGBA.fromHex(state.theme.colors.textMuted)
-    tabs.selectedBackgroundColor = RGBA.fromHex(state.theme.colors.bg)
-    tabs.selectedTextColor = RGBA.fromHex(state.theme.colors.textPrimary)
-    
+    applyFocusModeStyles()
+
     statusBar.backgroundColor = RGBA.fromHex(state.theme.colors.statusBar)
-    statusLeft.fg = RGBA.fromHex(state.theme.colors.textSecondary)
+    statusLeft.fg = RGBA.fromHex(state.theme.colors.textPrimary)
     statusCenter.fg = RGBA.fromHex(state.theme.colors.textPrimary)
-    statusRight.fg = RGBA.fromHex(state.theme.colors.textMuted)
-    statusRight.content = `● ${state.theme.name === "dark" ? "Dark" : "Light"} Mode`
+    statusRight.fg = RGBA.fromHex(state.theme.colors.textSecondary)
+    refreshStatusHints()
     
     // Rebuild current panel with new theme
     if (state.activeTab === 0) showHistory()
@@ -335,14 +381,38 @@ export function createApp(
       return
     }
 
-    // Tab key: switch app tabs (only when config has no focused widget)
-    if (key.name === "tab" && !key.ctrl) {
-      if (state.activeTab === 1 && configPanel?.hasFocus()) return
-      const next = (state.activeTab + 1) % 2
-      tabs.setSelectedIndex(next)
-      state.activeTab = next
-      if (next === 0) showHistory()
-      else showConfig()
+    // Left/Right or h/l: Navigate between tabs (only when tabs are focused)
+    if (focusMode === "tabs") {
+      if (key.name === "left" || key.name === "right" || key.name === "h" || key.name === "l") {
+        const next = (state.activeTab + 1) % 2
+        tabs.setSelectedIndex(next)
+        state.activeTab = next
+        return
+      }
+      
+      // Enter or Down or j: Enter content area
+      if (key.name === "return" || key.name === "down" || key.name === "j") {
+        setFocusMode("content")
+        if (state.activeTab === 0) {
+          if (historyPanel) historyPanel.focusFirst?.()
+        } else {
+          if (configPanel) configPanel.focusFirst()
+        }
+        return
+      }
+    }
+    
+    // Escape: Return to tabs from content
+    if (key.name === "escape" && focusMode === "content") {
+      if (state.activeTab === 0) {
+        if (historyPanel) historyPanel.blurAll?.()
+      } else {
+        if (configPanel && configPanel.hasFocus()) {
+          configPanel.blurAll()
+        }
+      }
+      setFocusMode("tabs")
+      tabs.focus()
       return
     }
   })
