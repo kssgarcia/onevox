@@ -19,7 +19,7 @@ use anyhow::Result;
 #[cfg(feature = "onnx")]
 use ndarray::{Array1, Array2, Array3, Axis};
 #[cfg(feature = "onnx")]
-use ort::session::{Session, builder::GraphOptimizationLevel};
+use ort::session::{builder::GraphOptimizationLevel, Session};
 #[cfg(feature = "onnx")]
 use ort::value::Tensor;
 #[cfg(feature = "onnx")]
@@ -219,6 +219,7 @@ impl WhisperOnnx {
     /// Compute mel spectrogram from audio samples
     fn compute_mel_spectrogram(&self, samples: &[f32]) -> Result<Array3<f32>> {
         use constants::*;
+        use rustfft::{num_complex::Complex, FftPlanner};
 
         let filters = self
             .mel_filters
@@ -229,6 +230,10 @@ impl WhisperOnnx {
         let mut padded = vec![0.0f32; N_SAMPLES];
         let copy_len = samples.len().min(N_SAMPLES);
         padded[..copy_len].copy_from_slice(&samples[..copy_len]);
+
+        // Initialize FFT planner
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(N_FFT);
 
         // Compute STFT
         let mut spectrogram = Array2::<f32>::zeros((N_MELS, N_FRAMES));
@@ -242,24 +247,20 @@ impl WhisperOnnx {
             }
 
             // Extract frame with Hann window
-            let mut frame = vec![0.0f32; N_FFT];
+            let mut frame = vec![Complex::new(0.0f32, 0.0f32); N_FFT];
             for i in 0..(end - start) {
                 let window =
                     0.5 * (1.0 - ((2.0 * std::f32::consts::PI * i as f32) / N_FFT as f32).cos());
-                frame[i] = padded[start + i] * window;
+                frame[i] = Complex::new(padded[start + i] * window, 0.0);
             }
 
-            // Compute FFT magnitudes (simplified - using DFT)
+            // Compute FFT
+            fft.process(&mut frame);
+
+            // Compute magnitudes (only need first half + DC for real signal)
             let mut magnitudes = vec![0.0f32; N_FFT / 2 + 1];
-            for k in 0..magnitudes.len() {
-                let mut real = 0.0f32;
-                let mut imag = 0.0f32;
-                for (n, &sample) in frame.iter().enumerate() {
-                    let angle = -2.0 * std::f32::consts::PI * k as f32 * n as f32 / N_FFT as f32;
-                    real += sample * angle.cos();
-                    imag += sample * angle.sin();
-                }
-                magnitudes[k] = (real * real + imag * imag).sqrt();
+            for (k, mag) in magnitudes.iter_mut().enumerate() {
+                *mag = frame[k].norm();
             }
 
             // Apply mel filterbank
@@ -275,7 +276,7 @@ impl WhisperOnnx {
             }
         }
 
-        // Convert to log scale
+        // Convert to log scale (with small epsilon to avoid log(0))
         let log_spec = spectrogram.mapv(|x| (x.max(1e-10)).ln());
 
         // Normalize to match Whisper's expected input range
@@ -352,6 +353,13 @@ impl WhisperOnnx {
 
         debug!("Initial tokens: {:?}", tokens);
 
+        // Track token history for repetition detection
+        let mut token_counts: std::collections::HashMap<i64, usize> =
+            std::collections::HashMap::new();
+        let mut consecutive_repeats = 0;
+        let mut last_token: Option<i64> = None;
+        let mut recent_tokens: Vec<i64> = Vec::new(); // Track last N tokens for pattern detection
+
         // Autoregressive generation
         for step in 0..MAX_LENGTH {
             // Prepare decoder inputs
@@ -380,9 +388,11 @@ impl WhisperOnnx {
 
                 // Logits shape is [batch_size, sequence_length, vocab_size]
                 // Get the actual dimensions
-                debug!("Logits shape: {:?}", shape);
-                debug!("Logits data length: {}", logits_data.len());
-                debug!("Current token count: {}", tokens.len());
+                if step < 3 {
+                    debug!("Logits shape: {:?}", shape);
+                    debug!("Logits data length: {}", logits_data.len());
+                    debug!("Current token count: {}", tokens.len());
+                }
 
                 // Calculate vocab size from the shape
                 let vocab_size = shape[shape.len() - 1] as usize;
@@ -407,8 +417,29 @@ impl WhisperOnnx {
 
                 let last_logits = &logits_data[last_logits_start..last_logits_end];
 
-                // Get next token (greedy decoding) - compute before scope ends
-                last_logits
+                // Apply repetition penalty
+                let mut adjusted_logits: Vec<f32> = last_logits.to_vec();
+                let repetition_penalty: f32 = 2.0; // Strong penalty for repeated tokens
+
+                for (token_id, count) in &token_counts {
+                    if *count > 0 && (*token_id as usize) < adjusted_logits.len() {
+                        // Reduce logit score for repeated tokens exponentially
+                        let penalty = repetition_penalty.powi(*count as i32);
+                        adjusted_logits[*token_id as usize] /= penalty;
+                    }
+                }
+
+                // Boost EOT token to encourage ending
+                if step > 20 {
+                    // After 20 tokens, start boosting EOT
+                    let eot_boost = 1.0 + (step as f32 / 100.0); // Gradually increase
+                    if (EOT_TOKEN as usize) < adjusted_logits.len() {
+                        adjusted_logits[EOT_TOKEN as usize] *= eot_boost;
+                    }
+                }
+
+                // Greedy decoding with penalties applied
+                adjusted_logits
                     .iter()
                     .enumerate()
                     .max_by(|(_, a): &(usize, &f32), (_, b): &(usize, &f32)| {
@@ -418,7 +449,80 @@ impl WhisperOnnx {
                     .unwrap_or(EOT_TOKEN)
             }; // decoder_locked is dropped here
 
-            debug!("Step {}: Generated token {}", step, next_token);
+            if step < 10 || step % 20 == 0 {
+                debug!("Step {}: Generated token {}", step, next_token);
+            }
+
+            // Check for end of transcript
+            if next_token == EOT_TOKEN {
+                debug!("End of transcript at step {}", step);
+                break;
+            }
+
+            // Detect repetition loops (both consecutive and alternating patterns)
+            if Some(next_token) == last_token {
+                consecutive_repeats += 1;
+                if consecutive_repeats > 5 {
+                    warn!(
+                        "Detected consecutive repetition (token {} repeated {} times), stopping",
+                        next_token, consecutive_repeats
+                    );
+                    break;
+                }
+            } else {
+                consecutive_repeats = 0;
+            }
+
+            // Detect alternating patterns (A-B-A-B or A-B-C-A-B-C)
+            recent_tokens.push(next_token);
+            if recent_tokens.len() > 10 {
+                recent_tokens.remove(0);
+            }
+
+            // Check for A-B-A-B pattern (at least 8 repetitions to be sure)
+            if recent_tokens.len() >= 8 {
+                let len = recent_tokens.len();
+                // Check if last 8 tokens form A-B-A-B-A-B-A-B pattern
+                if recent_tokens[len - 1] == recent_tokens[len - 3]
+                    && recent_tokens[len - 1] == recent_tokens[len - 5]
+                    && recent_tokens[len - 1] == recent_tokens[len - 7]
+                    && recent_tokens[len - 2] == recent_tokens[len - 4]
+                    && recent_tokens[len - 2] == recent_tokens[len - 6]
+                    && recent_tokens[len - 2] == recent_tokens[len - 8]
+                    && recent_tokens[len - 1] != recent_tokens[len - 2]
+                {
+                    warn!(
+                        "Detected alternating repetition pattern ({} <-> {}), stopping",
+                        recent_tokens[len - 1],
+                        recent_tokens[len - 2]
+                    );
+                    break;
+                }
+            }
+
+            // Check for A-B-A-B pattern (at least 4 tokens)
+            if recent_tokens.len() >= 6 {
+                let len = recent_tokens.len();
+                // Check if last 6 tokens form A-B-A-B-A-B pattern
+                if recent_tokens[len - 1] == recent_tokens[len - 3]
+                    && recent_tokens[len - 1] == recent_tokens[len - 5]
+                    && recent_tokens[len - 2] == recent_tokens[len - 4]
+                    && recent_tokens[len - 2] == recent_tokens[len - 6]
+                    && recent_tokens[len - 1] != recent_tokens[len - 2]
+                {
+                    warn!(
+                        "Detected alternating repetition pattern ({} <-> {}), stopping",
+                        recent_tokens[len - 1],
+                        recent_tokens[len - 2]
+                    );
+                    break;
+                }
+            }
+
+            last_token = Some(next_token);
+
+            // Track token occurrences
+            *token_counts.entry(next_token).or_insert(0) += 1;
 
             // Check for end of transcript
             if next_token == EOT_TOKEN {

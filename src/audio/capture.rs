@@ -9,7 +9,7 @@ use cpal::{Device, Sample as CpalSample, SampleFormat, Stream, StreamConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 /// Parameters for building an audio stream
 struct StreamParams {
@@ -17,6 +17,8 @@ struct StreamParams {
     chunk_size: usize,
     target_sample_rate: u32,
     device_sample_rate: u32,
+    is_running: Arc<AtomicBool>,
+    channel_open: Arc<AtomicBool>,
 }
 
 /// Audio capture configuration
@@ -109,6 +111,7 @@ impl AudioCapture {
 
         let target_sample_rate = self.config.sample_rate;
         let is_running = Arc::clone(&self.is_running);
+        let channel_open = Arc::new(AtomicBool::new(true));
 
         // Build stream config
         let stream_params = StreamParams {
@@ -116,6 +119,8 @@ impl AudioCapture {
             chunk_size,
             target_sample_rate,
             device_sample_rate,
+            is_running: Arc::clone(&is_running),
+            channel_open,
         };
 
         // Build the input stream
@@ -165,6 +170,8 @@ impl AudioCapture {
             chunk_size,
             target_sample_rate,
             device_sample_rate,
+            is_running,
+            channel_open,
         } = params;
 
         let mut local_accumulator = Vec::with_capacity(chunk_size);
@@ -174,6 +181,12 @@ impl AudioCapture {
             .build_input_stream(
                 config,
                 move |data: &[T], _: &cpal::InputCallbackInfo| {
+                    if !is_running.load(Ordering::Relaxed)
+                        || !channel_open.load(Ordering::Relaxed)
+                    {
+                        return;
+                    }
+
                     // Convert samples to f32
                     for &sample in data.iter() {
                         let f32_sample: f32 = cpal::Sample::from_sample(sample);
@@ -181,20 +194,23 @@ impl AudioCapture {
 
                         // When we have enough samples for a chunk
                         if local_accumulator.len() >= chunk_size {
+                            let samples =
+                                std::mem::replace(&mut local_accumulator, Vec::with_capacity(chunk_size));
                             let chunk = if needs_resampling {
                                 // TODO: Implement resampling
                                 // For now, just use the samples as-is
-                                AudioChunk::new(local_accumulator.clone(), device_sample_rate)
+                                AudioChunk::new(samples, device_sample_rate)
                             } else {
-                                AudioChunk::new(local_accumulator.clone(), target_sample_rate)
+                                AudioChunk::new(samples, target_sample_rate)
                             };
 
                             // Send chunk
                             if let Err(e) = chunk_tx.send(chunk) {
-                                error!("Failed to send audio chunk: {}", e);
+                                if channel_open.swap(false, Ordering::Relaxed) {
+                                    debug!("Audio receiver closed, stopping chunk delivery: {}", e);
+                                }
+                                return;
                             }
-
-                            local_accumulator.clear();
                         }
                     }
                 },
@@ -215,12 +231,12 @@ impl AudioCapture {
         }
 
         info!("Stopping audio capture");
+        self.is_running.store(false, Ordering::SeqCst);
 
         if let Some(stream) = self.stream.take() {
             drop(stream);
         }
 
-        self.is_running.store(false, Ordering::SeqCst);
         self.chunk_tx = None;
 
         info!("Audio capture stopped");

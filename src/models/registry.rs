@@ -4,6 +4,17 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Model format/backend
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModelFormat {
+    /// GGML format (whisper.cpp)
+    GGML,
+    /// ONNX format
+    ONNX,
+    /// PyTorch format
+    PyTorch,
+}
+
 /// Available Whisper model sizes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModelSize {
@@ -47,6 +58,9 @@ pub struct ModelMetadata {
 
     /// Model variant
     pub variant: ModelVariant,
+
+    /// Model format/backend
+    pub format: ModelFormat,
 
     /// Approximate size in bytes
     pub size_bytes: u64,
@@ -93,12 +107,66 @@ impl ModelRegistry {
     pub fn new() -> Self {
         Self {
             models: vec![
+                // ============================================================
+                // GGML Models (whisper.cpp) - RECOMMENDED
+                // ============================================================
+                
+                // Tiny English-only GGML
+                ModelMetadata {
+                    id: "ggml-tiny.en".to_string(),
+                    name: "Whisper Tiny English (GGML)".to_string(),
+                    size: ModelSize::Tiny,
+                    variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::GGML,
+                    size_bytes: 75 * 1024 * 1024, // ~75 MB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-tiny.en.bin".to_string()],
+                    speed_factor: 32.0,
+                    memory_mb: 200,
+                    description: "Fastest model using whisper.cpp. English only. Recommended for real-time dictation.".to_string(),
+                },
+                
+                // Base English-only GGML
+                ModelMetadata {
+                    id: "ggml-base.en".to_string(),
+                    name: "Whisper Base English (GGML)".to_string(),
+                    size: ModelSize::Base,
+                    variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::GGML,
+                    size_bytes: 140 * 1024 * 1024, // ~140 MB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-base.en.bin".to_string()],
+                    speed_factor: 16.0,
+                    memory_mb: 300,
+                    description: "Best balance of speed and accuracy. Recommended for most users.".to_string(),
+                },
+                
+                // Small English-only GGML
+                ModelMetadata {
+                    id: "ggml-small.en".to_string(),
+                    name: "Whisper Small English (GGML)".to_string(),
+                    size: ModelSize::Small,
+                    variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::GGML,
+                    size_bytes: 470 * 1024 * 1024, // ~470 MB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-small.en.bin".to_string()],
+                    speed_factor: 8.0,
+                    memory_mb: 600,
+                    description: "Higher accuracy, still fast enough for real-time use.".to_string(),
+                },
+                
+                // ============================================================
+                // ONNX Models (Alternative backend)
+                // ============================================================
+                
                 // Tiny English-only (fastest, lowest quality)
                 ModelMetadata {
                     id: "whisper-tiny.en".to_string(),
-                    name: "Whisper Tiny (English)".to_string(),
+                    name: "Whisper Tiny English (ONNX)".to_string(),
                     size: ModelSize::Tiny,
                     variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::ONNX,
                     size_bytes: 75 * 1024 * 1024, // ~75 MB
                     hf_repo: "onnx-community/whisper-tiny.en".to_string(),
                     files: vec![
@@ -107,15 +175,16 @@ impl ModelRegistry {
                     ],
                     speed_factor: 32.0, // 32x faster than real-time on CPU
                     memory_mb: 200,
-                    description: "Fastest model, best for real-time dictation. English only."
+                    description: "ONNX backend (experimental). Use GGML models instead."
                         .to_string(),
                 },
                 // Base English-only (good balance)
                 ModelMetadata {
                     id: "whisper-base.en".to_string(),
-                    name: "Whisper Base (English)".to_string(),
+                    name: "Whisper Base English (ONNX)".to_string(),
                     size: ModelSize::Base,
                     variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::ONNX,
                     size_bytes: 140 * 1024 * 1024, // ~140 MB
                     hf_repo: "onnx-community/whisper-base.en".to_string(),
                     files: vec![
@@ -124,15 +193,16 @@ impl ModelRegistry {
                     ],
                     speed_factor: 16.0, // 16x faster than real-time
                     memory_mb: 300,
-                    description: "Good balance of speed and accuracy. Recommended for most users."
+                    description: "ONNX backend (experimental). Use GGML models instead."
                         .to_string(),
                 },
                 // Small English-only (better quality)
                 ModelMetadata {
                     id: "whisper-small.en".to_string(),
-                    name: "Whisper Small (English)".to_string(),
+                    name: "Whisper Small English (ONNX)".to_string(),
                     size: ModelSize::Small,
                     variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::ONNX,
                     size_bytes: 470 * 1024 * 1024, // ~470 MB
                     hf_repo: "onnx-community/whisper-small.en".to_string(),
                     files: vec![
@@ -141,15 +211,16 @@ impl ModelRegistry {
                     ],
                     speed_factor: 8.0, // 8x faster than real-time
                     memory_mb: 600,
-                    description: "Higher accuracy, still fast enough for real-time use."
+                    description: "ONNX backend (experimental). Use GGML models instead."
                         .to_string(),
                 },
                 // Medium English-only (high quality)
                 ModelMetadata {
                     id: "whisper-medium.en".to_string(),
-                    name: "Whisper Medium (English)".to_string(),
+                    name: "Whisper Medium English (ONNX)".to_string(),
                     size: ModelSize::Medium,
                     variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::ONNX,
                     size_bytes: 1500 * 1024 * 1024, // ~1.5 GB
                     hf_repo: "onnx-community/whisper-medium.en".to_string(),
                     files: vec![
@@ -158,8 +229,7 @@ impl ModelRegistry {
                     ],
                     speed_factor: 4.0, // 4x faster than real-time
                     memory_mb: 1200,
-                    description:
-                        "High accuracy, requires more memory. May not be real-time on slower CPUs."
+                    description: "ONNX backend (experimental). Use GGML models instead."
                             .to_string(),
                 },
             ],
@@ -176,10 +246,10 @@ impl ModelRegistry {
         self.models.iter().find(|m| m.id == id)
     }
 
-    /// Get recommended model (base.en for most users)
+    /// Get recommended model (ggml-base.en for most users)
     pub fn recommended(&self) -> &ModelMetadata {
-        self.get_model("whisper-base.en")
-            .expect("base.en model should exist")
+        self.get_model("ggml-base.en")
+            .expect("ggml-base.en model should exist")
     }
 }
 

@@ -31,11 +31,10 @@ hound = "3.5"
 rubato = "0.15"
 ringbuf = "0.4"
 dasp = "0.11"
+rustfft = "6.2"  # Fast FFT for mel spectrogram computation
 
-# Speech-to-text models
-# whisper-rs = "0.15"  # TODO: Re-enable once build issues resolved
-# Note: Currently using mock model for testing. whisper-rs has build issues
-# with macOS 26.2 SDK and C++ compiler compatibility.
+# Utilities
+tempfile = "3.8"  # Temporary files for whisper-cli integration
 
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
@@ -78,10 +77,9 @@ handy-keys = "0.2.1"  # Cross-platform global keyboard shortcuts
 enigo = "0.6"  # Keyboard/mouse simulation for text injection
 
 [features]
-default = ["onnx"]  # Enable ONNX by default for Whisper support
+default = []  # No optional features by default - whisper-cpp-cli is always available
 
 # Model backends
-whisper-cpp = []
 faster-whisper = ["pyo3", "pyo3-asyncio"]
 onnx = ["ort", "ndarray"]
 candle = ["candle-core", "candle-nn", "candle-transformers"]
@@ -148,7 +146,6 @@ optional = true
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.8"
 assert_cmd = "2.0"
 predicates = "3.0"
 criterion = { version = "0.5", features = ["html_reports"] }

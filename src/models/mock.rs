@@ -43,11 +43,12 @@ impl ModelRuntime for MockModel {
         self.is_loaded
     }
 
-    fn transcribe(&self, samples: &[f32], sample_rate: u32) -> crate::Result<Transcription> {
+    fn transcribe(&mut self, samples: &[f32], sample_rate: u32) -> crate::Result<Transcription> {
         if !self.is_loaded {
             return Err(crate::Error::Model("Model not loaded".to_string()));
         }
 
+        self.transcription_count += 1;
         let start = Instant::now();
 
         // Calculate duration

@@ -5,12 +5,12 @@
 
 use crate::audio::{AudioEngine, CaptureConfig};
 use crate::config::Config;
-use crate::models::{ModelConfig, ModelRuntime, WhisperOnnx};
+use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCppCli};
 use crate::platform::{HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector};
 use crate::vad::{EnergyVad, VadDetector, VadProcessor};
 use anyhow::{Context, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
@@ -29,7 +29,7 @@ pub struct DictationEngine {
     audio_engine: AudioEngine,
 
     /// Model runtime
-    model: Box<dyn ModelRuntime>,
+    model: Arc<Mutex<Box<dyn ModelRuntime>>>,
 
     /// Is currently dictating
     is_dictating: Arc<AtomicBool>,
@@ -56,10 +56,8 @@ impl DictationEngine {
         // Create audio engine
         let audio_engine = AudioEngine::new();
 
-        // Create Whisper ONNX model
-        let mut model: Box<dyn ModelRuntime> = Box::new(
-            WhisperOnnx::new().context("Failed to create Whisper ONNX model")?
-        );
+        // Create Whisper CLI model
+        let mut model: Box<dyn ModelRuntime> = Box::new(WhisperCppCli::new(None));
         let model_config = ModelConfig {
             model_path: config.model.model_path.clone(),
             language: config.model.language.clone(),
@@ -75,7 +73,7 @@ impl DictationEngine {
             hotkey_manager,
             text_injector,
             audio_engine,
-            model,
+            model: Arc::new(Mutex::new(model)),
             is_dictating: Arc::new(AtomicBool::new(false)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
         })
@@ -84,6 +82,9 @@ impl DictationEngine {
     /// Start the dictation engine
     pub async fn start(&mut self) -> Result<()> {
         info!("Starting dictation engine");
+
+        // List available audio devices for debugging
+        self.list_audio_devices();
 
         // Register global hotkey
         let hotkey_str = self.config.hotkey.trigger.clone();
@@ -176,7 +177,7 @@ impl DictationEngine {
         // Clone needed values for the processing task
         let is_dictating = Arc::clone(&self.is_dictating);
         let injector = self.text_injector.clone();
-        let model = self.model_clone();
+        let model = Arc::clone(&self.model);
         let vad_enabled = self.config.vad.enabled;
 
         if vad_enabled {
@@ -193,17 +194,21 @@ impl DictationEngine {
             tokio::spawn(async move {
                 info!("📡 Audio processing task started (VAD mode)");
 
-                while is_dictating.load(Ordering::SeqCst) {
-                    // Receive audio chunk
-                    match audio_rx.recv().await {
-                        Some(chunk) => {
+                loop {
+                    match tokio::time::timeout(
+                        tokio::time::Duration::from_millis(100),
+                        audio_rx.recv(),
+                    )
+                    .await
+                    {
+                        Ok(Some(chunk)) => {
                             // Process through VAD
                             match vad_processor.process(chunk) {
                                 Ok(Some(segment)) => {
                                     info!("🎯 Speech segment detected ({} chunks)", segment.len());
 
                                     // Transcribe
-                                    match model.transcribe_segment(&segment) {
+                                    match Self::transcribe_with_model(Arc::clone(&model), segment).await {
                                         Ok(transcript) => {
                                             info!("📝 Transcription: {}", transcript.text);
 
@@ -227,9 +232,14 @@ impl DictationEngine {
                                 }
                             }
                         }
-                        None => {
+                        Ok(None) => {
                             debug!("Audio channel closed");
                             break;
+                        }
+                        Err(_) => {
+                            if !is_dictating.load(Ordering::SeqCst) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -245,16 +255,25 @@ impl DictationEngine {
                 info!("📡 Audio collection task started (no VAD)");
                 let mut collected_chunks = Vec::new();
 
-                while is_dictating.load(Ordering::SeqCst) {
-                    // Receive audio chunk
-                    match audio_rx.recv().await {
-                        Some(chunk) => {
+                loop {
+                    match tokio::time::timeout(
+                        tokio::time::Duration::from_millis(100),
+                        audio_rx.recv(),
+                    )
+                    .await
+                    {
+                        Ok(Some(chunk)) => {
                             debug!("Collected audio chunk: {} samples", chunk.samples.len());
                             collected_chunks.push(chunk);
                         }
-                        None => {
+                        Ok(None) => {
                             debug!("Audio channel closed");
                             break;
+                        }
+                        Err(_) => {
+                            if !is_dictating.load(Ordering::SeqCst) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -266,8 +285,29 @@ impl DictationEngine {
                     // Create a speech segment from all collected chunks
                     let segment = crate::vad::SpeechSegment::new(collected_chunks);
                     
+                    // DEBUG: Analyze captured audio
+                    let samples = segment.get_samples();
+                    let sample_rate = segment.sample_rate();
+                    
+                    // Calculate audio statistics
+                    let duration_secs = samples.len() as f32 / sample_rate as f32;
+                    let max_amplitude = samples.iter().map(|&s| s.abs()).fold(0.0f32, f32::max);
+                    let rms = (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
+                    let non_zero_samples = samples.iter().filter(|&&s| s.abs() > 0.0001).count();
+                    
+                    info!("📊 Audio statistics:");
+                    info!("  - Total samples: {}", samples.len());
+                    info!("  - Sample rate: {} Hz", sample_rate);
+                    info!("  - Duration: {:.2} seconds", duration_secs);
+                    info!("  - Max amplitude: {:.4}", max_amplitude);
+                    info!("  - RMS level: {:.4}", rms);
+                    info!("  - Non-zero samples: {} ({:.1}%)", 
+                        non_zero_samples,
+                        100.0 * non_zero_samples as f32 / samples.len() as f32
+                    );
+
                     // Transcribe
-                    match model.transcribe_segment(&segment) {
+                    match Self::transcribe_with_model(Arc::clone(&model), segment).await {
                         Ok(transcript) => {
                             info!("📝 Transcription: {}", transcript.text);
 
@@ -309,22 +349,41 @@ impl DictationEngine {
         Ok(())
     }
 
-    /// Clone the model (workaround for non-Clone trait)
-    /// TODO: Improve this with proper model management
-    fn model_clone(&self) -> Box<dyn ModelRuntime> {
-        // For now, create a new WhisperOnnx model
-        // In production, we'd use Arc<Mutex<>> or similar
-        let mut model: Box<dyn ModelRuntime> = Box::new(
-            WhisperOnnx::new().expect("Failed to create Whisper ONNX model")
-        );
-        let config = ModelConfig {
-            model_path: self.config.model.model_path.clone(),
-            language: self.config.model.language.clone(),
-            use_gpu: self.config.model.device == "gpu",
-            ..Default::default()
-        };
-        let _ = model.load(config);
-        model
+    async fn transcribe_with_model(
+        model: Arc<Mutex<Box<dyn ModelRuntime>>>,
+        segment: crate::vad::SpeechSegment,
+    ) -> std::result::Result<Transcription, String> {
+        match tokio::task::spawn_blocking(move || {
+            let mut guard = model
+                .lock()
+                .map_err(|_| "Model mutex poisoned".to_string())?;
+            guard
+                .transcribe_segment(&segment)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        {
+            Ok(result) => result,
+            Err(e) => Err(format!("Transcription task failed: {}", e)),
+        }
+    }
+
+    /// List available audio devices for debugging
+    fn list_audio_devices(&self) {
+        use crate::audio::devices::AudioDeviceManager;
+        
+        let device_manager = AudioDeviceManager::new();
+        match device_manager.list_input_devices() {
+            Ok(devices) => {
+                info!("🎙️  Available audio input devices:");
+                for device in devices {
+                    info!("  - {}", device);
+                }
+            }
+            Err(e) => {
+                warn!("Failed to list audio devices: {}", e);
+            }
+        }
     }
 
     /// Shutdown the dictation engine
@@ -342,7 +401,11 @@ impl DictationEngine {
             error!("Failed to unregister hotkeys: {}", e);
         }
 
-        self.model.unload();
+        if let Ok(mut model) = self.model.lock() {
+            model.unload();
+        } else {
+            error!("Failed to acquire model lock during shutdown");
+        }
     }
 
     /// Check if currently dictating

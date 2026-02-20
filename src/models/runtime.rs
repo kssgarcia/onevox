@@ -78,15 +78,15 @@ pub trait ModelRuntime: Send + Sync {
 
     /// Transcribe raw audio samples
     /// Samples should be mono, f32, 16kHz
-    fn transcribe(&self, samples: &[f32], sample_rate: u32) -> crate::Result<Transcription>;
+    fn transcribe(&mut self, samples: &[f32], sample_rate: u32) -> crate::Result<Transcription>;
 
     /// Transcribe an audio chunk
-    fn transcribe_chunk(&self, chunk: &AudioChunk) -> crate::Result<Transcription> {
+    fn transcribe_chunk(&mut self, chunk: &AudioChunk) -> crate::Result<Transcription> {
         self.transcribe(&chunk.samples, chunk.sample_rate)
     }
 
     /// Transcribe a speech segment
-    fn transcribe_segment(&self, segment: &SpeechSegment) -> crate::Result<Transcription> {
+    fn transcribe_segment(&mut self, segment: &SpeechSegment) -> crate::Result<Transcription> {
         let samples = segment.get_samples();
         let sample_rate = segment.sample_rate();
         self.transcribe(&samples, sample_rate)
