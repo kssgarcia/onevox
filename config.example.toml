@@ -41,6 +41,10 @@ chunk_duration_ms = 200
 # How much audio to keep in memory before dropping
 buffer_duration_sec = 2
 
+[ui]
+# Show floating desktop indicator while recording/processing
+recording_overlay = true
+
 [vad]
 # Enable Voice Activity Detection to filter silence
 enabled = false
@@ -131,6 +135,10 @@ method = "accessibility"
 
 # Delay before pasting (ms) - only for clipboard/paste methods
 paste_delay_ms = 50
+
+# Delay after closing overlay before injection starts (ms)
+# Helps avoid focus races on some platforms/apps
+focus_settle_ms = 80
 
 # Simulate typing speed (chars/sec) - only for paste method
 typing_speed = 100

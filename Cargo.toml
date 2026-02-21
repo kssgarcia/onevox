@@ -77,7 +77,7 @@ handy-keys = "0.2.1"  # Cross-platform global keyboard shortcuts
 enigo = "0.6"  # Keyboard/mouse simulation for text injection
 
 [features]
-default = []  # No optional features by default - whisper-cpp-cli is always available
+default = ["overlay-indicator"]  # Enable desktop recording overlay by default
 
 # Model backends
 faster-whisper = ["pyo3", "pyo3-asyncio"]
@@ -91,6 +91,7 @@ webrtc-vad = []
 # Features
 tui = ["ratatui", "crossterm"]
 gpu = []
+overlay-indicator = ["eframe", "winit"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"
@@ -142,6 +143,14 @@ optional = true
 
 [dependencies.crossterm]
 version = "0.28"
+optional = true
+
+[dependencies.eframe]
+version = "0.31"
+optional = true
+
+[dependencies.winit]
+version = "0.30"
 optional = true
 
 [dev-dependencies]

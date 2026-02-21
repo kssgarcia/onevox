@@ -13,6 +13,8 @@ pub struct Config {
     pub hotkey: HotkeyConfig,
     pub audio: AudioConfig,
     #[serde(default)]
+    pub ui: UiConfig,
+    #[serde(default)]
     pub vad: VadConfig,
     #[serde(default)]
     pub model: ModelConfig,
@@ -39,6 +41,11 @@ pub struct AudioConfig {
     pub device: String,
     pub sample_rate: u32,
     pub chunk_duration_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UiConfig {
+    pub recording_overlay: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +81,8 @@ pub struct PostProcessingConfig {
 pub struct InjectionConfig {
     pub method: String,
     pub paste_delay_ms: u32,
+    #[serde(default = "default_focus_settle_ms")]
+    pub focus_settle_ms: u32,
 }
 
 impl Default for Config {
@@ -92,6 +101,7 @@ impl Default for Config {
                 sample_rate: 16000,
                 chunk_duration_ms: 200,
             },
+            ui: UiConfig::default(),
             vad: VadConfig::default(),
             model: ModelConfig::default(),
             post_processing: PostProcessingConfig::default(),
@@ -111,6 +121,14 @@ impl Default for VadConfig {
             min_speech_chunks: 2,
             min_silence_chunks: 3,
             adaptive: true,
+        }
+    }
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        Self {
+            recording_overlay: true,
         }
     }
 }
@@ -143,8 +161,13 @@ impl Default for InjectionConfig {
         Self {
             method: "accessibility".to_string(),
             paste_delay_ms: 50,
+            focus_settle_ms: default_focus_settle_ms(),
         }
     }
+}
+
+fn default_focus_settle_ms() -> u32 {
+    80
 }
 
 impl Config {

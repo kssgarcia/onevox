@@ -5,6 +5,7 @@
 
 use crate::audio::{AudioEngine, CaptureConfig};
 use crate::config::Config;
+use crate::indicator::RecordingIndicator;
 use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCppCli};
 use crate::platform::{HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector};
 use crate::vad::{EnergyVad, VadDetector, VadProcessor};
@@ -36,6 +37,9 @@ pub struct DictationEngine {
 
     /// Shutdown signal
     shutdown_signal: Arc<AtomicBool>,
+
+    /// Floating UI indicator
+    indicator: Arc<RecordingIndicator>,
 }
 
 impl DictationEngine {
@@ -69,6 +73,7 @@ impl DictationEngine {
         info!("✅ Dictation engine initialized");
 
         Ok(Self {
+            indicator: Arc::new(RecordingIndicator::new(config.ui.recording_overlay)),
             config,
             hotkey_manager,
             text_injector,
@@ -163,6 +168,7 @@ impl DictationEngine {
 
         info!("🎤 Starting dictation");
         self.is_dictating.store(true, Ordering::SeqCst);
+        self.indicator.recording();
 
         // Start audio capture
         let capture_config = CaptureConfig {
@@ -179,6 +185,8 @@ impl DictationEngine {
         let injector = self.text_injector.clone();
         let model = Arc::clone(&self.model);
         let vad_enabled = self.config.vad.enabled;
+        let indicator = Arc::clone(&self.indicator);
+        let focus_settle_ms = self.config.injection.focus_settle_ms;
 
         if vad_enabled {
             // VAD-based processing: detect speech segments and transcribe them
@@ -206,11 +214,21 @@ impl DictationEngine {
                             match vad_processor.process(chunk) {
                                 Ok(Some(segment)) => {
                                     info!("🎯 Speech segment detected ({} chunks)", segment.len());
+                                    indicator.processing();
 
                                     // Transcribe
                                     match Self::transcribe_with_model(Arc::clone(&model), segment).await {
                                         Ok(transcript) => {
                                             info!("📝 Transcription: {}", transcript.text);
+
+                                            // Hide overlay before injection so target app keeps focus.
+                                            indicator.hide();
+                                            if focus_settle_ms > 0 {
+                                                tokio::time::sleep(tokio::time::Duration::from_millis(
+                                                    focus_settle_ms as u64,
+                                                ))
+                                                .await;
+                                            }
 
                                             // Inject text into active application
                                             if let Err(e) = injector.inject(&transcript.text) {
@@ -222,6 +240,10 @@ impl DictationEngine {
                                         Err(e) => {
                                             error!("Transcription failed: {}", e);
                                         }
+                                    }
+
+                                    if is_dictating.load(Ordering::SeqCst) {
+                                        indicator.recording();
                                     }
                                 }
                                 Ok(None) => {
@@ -244,6 +266,7 @@ impl DictationEngine {
                     }
                 }
 
+                indicator.hide();
                 info!("📡 Audio processing task stopped");
             });
         } else {
@@ -281,6 +304,7 @@ impl DictationEngine {
                 // Hotkey released - transcribe all collected audio
                 if !collected_chunks.is_empty() {
                     info!("🎤 Hotkey released - transcribing {} chunks", collected_chunks.len());
+                    indicator.processing();
 
                     // Create a speech segment from all collected chunks
                     let segment = crate::vad::SpeechSegment::new(collected_chunks);
@@ -311,6 +335,15 @@ impl DictationEngine {
                         Ok(transcript) => {
                             info!("📝 Transcription: {}", transcript.text);
 
+                            // Hide overlay before injection so target app keeps focus.
+                            indicator.hide();
+                            if focus_settle_ms > 0 {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(
+                                    focus_settle_ms as u64,
+                                ))
+                                .await;
+                            }
+
                             // Inject text into active application
                             if let Err(e) = injector.inject(&transcript.text) {
                                 error!("Failed to inject text: {}", e);
@@ -326,6 +359,7 @@ impl DictationEngine {
                     info!("No audio collected during dictation session");
                 }
 
+                indicator.hide();
                 info!("📡 Audio collection task stopped");
             });
         }
@@ -342,6 +376,7 @@ impl DictationEngine {
 
         info!("🛑 Stopping dictation");
         self.is_dictating.store(false, Ordering::SeqCst);
+        self.indicator.processing();
 
         // Stop audio capture
         self.audio_engine.stop_capture()?;
@@ -396,6 +431,7 @@ impl DictationEngine {
             let _ = self.audio_engine.stop_capture();
             self.is_dictating.store(false, Ordering::SeqCst);
         }
+        self.indicator.hide();
 
         if let Err(e) = self.hotkey_manager.unregister() {
             error!("Failed to unregister hotkeys: {}", e);

@@ -80,6 +80,14 @@ enum Commands {
         #[arg(short, long, default_value = "Cmd+Shift+Space")]
         hotkey: String,
     },
+
+    /// Internal overlay indicator process
+    #[command(hide = true)]
+    Indicator {
+        /// Indicator mode: recording or processing
+        #[arg(long)]
+        mode: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -636,6 +644,16 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
+
+        Commands::Indicator { mode } => {
+            let parsed = onevox::indicator::IndicatorMode::from_cli(&mode).ok_or_else(|| {
+                onevox::Error::Config(format!(
+                    "Invalid indicator mode '{}', expected 'recording' or 'processing'",
+                    mode
+                ))
+            })?;
+            onevox::indicator::run_indicator(parsed)
+        },
 
         Commands::TestHotkey { hotkey } => {
             println!("🎹 Testing hotkey detection...");
