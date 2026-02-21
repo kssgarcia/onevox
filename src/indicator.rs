@@ -138,7 +138,9 @@ fn spawn_child(mode: IndicatorMode) -> Option<Child> {
 }
 
 fn indicator_state_path() -> Option<PathBuf> {
-    dirs::cache_dir().map(|d| d.join("onevox").join("indicator.state"))
+    crate::platform::paths::cache_dir()
+        .ok()
+        .map(|d| d.join("indicator.state"))
 }
 
 fn write_indicator_state(mode: Option<IndicatorMode>) {

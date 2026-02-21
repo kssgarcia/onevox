@@ -226,11 +226,9 @@ impl Config {
 
     /// Get default config path
     pub fn default_path() -> PathBuf {
-        let config_dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("onevox");
-
-        config_dir.join("config.toml")
+        crate::platform::paths::config_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("config.toml")
     }
 
     /// Load from default location

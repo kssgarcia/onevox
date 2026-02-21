@@ -31,27 +31,11 @@ impl IpcClient {
 
     /// Get default socket path
     pub fn default_socket_path() -> PathBuf {
-        #[cfg(target_os = "macos")]
-        {
-            dirs::runtime_dir()
-                .or_else(dirs::cache_dir)
-                .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("onevox")
-                .join("onevox.sock")
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            dirs::runtime_dir()
-                .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("onevox")
-                .join("onevox.sock")
-        }
-
-        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-        {
-            PathBuf::from("/tmp/onevox/onevox.sock")
-        }
+        // Use platform-appropriate runtime directory
+        crate::platform::paths::runtime_dir()
+            .or_else(|_| crate::platform::paths::cache_dir())
+            .unwrap_or_else(|_| PathBuf::from("/tmp").join("onevox"))
+            .join("onevox.sock")
     }
 
     /// Send a command and wait for response
@@ -141,7 +125,10 @@ impl IpcClient {
 
     /// Delete a specific history entry
     pub async fn delete_history_entry(&mut self, id: u64) -> Result<()> {
-        match self.send_command(Command::DeleteHistoryEntry { id }).await? {
+        match self
+            .send_command(Command::DeleteHistoryEntry { id })
+            .await?
+        {
             Response::Ok(_) => Ok(()),
             Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
             _ => Err(anyhow::anyhow!("Unexpected response")),

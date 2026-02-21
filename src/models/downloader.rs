@@ -4,6 +4,7 @@
 
 use crate::models::registry::ModelMetadata;
 use anyhow::{Context, Result};
+use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use tokio::fs;
@@ -19,7 +20,7 @@ pub struct ModelDownloader {
 impl ModelDownloader {
     /// Create a new model downloader
     pub fn new() -> Result<Self> {
-        let cache_dir = Self::get_cache_dir()?;
+        let cache_dir = crate::platform::models_dir().context("Failed to get models directory")?;
 
         let client = reqwest::Client::builder()
             .user_agent("onevox/0.1.0")
@@ -32,11 +33,7 @@ impl ModelDownloader {
 
     /// Get the model cache directory
     pub fn get_cache_dir() -> Result<PathBuf> {
-        let cache_dir = dirs::cache_dir()
-            .context("Failed to get cache directory")?
-            .join("onevox")
-            .join("models");
-        Ok(cache_dir)
+        crate::platform::models_dir().context("Failed to get models directory")
     }
 
     /// Get the directory for a specific model
@@ -89,7 +86,22 @@ impl ModelDownloader {
             }
 
             info!("Downloading: {} from {}", file, url);
-            self.download_file(&url, &file_path).await?;
+            if let Err(e) = self.download_file(&url, &file_path).await {
+                return Err(anyhow::anyhow!(
+                    "Failed to download '{}' from '{}': {}. \
+                     You can manually download this file and place it at '{}'.",
+                    file,
+                    url,
+                    e,
+                    file_path.display()
+                ));
+            }
+
+            // Verify downloaded artifact when checksum is available.
+            if let Some(expected_sha) = metadata.file_sha256.get(&file) {
+                self.verify_checksum(&file_path, expected_sha).await?;
+                info!("Checksum verified: {}", file);
+            }
         }
 
         info!("✅ Model downloaded successfully: {}", metadata.id);
@@ -118,12 +130,14 @@ impl ModelDownloader {
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-                .unwrap()
+                .unwrap_or_else(|_| ProgressStyle::default_bar())
                 .progress_chars("#>-"),
         );
         pb.set_message(format!(
             "Downloading {}",
-            dest.file_name().unwrap().to_string_lossy()
+            dest.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "model".to_string())
         ));
 
         // Create temporary file
@@ -136,7 +150,6 @@ impl ModelDownloader {
         let mut downloaded: u64 = 0;
         let mut stream = response.bytes_stream();
 
-        use futures::StreamExt;
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.context("Failed to read download chunk")?;
             file.write_all(&chunk)
@@ -148,13 +161,63 @@ impl ModelDownloader {
 
         pb.finish_with_message(format!(
             "Downloaded {}",
-            dest.file_name().unwrap().to_string_lossy()
+            dest.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "model".to_string())
         ));
 
         // Move temp file to final location
         fs::rename(&temp_path, dest)
             .await
             .context("Failed to move downloaded file")?;
+
+        Ok(())
+    }
+
+    async fn verify_checksum(&self, path: &Path, expected_sha256: &str) -> Result<()> {
+        let file = path.to_path_buf();
+        let expected = expected_sha256.to_ascii_lowercase();
+
+        let actual = tokio::task::spawn_blocking(move || -> Result<String> {
+            let file_str = file.to_string_lossy().to_string();
+
+            let candidates: [(&str, Vec<&str>); 3] = [
+                ("sha256sum", vec![&file_str]),
+                ("shasum", vec!["-a", "256", &file_str]),
+                ("openssl", vec!["dgst", "-sha256", &file_str]),
+            ];
+
+            for (bin, args) in candidates {
+                let output = std::process::Command::new(bin).args(args).output();
+                let Ok(output) = output else {
+                    continue;
+                };
+
+                if !output.status.success() {
+                    continue;
+                }
+
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(hash) = parse_sha256_from_output(&stdout) {
+                    return Ok(hash.to_ascii_lowercase());
+                }
+            }
+
+            anyhow::bail!(
+                "No checksum tool available (tried: sha256sum, shasum, openssl). \
+                 Install one to enable model integrity verification."
+            )
+        })
+        .await??;
+
+        if !actual.eq_ignore_ascii_case(expected_sha256) {
+            anyhow::bail!(
+                "Checksum mismatch for {}. expected={}, actual={}",
+                path.display(),
+                expected,
+                actual
+            );
+        }
 
         Ok(())
     }
@@ -230,6 +293,21 @@ impl ModelDownloader {
             Ok(total_size)
         })
     }
+}
+
+fn parse_sha256_from_output(output: &str) -> Option<String> {
+    if let Some(first) = output.split_whitespace().next() {
+        if first.len() == 64 && first.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Some(first.to_string());
+        }
+    }
+
+    output
+        .split('=')
+        .nth(1)
+        .map(str::trim)
+        .filter(|hash| hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()))
+        .map(ToOwned::to_owned)
 }
 
 impl Default for ModelDownloader {

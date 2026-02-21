@@ -9,8 +9,9 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
 /// A single transcription history entry
@@ -40,7 +41,7 @@ impl HistoryEntry {
     pub fn new(text: String, model: String, duration_ms: u64, confidence: Option<f32>) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(std::time::Duration::from_secs(0))
             .as_secs();
 
         Self {
@@ -67,13 +68,32 @@ pub struct HistoryManager {
 }
 
 impl HistoryManager {
-    /// Create a new history manager
+    /// Create a new history manager (synchronous constructor)
+    /// Use `new_async()` instead for proper async initialization
     pub fn new(config: crate::config::HistoryConfig) -> crate::Result<Self> {
         let history_path = Self::default_history_path();
 
         // Create data directory if it doesn't exist
         if let Some(parent) = history_path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
+                crate::Error::Other(format!("Failed to create history directory: {}", e))
+            })?;
+        }
+
+        Ok(Self {
+            config,
+            history_path,
+            entries: Arc::new(Mutex::new(Vec::new())),
+        })
+    }
+
+    /// Create a new history manager with async initialization (recommended)
+    pub async fn new_async(config: crate::config::HistoryConfig) -> crate::Result<Self> {
+        let history_path = Self::default_history_path();
+
+        // Create data directory if it doesn't exist
+        if let Some(parent) = history_path.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
                 crate::Error::Other(format!("Failed to create history directory: {}", e))
             })?;
         }
@@ -86,7 +106,7 @@ impl HistoryManager {
 
         // Load existing history
         if manager.config.enabled {
-            if let Err(e) = manager.load() {
+            if let Err(e) = manager.load().await {
                 warn!("Failed to load history: {}", e);
             }
         }
@@ -96,56 +116,18 @@ impl HistoryManager {
 
     /// Get the default history file path
     pub fn default_history_path() -> PathBuf {
-        let data_dir = if let Ok(dir) = std::env::var("ONEVOX_DATA_DIR") {
-            PathBuf::from(dir)
-        } else if let Ok(dir) = std::env::var("VOX_DATA_DIR") {
-            PathBuf::from(dir)
-        } else {
-            #[cfg(target_os = "windows")]
-            {
-                let appdata = std::env::var("APPDATA").unwrap_or_else(|_| {
-                    dirs::home_dir()
-                        .unwrap()
-                        .join("AppData\\Roaming")
-                        .to_string_lossy()
-                        .to_string()
-                });
-                PathBuf::from(appdata).join("onevox")
-            }
-
-            #[cfg(target_os = "macos")]
-            {
-                dirs::home_dir()
-                    .unwrap_or_else(|| PathBuf::from("."))
-                    .join("Library/Application Support/onevox")
-            }
-
-            #[cfg(target_os = "linux")]
-            {
-                if let Ok(xdg_data) = std::env::var("XDG_DATA_HOME") {
-                    PathBuf::from(xdg_data).join("onevox")
-                } else {
-                    dirs::home_dir()
-                        .unwrap_or_else(|| PathBuf::from("."))
-                        .join(".local/share/onevox")
-                }
-            }
-        };
-
-        data_dir.join("history.json")
+        crate::platform::paths::history_db_path()
+            .unwrap_or_else(|_| PathBuf::from("./history.json"))
     }
 
     /// Add a new entry to history
-    pub fn add_entry(&self, entry: HistoryEntry) -> crate::Result<()> {
+    pub async fn add_entry(&self, entry: HistoryEntry) -> crate::Result<()> {
         if !self.config.enabled {
             debug!("History disabled, skipping entry");
             return Ok(());
         }
 
-        let mut entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+        let mut entries = self.entries.lock().await;
 
         entries.push(entry.clone());
         info!(
@@ -171,40 +153,31 @@ impl HistoryManager {
         // Auto-save if enabled
         if self.config.auto_save {
             drop(entries); // Release lock before saving
-            self.save()?;
+            self.save().await?;
         }
 
         Ok(())
     }
 
     /// Get all history entries
-    pub fn get_all(&self) -> crate::Result<Vec<HistoryEntry>> {
-        let entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+    pub async fn get_all(&self) -> crate::Result<Vec<HistoryEntry>> {
+        let entries = self.entries.lock().await;
         Ok(entries.clone())
     }
 
     /// Get a specific entry by ID
-    pub fn get_entry(&self, id: u64) -> crate::Result<Option<HistoryEntry>> {
-        let entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+    pub async fn get_entry(&self, id: u64) -> crate::Result<Option<HistoryEntry>> {
+        let entries = self.entries.lock().await;
         Ok(entries.iter().find(|e| e.id == id).cloned())
     }
 
     /// Delete a specific entry by ID
-    pub fn delete_entry(&self, id: u64) -> crate::Result<bool> {
+    pub async fn delete_entry(&self, id: u64) -> crate::Result<bool> {
         if !self.config.enabled {
             return Err(crate::Error::Other("History is disabled".to_string()));
         }
 
-        let mut entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+        let mut entries = self.entries.lock().await;
 
         let original_len = entries.len();
         entries.retain(|e| e.id != id);
@@ -213,7 +186,7 @@ impl HistoryManager {
         if deleted {
             info!("Deleted history entry #{}", id);
             drop(entries);
-            self.save()?;
+            self.save().await?;
         } else {
             debug!("Entry #{} not found for deletion", id);
         }
@@ -222,48 +195,44 @@ impl HistoryManager {
     }
 
     /// Clear all history
-    pub fn clear(&self) -> crate::Result<()> {
+    pub async fn clear(&self) -> crate::Result<()> {
         if !self.config.enabled {
             return Err(crate::Error::Other("History is disabled".to_string()));
         }
 
-        let mut entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+        let mut entries = self.entries.lock().await;
 
         let count = entries.len();
         entries.clear();
         info!("Cleared {} history entries", count);
 
         drop(entries);
-        self.save()?;
+        self.save().await?;
 
         Ok(())
     }
 
     /// Get the number of entries
     pub fn count(&self) -> usize {
-        self.entries.lock().map(|e| e.len()).unwrap_or(0)
+        // Use try_lock to avoid blocking
+        self.entries.try_lock().map(|e| e.len()).unwrap_or(0)
     }
 
     /// Load history from disk
-    fn load(&mut self) -> crate::Result<()> {
+    async fn load(&mut self) -> crate::Result<()> {
         if !self.history_path.exists() {
             debug!("History file not found, starting with empty history");
             return Ok(());
         }
 
-        let contents = fs::read_to_string(&self.history_path)
+        let contents = tokio::fs::read_to_string(&self.history_path)
+            .await
             .map_err(|e| crate::Error::Other(format!("Failed to read history file: {}", e)))?;
 
         let loaded_entries: Vec<HistoryEntry> = serde_json::from_str(&contents)
             .map_err(|e| crate::Error::Other(format!("Failed to parse history file: {}", e)))?;
 
-        let mut entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+        let mut entries = self.entries.lock().await;
 
         *entries = loaded_entries;
         info!(
@@ -276,16 +245,14 @@ impl HistoryManager {
     }
 
     /// Save history to disk
-    fn save(&self) -> crate::Result<()> {
-        let entries = self
-            .entries
-            .lock()
-            .map_err(|e| crate::Error::Other(format!("Failed to lock history: {}", e)))?;
+    async fn save(&self) -> crate::Result<()> {
+        let entries = self.entries.lock().await;
 
         let json = serde_json::to_string_pretty(&*entries)
             .map_err(|e| crate::Error::Other(format!("Failed to serialize history: {}", e)))?;
 
-        fs::write(&self.history_path, json)
+        tokio::fs::write(&self.history_path, json)
+            .await
             .map_err(|e| crate::Error::Other(format!("Failed to write history file: {}", e)))?;
 
         debug!("Saved {} entries to {:?}", entries.len(), self.history_path);
@@ -294,8 +261,8 @@ impl HistoryManager {
     }
 
     /// Manually save history (for when auto-save is disabled)
-    pub fn manual_save(&self) -> crate::Result<()> {
-        self.save()
+    pub async fn manual_save(&self) -> crate::Result<()> {
+        self.save().await
     }
 }
 
@@ -319,8 +286,8 @@ mod tests {
         assert!(entry.timestamp > 0);
     }
 
-    #[test]
-    fn test_history_manager_add_and_get() {
+    #[tokio::test]
+    async fn test_history_manager_add_and_get() {
         let config = crate::config::HistoryConfig {
             enabled: true,
             max_entries: 10,
@@ -331,16 +298,16 @@ mod tests {
 
         let entry = HistoryEntry::new("Test".to_string(), "whisper".to_string(), 1000, None);
 
-        manager.add_entry(entry.clone()).unwrap();
+        manager.add_entry(entry.clone()).await.unwrap();
         assert_eq!(manager.count(), 1);
 
-        let entries = manager.get_all().unwrap();
+        let entries = manager.get_all().await.unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].text, "Test");
     }
 
-    #[test]
-    fn test_history_manager_max_entries() {
+    #[tokio::test]
+    async fn test_history_manager_max_entries() {
         let config = crate::config::HistoryConfig {
             enabled: true,
             max_entries: 3,
@@ -351,15 +318,15 @@ mod tests {
 
         for i in 0..5 {
             let entry = HistoryEntry::new(format!("Test {}", i), "whisper".to_string(), 1000, None);
-            manager.add_entry(entry).unwrap();
-            std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure unique IDs
+            manager.add_entry(entry).await.unwrap();
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // Ensure unique IDs
         }
 
         assert_eq!(manager.count(), 3);
     }
 
-    #[test]
-    fn test_delete_entry() {
+    #[tokio::test]
+    async fn test_delete_entry() {
         let config = crate::config::HistoryConfig {
             enabled: true,
             max_entries: 10,
@@ -371,15 +338,15 @@ mod tests {
         let entry = HistoryEntry::new("Test".to_string(), "whisper".to_string(), 1000, None);
 
         let id = entry.id;
-        manager.add_entry(entry).unwrap();
+        manager.add_entry(entry).await.unwrap();
         assert_eq!(manager.count(), 1);
 
-        manager.delete_entry(id).unwrap();
+        manager.delete_entry(id).await.unwrap();
         assert_eq!(manager.count(), 0);
     }
 
-    #[test]
-    fn test_clear_history() {
+    #[tokio::test]
+    async fn test_clear_history() {
         let config = crate::config::HistoryConfig {
             enabled: true,
             max_entries: 10,
@@ -390,12 +357,12 @@ mod tests {
 
         for i in 0..3 {
             let entry = HistoryEntry::new(format!("Test {}", i), "whisper".to_string(), 1000, None);
-            manager.add_entry(entry).unwrap();
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            manager.add_entry(entry).await.unwrap();
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
 
         assert_eq!(manager.count(), 3);
-        manager.clear().unwrap();
+        manager.clear().await.unwrap();
         assert_eq!(manager.count(), 0);
     }
 }

@@ -69,8 +69,26 @@ mod constants {
 impl WhisperOnnx {
     /// Create a new Whisper ONNX model
     pub fn new() -> Result<Self> {
-        // Auto-detect ONNX Runtime library if not set
-        Self::ensure_onnx_runtime_available()?;
+        // Check for ONNX Runtime library (but don't modify environment)
+        let lib_path = Self::find_onnx_runtime_library()?;
+
+        if lib_path.is_none() {
+            warn!("ONNX Runtime library not found in standard locations");
+
+            #[cfg(target_os = "macos")]
+            let install_cmd = "brew install onnxruntime";
+            #[cfg(target_os = "linux")]
+            let install_cmd = "apt-get install onnxruntime";
+            #[cfg(target_os = "windows")]
+            let install_cmd = "Download from https://github.com/microsoft/onnxruntime/releases";
+
+            anyhow::bail!(
+                "ONNX Runtime library not found!\n\
+                Please install it with: {}\n\
+                Or set ORT_DYLIB_PATH environment variable to the library path",
+                install_cmd
+            );
+        }
 
         Ok(Self {
             encoder: None,
@@ -82,14 +100,16 @@ impl WhisperOnnx {
         })
     }
 
-    /// Ensure ONNX Runtime library is available
-    fn ensure_onnx_runtime_available() -> Result<()> {
+    /// Find ONNX Runtime library path in common locations
+    fn find_onnx_runtime_library() -> Result<Option<String>> {
         // Check if ORT_DYLIB_PATH is already set
-        if std::env::var("ORT_DYLIB_PATH").is_ok() {
-            return Ok(());
+        if let Ok(path) = std::env::var("ORT_DYLIB_PATH") {
+            info!("Using ONNX Runtime from ORT_DYLIB_PATH: {}", path);
+            return Ok(Some(path));
         }
 
-        // Try to find ONNX Runtime in common locations
+        // Cross-platform search paths
+        #[cfg(target_os = "macos")]
         let possible_paths = vec![
             "/opt/homebrew/lib/libonnxruntime.dylib",
             "/opt/homebrew/Cellar/onnxruntime/1.24.2/lib/libonnxruntime.dylib",
@@ -97,25 +117,28 @@ impl WhisperOnnx {
             "/usr/lib/libonnxruntime.dylib",
         ];
 
+        #[cfg(target_os = "linux")]
+        let possible_paths = vec![
+            "/usr/lib/x86_64-linux-gnu/libonnxruntime.so",
+            "/usr/lib/libonnxruntime.so",
+            "/usr/local/lib/libonnxruntime.so",
+        ];
+
+        #[cfg(target_os = "windows")]
+        let possible_paths = vec![
+            "C:\\Program Files\\onnxruntime\\lib\\onnxruntime.dll",
+            "C:\\onnxruntime\\lib\\onnxruntime.dll",
+        ];
+
         for path in possible_paths {
             if Path::new(path).exists() {
                 info!("Auto-detected ONNX Runtime at: {}", path);
-                // SAFETY: We're setting an environment variable that the ort crate needs.
-                // This is safe because we're doing it before any ONNX Runtime operations.
-                unsafe {
-                    std::env::set_var("ORT_DYLIB_PATH", path);
-                }
-                return Ok(());
+                return Ok(Some(path.to_string()));
             }
         }
 
-        // If not found, provide helpful error message
-        warn!("ONNX Runtime library not found in standard locations");
-        anyhow::bail!(
-            "ONNX Runtime library not found!\n\
-            Please install it with: brew install onnxruntime\n\
-            Or set ORT_DYLIB_PATH environment variable to the library path"
-        );
+        // Not found - return None to trigger helpful error
+        Ok(None)
     }
 
     /// Load model from downloaded files

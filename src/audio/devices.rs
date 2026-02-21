@@ -92,7 +92,9 @@ impl AudioDeviceManager {
             .input_devices()
             .map_err(|e| crate::Error::Audio(format!("Failed to enumerate devices: {}", e)))?
         {
-            if let Ok(device_name) = device.name() && device_name == name {
+            if let Ok(device_name) = device.name()
+                && device_name == name
+            {
                 return Ok(device);
             }
         }

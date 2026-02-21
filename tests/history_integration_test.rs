@@ -7,8 +7,8 @@ use onevox::history::{HistoryEntry, HistoryManager};
 use std::fs;
 use tempfile::TempDir;
 
-#[test]
-fn test_history_json_format_matches_tui_expectations() {
+#[tokio::test]
+async fn test_history_json_format_matches_tui_expectations() {
     // Create a temporary directory for the test
     let temp_dir = TempDir::new().unwrap();
     let history_path = temp_dir.path().join("history.json");
@@ -33,7 +33,7 @@ fn test_history_json_format_matches_tui_expectations() {
         150,
         Some(0.95),
     );
-    manager.add_entry(entry1).unwrap();
+    manager.add_entry(entry1).await.unwrap();
 
     let entry2 = HistoryEntry::new(
         "This is a test transcription".to_string(),
@@ -41,7 +41,7 @@ fn test_history_json_format_matches_tui_expectations() {
         85,
         None, // Some entries might not have confidence
     );
-    manager.add_entry(entry2).unwrap();
+    manager.add_entry(entry2).await.unwrap();
 
     // Read the JSON file
     let json_content = fs::read_to_string(&history_path).unwrap();
@@ -129,8 +129,8 @@ fn test_history_json_format_matches_tui_expectations() {
     println!("{}", json_content);
 }
 
-#[test]
-fn test_history_can_be_read_by_tui_logic() {
+#[tokio::test]
+async fn test_history_can_be_read_by_tui_logic() {
     // Simulate what the TUI does when reading history
 
     let temp_dir = TempDir::new().unwrap();
@@ -153,10 +153,10 @@ fn test_history_can_be_read_by_tui_logic() {
         100,
         Some(0.9),
     );
-    manager.add_entry(entry1).unwrap();
+    manager.add_entry(entry1).await.unwrap();
 
     let entry2 = HistoryEntry::new("Test entry 2".to_string(), "model-b".to_string(), 200, None);
-    manager.add_entry(entry2).unwrap();
+    manager.add_entry(entry2).await.unwrap();
 
     // Now read it back as the TUI would (parsing JSON manually)
     let json_str = fs::read_to_string(&history_path).unwrap();

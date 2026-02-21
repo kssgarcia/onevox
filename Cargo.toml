@@ -53,7 +53,7 @@ tracing-appender = "0.2"
 
 # CLI and utilities
 clap = { version = "4.5", features = ["derive"] }
-dirs = "6.0"
+directories = "5.0"  # Professional cross-platform directory discovery
 chrono = "0.4"
 
 # HTTP client for model downloads
@@ -76,6 +76,10 @@ sysinfo = "0.33"
 # Platform integration
 handy-keys = "0.2.1"  # Cross-platform global keyboard shortcuts
 enigo = "0.6"  # Keyboard/mouse simulation for text injection
+
+# Unix-specific dependencies
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [features]
 default = ["overlay-indicator"]  # Enable desktop recording overlay by default

@@ -24,6 +24,13 @@ impl Daemon {
         }
     }
 
+    /// Create a new daemon with async initialization (recommended)
+    pub async fn new_async(config: crate::Config) -> Self {
+        Self {
+            lifecycle: Lifecycle::new_async(config).await,
+        }
+    }
+
     /// Start the daemon
     pub async fn start(&mut self) -> crate::Result<()> {
         self.lifecycle

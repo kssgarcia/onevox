@@ -3,6 +3,7 @@
 //! Central registry of available Whisper models with metadata.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Model format/backend
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +72,10 @@ pub struct ModelMetadata {
     /// Required files to download
     pub files: Vec<String>,
 
+    /// Optional SHA256 checksums keyed by file path
+    #[serde(default)]
+    pub file_sha256: HashMap<String, String>,
+
     /// Speed factor (relative to real-time, 1.0 = real-time)
     pub speed_factor: f32,
 
@@ -110,7 +115,7 @@ impl ModelRegistry {
                 // ============================================================
                 // GGML Models (whisper.cpp) - RECOMMENDED
                 // ============================================================
-                
+
                 // Tiny English-only GGML
                 ModelMetadata {
                     id: "ggml-tiny.en".to_string(),
@@ -121,11 +126,12 @@ impl ModelRegistry {
                     size_bytes: 75 * 1024 * 1024, // ~75 MB
                     hf_repo: "ggerganov/whisper.cpp".to_string(),
                     files: vec!["ggml-tiny.en.bin".to_string()],
+                    file_sha256: HashMap::new(),
                     speed_factor: 32.0,
                     memory_mb: 200,
                     description: "Fastest model using whisper.cpp. English only. Recommended for real-time dictation.".to_string(),
                 },
-                
+
                 // Base English-only GGML
                 ModelMetadata {
                     id: "ggml-base.en".to_string(),
@@ -136,11 +142,12 @@ impl ModelRegistry {
                     size_bytes: 140 * 1024 * 1024, // ~140 MB
                     hf_repo: "ggerganov/whisper.cpp".to_string(),
                     files: vec!["ggml-base.en.bin".to_string()],
+                    file_sha256: HashMap::new(),
                     speed_factor: 16.0,
                     memory_mb: 300,
                     description: "Best balance of speed and accuracy. Recommended for most users.".to_string(),
                 },
-                
+
                 // Small English-only GGML
                 ModelMetadata {
                     id: "ggml-small.en".to_string(),
@@ -151,15 +158,16 @@ impl ModelRegistry {
                     size_bytes: 470 * 1024 * 1024, // ~470 MB
                     hf_repo: "ggerganov/whisper.cpp".to_string(),
                     files: vec!["ggml-small.en.bin".to_string()],
+                    file_sha256: HashMap::new(),
                     speed_factor: 8.0,
                     memory_mb: 600,
                     description: "Higher accuracy, still fast enough for real-time use.".to_string(),
                 },
-                
+
                 // ============================================================
                 // ONNX Models (Alternative backend)
                 // ============================================================
-                
+
                 // Tiny English-only (fastest, lowest quality)
                 ModelMetadata {
                     id: "whisper-tiny.en".to_string(),
@@ -173,6 +181,7 @@ impl ModelRegistry {
                         "onnx/decoder_model_merged.onnx".to_string(),
                         "onnx/encoder_model.onnx".to_string(),
                     ],
+                    file_sha256: HashMap::new(),
                     speed_factor: 32.0, // 32x faster than real-time on CPU
                     memory_mb: 200,
                     description: "ONNX backend (experimental). Use GGML models instead."
@@ -191,6 +200,7 @@ impl ModelRegistry {
                         "onnx/decoder_model_merged.onnx".to_string(),
                         "onnx/encoder_model.onnx".to_string(),
                     ],
+                    file_sha256: HashMap::new(),
                     speed_factor: 16.0, // 16x faster than real-time
                     memory_mb: 300,
                     description: "ONNX backend (experimental). Use GGML models instead."
@@ -209,6 +219,7 @@ impl ModelRegistry {
                         "onnx/decoder_model_merged.onnx".to_string(),
                         "onnx/encoder_model.onnx".to_string(),
                     ],
+                    file_sha256: HashMap::new(),
                     speed_factor: 8.0, // 8x faster than real-time
                     memory_mb: 600,
                     description: "ONNX backend (experimental). Use GGML models instead."
@@ -227,6 +238,7 @@ impl ModelRegistry {
                         "onnx/decoder_model_merged.onnx".to_string(),
                         "onnx/encoder_model.onnx".to_string(),
                     ],
+                    file_sha256: HashMap::new(),
                     speed_factor: 4.0, // 4x faster than real-time
                     memory_mb: 1200,
                     description: "ONNX backend (experimental). Use GGML models instead."

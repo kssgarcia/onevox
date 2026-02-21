@@ -8,7 +8,9 @@ use crate::config::Config;
 use crate::history::{HistoryEntry, HistoryManager};
 use crate::indicator::RecordingIndicator;
 use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCppCli};
-use crate::platform::{HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector};
+use crate::platform::{
+    HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector,
+};
 use crate::vad::{EnergyVad, VadDetector, VadProcessor};
 use anyhow::{Context, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -130,7 +132,7 @@ impl DictationEngine {
             &mut self.hotkey_manager,
             HotkeyManager::new().unwrap(), // Temporary placeholder
         );
-        
+
         hotkey_manager
             .start_listener()
             .context("Failed to start hotkey listener")?;
@@ -144,7 +146,10 @@ impl DictationEngine {
     }
 
     /// Run the hotkey event loop
-    async fn run_event_loop(&mut self, mut event_rx: mpsc::UnboundedReceiver<HotkeyEvent>) -> Result<()> {
+    async fn run_event_loop(
+        &mut self,
+        mut event_rx: mpsc::UnboundedReceiver<HotkeyEvent>,
+    ) -> Result<()> {
         info!("Dictation engine event loop started");
 
         while !self.shutdown_signal.load(Ordering::SeqCst) {
@@ -259,58 +264,62 @@ impl DictationEngine {
                     .await
                     {
                         Ok(Some(chunk)) => {
-                                // Process through VAD
-                                match vad_processor.process(chunk) {
-                                    Ok(Some(segment)) => {
-                                        info!("🎯 Speech segment detected ({} chunks)", segment.len());
-                                        indicator.processing();
+                            // Process through VAD
+                            match vad_processor.process(chunk) {
+                                Ok(Some(segment)) => {
+                                    info!("🎯 Speech segment detected ({} chunks)", segment.len());
+                                    indicator.processing();
 
-                                        // Transcribe
-                                        let model_clone = Arc::clone(&model);
-                                        let model_name_clone = model_name.clone();
-                                        let history_clone = Arc::clone(&history_manager);
-                                        
-                                        match Self::transcribe_with_model(model_clone, segment).await {
-                                            Ok(transcript) => {
-                                                info!("📝 Transcription: {}", transcript.text);
+                                    // Transcribe
+                                    let model_clone = Arc::clone(&model);
+                                    let model_name_clone = model_name.clone();
+                                    let history_clone = Arc::clone(&history_manager);
 
-                                                // Record to history
-                                                let history_entry = HistoryEntry::new(
-                                                    transcript.text.clone(),
-                                                    model_name_clone,
-                                                    transcript.processing_time_ms,
-                                                    transcript.confidence,
-                                                );
-                                                
-                                                if let Err(e) = history_clone.add_entry(history_entry) {
-                                                    error!("Failed to record history: {}", e);
-                                                }
+                                    match Self::transcribe_with_model(model_clone, segment).await {
+                                        Ok(transcript) => {
+                                            info!("📝 Transcription: {}", transcript.text);
 
-                                                // Hide overlay before injection so target app keeps focus.
-                                                indicator.hide();
-                                                if focus_settle_ms > 0 {
-                                                    tokio::time::sleep(tokio::time::Duration::from_millis(
-                                                        focus_settle_ms as u64,
-                                                    ))
-                                                    .await;
-                                                }
+                                            // Record to history
+                                            let history_entry = HistoryEntry::new(
+                                                transcript.text.clone(),
+                                                model_name_clone,
+                                                transcript.processing_time_ms,
+                                                transcript.confidence,
+                                            );
 
-                                                // Inject text into active application
-                                                if let Err(e) = injector.inject(&transcript.text) {
-                                                    error!("Failed to inject text: {}", e);
-                                                } else {
-                                                    info!("✅ Text injected successfully");
-                                                }
+                                            if let Err(e) =
+                                                history_clone.add_entry(history_entry).await
+                                            {
+                                                error!("Failed to record history: {}", e);
                                             }
-                                            Err(e) => {
-                                                error!("Transcription failed: {}", e);
+
+                                            // Hide overlay before injection so target app keeps focus.
+                                            indicator.hide();
+                                            if focus_settle_ms > 0 {
+                                                tokio::time::sleep(
+                                                    tokio::time::Duration::from_millis(
+                                                        focus_settle_ms as u64,
+                                                    ),
+                                                )
+                                                .await;
+                                            }
+
+                                            // Inject text into active application
+                                            if let Err(e) = injector.inject(&transcript.text) {
+                                                error!("Failed to inject text: {}", e);
+                                            } else {
+                                                info!("✅ Text injected successfully");
                                             }
                                         }
-
-                                        if is_dictating.load(Ordering::SeqCst) {
-                                            indicator.recording();
+                                        Err(e) => {
+                                            error!("Transcription failed: {}", e);
                                         }
                                     }
+
+                                    if is_dictating.load(Ordering::SeqCst) {
+                                        indicator.recording();
+                                    }
+                                }
                                 Ok(None) => {
                                     // No complete segment yet
                                 }
@@ -368,29 +377,34 @@ impl DictationEngine {
 
                 // Hotkey released - transcribe all collected audio
                 if !collected_chunks.is_empty() {
-                    info!("🎤 Hotkey released - transcribing {} chunks", collected_chunks.len());
+                    info!(
+                        "🎤 Hotkey released - transcribing {} chunks",
+                        collected_chunks.len()
+                    );
                     indicator.processing();
 
                     // Create a speech segment from all collected chunks
                     let segment = crate::vad::SpeechSegment::new(collected_chunks);
-                    
+
                     // DEBUG: Analyze captured audio
                     let samples = segment.get_samples();
                     let sample_rate = segment.sample_rate();
-                    
+
                     // Calculate audio statistics
                     let duration_secs = samples.len() as f32 / sample_rate as f32;
                     let max_amplitude = samples.iter().map(|&s| s.abs()).fold(0.0f32, f32::max);
-                    let rms = (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
+                    let rms =
+                        (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
                     let non_zero_samples = samples.iter().filter(|&&s| s.abs() > 0.0001).count();
-                    
+
                     info!("📊 Audio statistics:");
                     info!("  - Total samples: {}", samples.len());
                     info!("  - Sample rate: {} Hz", sample_rate);
                     info!("  - Duration: {:.2} seconds", duration_secs);
                     info!("  - Max amplitude: {:.4}", max_amplitude);
                     info!("  - RMS level: {:.4}", rms);
-                    info!("  - Non-zero samples: {} ({:.1}%)", 
+                    info!(
+                        "  - Non-zero samples: {} ({:.1}%)",
                         non_zero_samples,
                         100.0 * non_zero_samples as f32 / samples.len() as f32
                     );
@@ -407,8 +421,8 @@ impl DictationEngine {
                                 transcript.processing_time_ms,
                                 transcript.confidence,
                             );
-                            
-                            if let Err(e) = history_manager.add_entry(history_entry) {
+
+                            if let Err(e) = history_manager.add_entry(history_entry).await {
                                 error!("Failed to record history: {}", e);
                             }
 
@@ -457,7 +471,7 @@ impl DictationEngine {
 
         // Stop audio capture
         self.audio_engine.stop_capture()?;
-        
+
         // On macOS, give the audio system time to fully release the device
         // This prevents audio quality degradation issues specific to CoreAudio
         #[cfg(target_os = "macos")]
@@ -488,7 +502,7 @@ impl DictationEngine {
     /// List available audio devices for debugging
     fn list_audio_devices(&self) {
         use crate::audio::devices::AudioDeviceManager;
-        
+
         let device_manager = AudioDeviceManager::new();
         match device_manager.list_input_devices() {
             Ok(devices) => {

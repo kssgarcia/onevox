@@ -26,6 +26,12 @@ impl Lifecycle {
         Self { config, state }
     }
 
+    /// Create a new lifecycle manager with async initialization (recommended)
+    pub async fn new_async(config: Config) -> Self {
+        let state = Arc::new(RwLock::new(DaemonState::new_async(config.clone()).await));
+        Self { config, state }
+    }
+
     /// Start the daemon
     pub async fn start(&mut self) -> Result<()> {
         info!("🚀 Starting Onevox daemon v{}", env!("CARGO_PKG_VERSION"));
@@ -77,7 +83,7 @@ impl Lifecycle {
         let config = self.config.clone();
         let state_clone = Arc::clone(&self.state);
         let _dictation_handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
             rt.block_on(async {
                 // Get history manager from state
                 let history_manager = {
@@ -128,8 +134,10 @@ impl Lifecycle {
     async fn wait_for_shutdown_signal(&self) {
         #[cfg(unix)]
         {
-            let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
-            let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt()).unwrap();
+            let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+                .expect("Failed to register SIGTERM handler");
+            let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt())
+                .expect("Failed to register SIGINT handler");
 
             tokio::select! {
                 _ = sigterm.recv() => {
@@ -143,7 +151,9 @@ impl Lifecycle {
 
         #[cfg(not(unix))]
         {
-            signal::ctrl_c().await.unwrap();
+            if let Err(e) = signal::ctrl_c().await {
+                error!("Failed to wait for Ctrl+C: {}", e);
+            }
             info!("Received Ctrl+C");
         }
     }
@@ -207,8 +217,8 @@ impl Lifecycle {
 pub fn pid_file_path() -> PathBuf {
     IpcClient::default_socket_path()
         .parent()
-        .unwrap()
-        .join("onevox.pid")
+        .map(|p| p.join("onevox.pid"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/onevox.pid"))
 }
 
 /// Write PID file

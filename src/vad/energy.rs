@@ -81,7 +81,7 @@ impl EnergyVad {
         // Calculate median energy as background estimate
         if !self.energy_history.is_empty() {
             let mut sorted: Vec<f32> = self.energy_history.iter().copied().collect();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             self.background_energy = sorted[sorted.len() / 2];
         }
     }

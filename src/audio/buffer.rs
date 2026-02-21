@@ -2,7 +2,7 @@
 //!
 //! Lock-free ring buffer for zero-copy audio streaming.
 
-use ringbuf::{traits::*, HeapRb};
+use ringbuf::{HeapRb, traits::*};
 
 /// Audio sample type
 pub type Sample = f32;

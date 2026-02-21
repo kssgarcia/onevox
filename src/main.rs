@@ -212,7 +212,7 @@ async fn main() -> Result<()> {
             }
 
             // Create and start daemon
-            let mut daemon = onevox::Daemon::new(config);
+            let mut daemon = onevox::Daemon::new_async(config).await;
             daemon.start().await?;
 
             Ok(())
@@ -300,9 +300,7 @@ async fn main() -> Result<()> {
             }
         },
 
-        Commands::Tui => {
-            onevox::tui::launch()
-        }
+        Commands::Tui => onevox::tui::launch(),
 
         Commands::Devices { action } => match action {
             DeviceAction::List => {
@@ -487,7 +485,7 @@ async fn main() -> Result<()> {
         Commands::History { action } => match action {
             HistoryAction::List { limit } => {
                 let mut client = onevox::ipc::IpcClient::default();
-                
+
                 match client.get_history().await {
                     Ok(mut entries) => {
                         if entries.is_empty() {
@@ -511,8 +509,10 @@ async fn main() -> Result<()> {
 
                         for (i, entry) in entries.iter().take(to_show).enumerate() {
                             // Format timestamp
-                            let datetime = chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
-                                .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                            let datetime =
+                                chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
+                                    .or_else(|| chrono::DateTime::from_timestamp(0, 0))
+                                    .unwrap_or_else(|| chrono::DateTime::UNIX_EPOCH);
                             let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S");
 
                             println!("─────────────────────────────────────────");
@@ -544,7 +544,7 @@ async fn main() -> Result<()> {
 
             HistoryAction::Delete { id } => {
                 let mut client = onevox::ipc::IpcClient::default();
-                
+
                 match client.delete_history_entry(id).await {
                     Ok(_) => {
                         println!("✅ Deleted history entry #{}", id);
@@ -562,11 +562,16 @@ async fn main() -> Result<()> {
                     println!("⚠️  This will delete ALL transcription history.");
                     print!("Are you sure? (y/N): ");
                     use std::io::{self, Write};
-                    io::stdout().flush().unwrap();
-                    
+                    if let Err(e) = io::stdout().flush() {
+                        eprintln!("Warning: Failed to flush stdout: {}", e);
+                    }
+
                     let mut input = String::new();
-                    io::stdin().read_line(&mut input).unwrap();
-                    
+                    if let Err(e) = io::stdin().read_line(&mut input) {
+                        eprintln!("❌ Failed to read input: {}", e);
+                        std::process::exit(1);
+                    }
+
                     if !input.trim().eq_ignore_ascii_case("y") {
                         println!("Cancelled.");
                         return Ok(());
@@ -574,7 +579,7 @@ async fn main() -> Result<()> {
                 }
 
                 let mut client = onevox::ipc::IpcClient::default();
-                
+
                 match client.clear_history().await {
                     Ok(_) => {
                         println!("✅ All history cleared");
@@ -592,7 +597,7 @@ async fn main() -> Result<()> {
                 use std::io::Write;
 
                 let mut client = onevox::ipc::IpcClient::default();
-                
+
                 match client.get_history().await {
                     Ok(mut entries) => {
                         if entries.is_empty() {
@@ -608,28 +613,36 @@ async fn main() -> Result<()> {
                             onevox::Error::Other(format!("Failed to create file: {}", e))
                         })?;
 
-                        writeln!(file, "Onevox Transcription History").map_err(|e| {
-                            onevox::Error::Other(format!("Failed to write: {}", e))
-                        })?;
-                        writeln!(file, "Generated: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")).map_err(|e| {
-                            onevox::Error::Other(format!("Failed to write: {}", e))
-                        })?;
-                        writeln!(file, "Total entries: {}\n", entries.len()).map_err(|e| {
-                            onevox::Error::Other(format!("Failed to write: {}", e))
-                        })?;
-                        writeln!(file, "============================================================\n").map_err(|e| {
-                            onevox::Error::Other(format!("Failed to write: {}", e))
-                        })?;
+                        writeln!(file, "Onevox Transcription History")
+                            .map_err(|e| onevox::Error::Other(format!("Failed to write: {}", e)))?;
+                        writeln!(
+                            file,
+                            "Generated: {}",
+                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                        )
+                        .map_err(|e| onevox::Error::Other(format!("Failed to write: {}", e)))?;
+                        writeln!(file, "Total entries: {}\n", entries.len())
+                            .map_err(|e| onevox::Error::Other(format!("Failed to write: {}", e)))?;
+                        writeln!(
+                            file,
+                            "============================================================\n"
+                        )
+                        .map_err(|e| onevox::Error::Other(format!("Failed to write: {}", e)))?;
 
                         let entry_count = entries.len();
                         for entry in entries {
-                            let datetime = chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
-                                .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                            let datetime =
+                                chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
+                                    .or_else(|| chrono::DateTime::from_timestamp(0, 0))
+                                    .unwrap_or_else(|| chrono::DateTime::UNIX_EPOCH);
                             let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S");
 
-                            writeln!(file, "[{}] ({}ms) {}", formatted_time, entry.duration_ms, entry.model).map_err(|e| {
-                                onevox::Error::Other(format!("Failed to write: {}", e))
-                            })?;
+                            writeln!(
+                                file,
+                                "[{}] ({}ms) {}",
+                                formatted_time, entry.duration_ms, entry.model
+                            )
+                            .map_err(|e| onevox::Error::Other(format!("Failed to write: {}", e)))?;
                             writeln!(file, "{}\n", entry.text).map_err(|e| {
                                 onevox::Error::Other(format!("Failed to write: {}", e))
                             })?;
@@ -851,7 +864,7 @@ async fn main() -> Result<()> {
                 ))
             })?;
             onevox::indicator::run_indicator(parsed)
-        },
+        }
 
         Commands::TestHotkey { hotkey } => {
             println!("🎹 Testing hotkey detection...");

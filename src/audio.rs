@@ -35,12 +35,12 @@ impl AudioEngine {
     pub fn start_capture(
         &mut self,
         config: CaptureConfig,
-    ) -> crate::Result<tokio::sync::mpsc::UnboundedReceiver<AudioChunk>> {
+    ) -> crate::Result<tokio::sync::mpsc::Receiver<AudioChunk>> {
         // Ensure any existing capture is fully stopped before starting a new one
         if let Some(mut existing_capture) = self.capture.take() {
             existing_capture.stop()?;
         }
-        
+
         let mut capture = AudioCapture::new(config);
         let rx = capture.start()?;
         self.capture = Some(capture);

@@ -18,15 +18,23 @@ pub struct SimpleTokenizer {
 impl SimpleTokenizer {
     /// Create a new tokenizer by loading vocab.json from the model directory
     pub fn new() -> Self {
-        // Default path to vocab.json
-        let vocab_path = dirs::home_dir()
-            .expect("Failed to get home directory")
-            .join("Library/Caches/onevox/models/whisper-tiny.en/onnx/vocab.json");
+        // Get vocab path using cross-platform paths
+        let vocab_path = crate::platform::model_path("whisper-tiny.en")
+            .map(|p| p.join("onnx").join("vocab.json"))
+            .ok();
 
-        Self::from_file(&vocab_path).unwrap_or_else(|e| {
-            warn!("Failed to load vocab.json: {}. Using minimal fallback.", e);
+        if let Some(path) = vocab_path {
+            Self::from_file(&path).unwrap_or_else(|e| {
+                warn!(
+                    "Failed to load vocab.json from {:?}: {}. Using minimal fallback.",
+                    path, e
+                );
+                Self::minimal_fallback()
+            })
+        } else {
+            warn!("Could not determine vocab path. Using minimal fallback.");
             Self::minimal_fallback()
-        })
+        }
     }
 
     /// Create a minimal fallback tokenizer for testing

@@ -12,7 +12,11 @@ fn main() -> onevox::Result<()> {
     println!("Testing WhisperCppCli backend...\n");
 
     // Find a captured audio file
-    let audio_file = std::fs::read_dir(dirs::cache_dir().unwrap().join("onevox/debug"))?
+    let debug_dir = onevox::platform::paths::cache_dir()
+        .map(|c| c.join("debug"))
+        .unwrap_or_else(|_| std::path::PathBuf::from("./debug"));
+
+    let audio_file = std::fs::read_dir(&debug_dir)?
         .filter_map(|e| e.ok())
         .find(|e| {
             e.path()
@@ -42,9 +46,9 @@ fn main() -> onevox::Result<()> {
     );
 
     // Create model config
-    let model_path = dirs::cache_dir()
-        .unwrap()
-        .join("onevox/models/ggml-base.en/ggml-base.en.bin");
+    let model_path = onevox::platform::paths::models_dir()
+        .map(|m| m.join("ggml-base.en/ggml-base.en.bin"))
+        .unwrap_or_else(|_| std::path::PathBuf::from("./models/ggml-base.en/ggml-base.en.bin"));
 
     let config = ModelConfig {
         model_path: model_path.to_string_lossy().to_string(),

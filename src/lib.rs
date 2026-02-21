@@ -12,8 +12,8 @@ pub mod indicator;
 pub mod ipc;
 pub mod models;
 pub mod platform;
-pub mod vad;
 pub mod tui;
+pub mod vad;
 
 // Re-export commonly used types
 pub use config::Config;

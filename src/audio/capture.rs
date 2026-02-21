@@ -6,14 +6,14 @@ use super::buffer::AudioChunk;
 use super::devices::AudioDeviceManager;
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{Device, Sample as CpalSample, SampleFormat, Stream, StreamConfig};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
-use tracing::{debug, error, info};
+use tracing::{error, info, trace};
 
 /// Parameters for building an audio stream
 struct StreamParams {
-    chunk_tx: mpsc::UnboundedSender<AudioChunk>,
+    chunk_tx: mpsc::Sender<AudioChunk>,
     chunk_size: usize,
     target_sample_rate: u32,
     device_sample_rate: u32,
@@ -45,13 +45,41 @@ impl Default for CaptureConfig {
     }
 }
 
+impl CaptureConfig {
+    /// Validate capture settings before starting audio stream.
+    fn validate(&self) -> crate::Result<()> {
+        const VALID_SAMPLE_RATES: &[u32] = &[8000, 16000, 22050, 44100, 48000];
+
+        if !VALID_SAMPLE_RATES.contains(&self.sample_rate) {
+            return Err(crate::Error::Config(format!(
+                "Unsupported sample rate {}. Supported values: {:?}",
+                self.sample_rate, VALID_SAMPLE_RATES
+            )));
+        }
+
+        if !(10..=1000).contains(&self.chunk_duration_ms) {
+            return Err(crate::Error::Config(
+                "chunk_duration_ms must be between 10 and 1000".to_string(),
+            ));
+        }
+
+        if !(1..=60).contains(&self.buffer_capacity_secs) {
+            return Err(crate::Error::Config(
+                "buffer_capacity_secs must be between 1 and 60".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 /// Audio capture engine
 pub struct AudioCapture {
     config: CaptureConfig,
     device_manager: AudioDeviceManager,
     stream: Option<Stream>,
     is_running: Arc<AtomicBool>,
-    chunk_tx: Option<mpsc::UnboundedSender<AudioChunk>>,
+    chunk_tx: Option<mpsc::Sender<AudioChunk>>,
 }
 
 impl AudioCapture {
@@ -67,10 +95,12 @@ impl AudioCapture {
     }
 
     /// Start capturing audio
-    pub fn start(&mut self) -> crate::Result<mpsc::UnboundedReceiver<AudioChunk>> {
+    pub fn start(&mut self) -> crate::Result<mpsc::Receiver<AudioChunk>> {
         if self.is_running.load(Ordering::SeqCst) {
             return Err(crate::Error::Audio("Capture already running".to_string()));
         }
+
+        self.config.validate()?;
 
         info!("Starting audio capture");
 
@@ -95,19 +125,27 @@ impl AudioCapture {
             device_sample_rate, sample_format
         );
 
+        // Create bounded channel for audio chunks
+        // Buffer size = (sample_rate * buffer_capacity_secs) / chunk_size
+        // This ensures we don't buffer more than buffer_capacity_secs of audio
+        let chunk_size = (self.config.sample_rate * self.config.chunk_duration_ms / 1000) as usize;
+        let buffer_capacity = ((self.config.sample_rate * self.config.buffer_capacity_secs)
+            / chunk_size as u32) as usize;
+        let (chunk_tx, chunk_rx) = mpsc::channel(buffer_capacity.max(10)); // At least 10 chunks
+
+        info!(
+            "Audio buffer capacity: {} chunks (~{}s of audio), chunk_size: {} samples",
+            buffer_capacity, self.config.buffer_capacity_secs, chunk_size
+        );
+
+        self.chunk_tx = Some(chunk_tx.clone());
+
         // Create stream config
         let stream_config = StreamConfig {
             channels: 1, // We want mono
             sample_rate: cpal::SampleRate(device_sample_rate),
             buffer_size: cpal::BufferSize::Default,
         };
-
-        // Create channel for chunks
-        let (chunk_tx, chunk_rx) = mpsc::unbounded_channel();
-        self.chunk_tx = Some(chunk_tx.clone());
-
-        // Calculate chunk size
-        let chunk_size = (self.config.sample_rate * self.config.chunk_duration_ms / 1000) as usize;
 
         let target_sample_rate = self.config.sample_rate;
         let is_running = Arc::clone(&self.is_running);
@@ -138,7 +176,7 @@ impl AudioCapture {
                 return Err(crate::Error::Audio(format!(
                     "Unsupported sample format: {:?}",
                     sample_format
-                )))
+                )));
             }
         };
 
@@ -205,12 +243,21 @@ impl AudioCapture {
                                 AudioChunk::new(samples, target_sample_rate)
                             };
 
-                            // Send chunk
-                            if let Err(e) = chunk_tx.send(chunk) {
-                                if channel_open.swap(false, Ordering::Relaxed) {
-                                    debug!("Audio receiver closed, stopping chunk delivery: {}", e);
+                            // Send chunk (with backpressure handling)
+                            // Use try_send to avoid blocking the audio thread
+                            match chunk_tx.try_send(chunk) {
+                                Ok(_) => {}
+                                Err(mpsc::error::TrySendError::Full(_)) => {
+                                    // Buffer full - drop this chunk to avoid blocking audio callback
+                                    trace!(
+                                        "Audio buffer full, dropping chunk (transcription too slow)"
+                                    );
                                 }
-                                return;
+                                Err(mpsc::error::TrySendError::Closed(_)) => {
+                                    if channel_open.swap(false, Ordering::Relaxed) {
+                                        trace!("Audio receiver closed, stopping chunk delivery");
+                                    }
+                                }
                             }
                         }
                     }

@@ -61,11 +61,18 @@ impl Default for ModelConfig {
             model_path: "models/ggml-base.en.bin".to_string(),
             language: "en".to_string(),
             use_gpu: true,
-            n_threads: 4,
+            n_threads: default_thread_count(),
             beam_size: 5,
             translate: false,
         }
     }
+}
+
+fn default_thread_count() -> u32 {
+    std::thread::available_parallelism()
+        .map(|n| n.get() as u32)
+        .unwrap_or(1)
+        .clamp(1, 8)
 }
 
 /// Model runtime trait

@@ -5,11 +5,13 @@
 use super::protocol::{Command, Message, Payload, Response};
 use crate::daemon::state::DaemonState as DaemonStateManager;
 use anyhow::Result;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// IPC server
@@ -17,6 +19,8 @@ pub struct IpcServer {
     socket_path: PathBuf,
     listener: Option<UnixListener>,
     state: Arc<RwLock<DaemonStateManager>>,
+    request_limiter: Arc<Mutex<HashMap<u32, Instant>>>,
+    min_request_interval: Duration,
 }
 
 impl IpcServer {
@@ -26,6 +30,8 @@ impl IpcServer {
             socket_path,
             listener: None,
             state,
+            request_limiter: Arc::new(Mutex::new(HashMap::new())),
+            min_request_interval: Duration::from_millis(50),
         }
     }
 
@@ -70,8 +76,17 @@ impl IpcServer {
             match listener.accept().await {
                 Ok((stream, _addr)) => {
                     let state = Arc::clone(&self.state);
+                    let request_limiter = Arc::clone(&self.request_limiter);
+                    let min_request_interval = self.min_request_interval;
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_client(stream, state).await {
+                        if let Err(e) = Self::handle_client(
+                            stream,
+                            state,
+                            request_limiter,
+                            min_request_interval,
+                        )
+                        .await
+                        {
                             error!("Error handling client: {}", e);
                         }
                     });
@@ -83,12 +98,69 @@ impl IpcServer {
         }
     }
 
+    /// Verify client credentials (Unix only)
+    #[cfg(unix)]
+    fn verify_client_credentials(stream: &UnixStream) -> Result<u32> {
+        // Get peer credentials
+        let ucred = stream
+            .peer_cred()
+            .map_err(|e| anyhow::anyhow!("Failed to get peer credentials: {}", e))?;
+
+        // Get current process UID
+        let current_uid = unsafe { libc::getuid() };
+
+        // Verify same user
+        if ucred.uid() != current_uid {
+            warn!(
+                "IPC connection attempt from different user (UID {} != {})",
+                ucred.uid(),
+                current_uid
+            );
+            return Err(anyhow::anyhow!("Unauthorized: different user"));
+        }
+
+        debug!("Client credentials verified: UID={}", ucred.uid());
+        Ok(ucred.uid())
+    }
+
+    /// Verify client credentials (Windows - placeholder)
+    #[cfg(not(unix))]
+    fn verify_client_credentials(_stream: &UnixStream) -> Result<u32> {
+        // TODO: Implement Windows credential verification
+        warn!("Client credential verification not implemented on Windows");
+        Ok(0)
+    }
+
+    async fn check_rate_limit(
+        request_limiter: &Arc<Mutex<HashMap<u32, Instant>>>,
+        client_uid: u32,
+        min_request_interval: Duration,
+    ) -> Result<()> {
+        let now = Instant::now();
+        let mut limiter = request_limiter.lock().await;
+
+        if let Some(last_request) = limiter.get(&client_uid) {
+            if now.duration_since(*last_request) < min_request_interval {
+                return Err(anyhow::anyhow!("Rate limited"));
+            }
+        }
+
+        limiter.insert(client_uid, now);
+        Ok(())
+    }
+
     /// Handle a client connection
     async fn handle_client(
         mut stream: UnixStream,
         state: Arc<RwLock<DaemonStateManager>>,
+        request_limiter: Arc<Mutex<HashMap<u32, Instant>>>,
+        min_request_interval: Duration,
     ) -> Result<()> {
         debug!("New IPC client connected");
+
+        // SECURITY: Verify client credentials first
+        let client_uid = Self::verify_client_credentials(&stream)?;
+        Self::check_rate_limit(&request_limiter, client_uid, min_request_interval).await?;
 
         // Read message length (4 bytes)
         let mut len_bytes = [0u8; 4];
@@ -130,10 +202,7 @@ impl IpcServer {
     }
 
     /// Handle a command and generate response
-    async fn handle_command(
-        command: Command,
-        state: &Arc<RwLock<DaemonStateManager>>,
-    ) -> Response {
+    async fn handle_command(command: Command, state: &Arc<RwLock<DaemonStateManager>>) -> Response {
         match command {
             Command::Ping => Response::Pong,
 
@@ -200,7 +269,7 @@ impl IpcServer {
             Command::GetHistory => {
                 info!("Get history command received");
                 let state = state.read().await;
-                match state.history_manager().get_all() {
+                match state.history_manager().get_all().await {
                     Ok(entries) => Response::History(entries),
                     Err(e) => Response::Error(format!("Failed to get history: {}", e)),
                 }
@@ -209,7 +278,7 @@ impl IpcServer {
             Command::DeleteHistoryEntry { id } => {
                 info!("Delete history entry command received: {}", id);
                 let state = state.read().await;
-                match state.history_manager().delete_entry(id) {
+                match state.history_manager().delete_entry(id).await {
                     Ok(true) => Response::Ok(format!("Entry {} deleted", id)),
                     Ok(false) => Response::Error(format!("Entry {} not found", id)),
                     Err(e) => Response::Error(format!("Failed to delete entry: {}", e)),
@@ -219,7 +288,7 @@ impl IpcServer {
             Command::ClearHistory => {
                 info!("Clear history command received");
                 let state = state.read().await;
-                match state.history_manager().clear() {
+                match state.history_manager().clear().await {
                     Ok(()) => Response::Ok("History cleared".to_string()),
                     Err(e) => Response::Error(format!("Failed to clear history: {}", e)),
                 }

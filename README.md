@@ -46,6 +46,10 @@ The app is **fully functional** on macOS! You can:
 
 ## 🚀 Quick Start
 
+> **⚠️ Upgrading from pre-v0.1.0?**  
+> Run `./scripts/migrate_legacy_paths.sh` to migrate your data to new platform-appropriate paths.  
+> See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for details.
+
 ### Prerequisites
 
 **Rust 1.93+ Required**:

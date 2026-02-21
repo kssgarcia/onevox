@@ -131,15 +131,6 @@ impl VadProcessor {
 
         match self.state {
             ProcessorState::Idle => {
-                // Add to pre-roll buffer
-                self.pre_roll_buffer.push_back(chunk.clone());
-
-                // Maintain pre-roll buffer size
-                while self.pre_roll_buffer.len() > self.max_pre_roll_chunks {
-                    self.pre_roll_buffer.pop_front();
-                }
-
-                // Check if speech started
                 if decision == VadDecision::Speech {
                     info!("Speech started");
                     self.state = ProcessorState::InSpeech;
@@ -149,6 +140,14 @@ impl VadProcessor {
 
                     // Add current chunk
                     self.speech_buffer.push(chunk);
+                } else {
+                    // Add to pre-roll buffer
+                    self.pre_roll_buffer.push_back(chunk);
+
+                    // Maintain pre-roll buffer size
+                    while self.pre_roll_buffer.len() > self.max_pre_roll_chunks {
+                        self.pre_roll_buffer.pop_front();
+                    }
                 }
 
                 Ok(None)

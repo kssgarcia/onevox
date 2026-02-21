@@ -7,7 +7,8 @@
 use crate::Result;
 use crate::models::runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
+use std::time::Duration;
 use tempfile::NamedTempFile;
 use tracing::{debug, info, warn};
 
@@ -21,12 +22,12 @@ impl WhisperCppCli {
     /// Create a new WhisperCppCli backend
     ///
     /// # Arguments
-    /// * `binary_path` - Path to whisper-cli binary (default: ~/Library/Caches/onevox/bin/whisper-cli)
+    /// * `binary_path` - Path to whisper-cli binary (default: <cache_dir>/bin/whisper-cli)
     pub fn new(binary_path: Option<PathBuf>) -> Self {
         let binary_path = binary_path.unwrap_or_else(|| {
-            dirs::cache_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("onevox/bin/whisper-cli")
+            crate::platform::paths::cache_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("bin/whisper-cli")
         });
 
         Self {
@@ -40,7 +41,17 @@ impl WhisperCppCli {
     fn write_temp_wav(&self, audio: &[f32]) -> Result<NamedTempFile> {
         use hound::{SampleFormat, WavSpec, WavWriter};
 
-        let temp_file = NamedTempFile::new()?;
+        let temp_file = tempfile::Builder::new()
+            .prefix("onevox-audio-")
+            .suffix(".wav")
+            .tempfile()?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            std::fs::set_permissions(temp_file.path(), perms)?;
+        }
 
         let spec = WavSpec {
             channels: 1,
@@ -105,10 +116,8 @@ impl WhisperCppCli {
             return direct;
         }
 
-        let cache_root = dirs::cache_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("onevox")
-            .join("models");
+        let cache_root =
+            crate::platform::paths::models_dir().unwrap_or_else(|_| PathBuf::from("./models"));
 
         // If input is a model id (e.g. "ggml-base.en"), try <id>/<id>.bin.
         let by_id = cache_root.join(input).join(format!("{}.bin", input));
@@ -131,6 +140,68 @@ impl WhisperCppCli {
         }
 
         direct
+    }
+
+    /// Validate a model path string.
+    fn validate_model_path(path: &str) -> Result<()> {
+        if path.trim().is_empty() {
+            return Err(crate::Error::Model(
+                "Model path cannot be empty".to_string(),
+            ));
+        }
+
+        if path.chars().any(|c| c == '\0' || c == '\n' || c == '\r') {
+            return Err(crate::Error::Model(
+                "Model path contains invalid control characters".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn run_command_with_timeout(
+        cmd: &mut Command,
+        timeout: Duration,
+        binary_path: &std::path::Path,
+        model_path: &str,
+    ) -> Result<Output> {
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| {
+            crate::Error::Model(format!(
+                "Failed to execute whisper-cli at '{}' with model '{}': {}",
+                binary_path.display(),
+                model_path,
+                e
+            ))
+        })?;
+
+        let started = std::time::Instant::now();
+        loop {
+            if let Some(_status) = child.try_wait().map_err(|e| {
+                crate::Error::Model(format!("Failed while waiting for whisper-cli: {}", e))
+            })? {
+                break;
+            }
+
+            if started.elapsed() > timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(crate::Error::Model(format!(
+                    "whisper-cli timed out after {} seconds",
+                    timeout.as_secs()
+                )));
+            }
+
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        child.wait_with_output().map_err(|e| {
+            crate::Error::Model(format!(
+                "Failed to collect whisper-cli output for model '{}': {}",
+                model_path, e
+            ))
+        })
     }
 }
 
@@ -180,6 +251,8 @@ impl ModelRuntime for WhisperCppCli {
             ));
         }
 
+        Self::validate_model_path(&self.config.model_path)?;
+
         let start = std::time::Instant::now();
 
         debug!(
@@ -209,8 +282,13 @@ impl ModelRuntime for WhisperCppCli {
             cmd.arg("-tr");
         }
 
-        // Run whisper-cli
-        let output = cmd.output()?;
+        // Run whisper-cli with timeout to avoid hangs
+        let output = Self::run_command_with_timeout(
+            &mut cmd,
+            Duration::from_secs(30),
+            &self.binary_path,
+            &self.config.model_path,
+        )?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

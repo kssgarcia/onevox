@@ -5,8 +5,8 @@
 use crate::config::Config;
 use crate::history::HistoryManager;
 use crate::ipc::protocol::{DaemonState as State, DaemonStatus};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use sysinfo::System;
 
@@ -46,7 +46,7 @@ pub struct DaemonState {
 impl DaemonState {
     /// Create a new daemon state
     pub fn new(config: Config) -> Self {
-        // Create history manager
+        // Create history manager (using sync constructor, will not load from disk)
         let history_config = config.history.clone();
         let history_manager = HistoryManager::new(history_config).unwrap_or_else(|e| {
             tracing::warn!("Failed to create history manager: {}", e);
@@ -58,6 +58,37 @@ impl DaemonState {
             })
             .expect("Failed to create fallback history manager")
         });
+
+        Self {
+            config,
+            start_time: Instant::now(),
+            pid: std::process::id(),
+            state: State::Starting,
+            shutdown_requested: Arc::new(AtomicBool::new(false)),
+            model_loaded: false,
+            model_name: None,
+            is_dictating: false,
+            sys_info: System::new(),
+            history_manager: Arc::new(history_manager),
+        }
+    }
+
+    /// Create a new daemon state with async initialization (recommended)
+    pub async fn new_async(config: Config) -> Self {
+        // Create history manager with async initialization
+        let history_config = config.history.clone();
+        let history_manager = HistoryManager::new_async(history_config)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("Failed to create history manager: {}", e);
+                // Create a disabled history manager as fallback (sync version is fine for fallback)
+                HistoryManager::new(crate::config::HistoryConfig {
+                    enabled: false,
+                    max_entries: 0,
+                    auto_save: false,
+                })
+                .expect("Failed to create fallback history manager")
+            });
 
         Self {
             config,
