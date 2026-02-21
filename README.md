@@ -13,6 +13,7 @@ This is not just another dictation app. Onevox is:
 > **A Local Speech Inference Layer for the Operating System**
 
 It's designed for developers, power users, and anyone who values:
+
 - **Privacy**: 100% local processing, no cloud dependencies
 - **Speed**: Sub-350ms latency for real-time dictation
 - **Flexibility**: Multiple model backends (Whisper, ONNX, etc.)
@@ -36,6 +37,7 @@ It's designed for developers, power users, and anyone who values:
 ### 🎉 Currently Working
 
 The app is **fully functional** on macOS! You can:
+
 - Start the daemon and have it listen for hotkeys
 - Speak and get real-time transcription from Whisper models
 - Inject transcribed text into any application
@@ -53,6 +55,7 @@ The app is **fully functional** on macOS! You can:
 ### Prerequisites
 
 **Rust 1.93+ Required**:
+
 ```bash
 # Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -62,13 +65,41 @@ rustc --version  # Should show 1.93 or higher
 ```
 
 **macOS**:
+
 ```bash
 xcode-select --install
 ```
 
 **Linux (Ubuntu/Debian)**:
+
 ```bash
 sudo apt-get install build-essential cmake pkg-config
+```
+
+### Whisper CLI Setup (Required for GGML models)
+
+GGML models (like ggml-base.en) require the whisper-cli binary. See [WHISPER_CLI_SETUP.md](WHISPER_CLI_SETUP.md) for detailed instructions.
+
+**Quick Setup:**
+```bash
+# Option 1: Automatic (recommended) - installs when downloading a model
+onevox models download ggml-base.en
+
+# Option 2: Manual installation
+./scripts/setup_whisper_cli.sh
+```
+
+**Manual build commands (macOS):**
+```bash
+git clone https://github.com/ggerganov/whisper.cpp /tmp/whisper.cpp
+cd /tmp/whisper.cpp
+cmake -B build \
+  -DCMAKE_C_COMPILER=$(xcrun -find clang) \
+  -DCMAKE_CXX_COMPILER=$(xcrun -find clang++) \
+  -DGGML_METAL=ON
+cmake --build build --config Release -j$(sysctl -n hw.logicalcpu)
+mkdir -p ~/Library/Caches/com.onevox.onevox/bin
+cp build/bin/whisper-cli ~/Library/Caches/com.onevox.onevox/bin/whisper-cli
 ```
 
 ### Build & Run
@@ -96,10 +127,31 @@ cargo build --release
 
 to add command `onevox` (mac):
 
-``` bash
+```bash
 sudo ln -sf /Users/kevinsepulveda/Documents/onevox/target/release/onevox /usr/local/bin/onevox
 onevox --help
 ```
+
+to install whisper-cli:
+
+```
+# 1. Clone & build
+git clone https://github.com/ggerganov/whisper.cpp /tmp/whisper.cpp
+cd /tmp/whisper.cpp
+cmake -B build \
+  -DCMAKE_C_COMPILER=$(xcrun -find clang) \
+  -DCMAKE_CXX_COMPILER=$(xcrun -find clang++) \
+  -DGGML_METAL=ON
+cmake --build build --config Release -j$(sysctl -n hw.logicalcpu)
+
+# 2. Install
+mkdir -p ~/Library/Caches/com.onevox.onevox/bin
+cp build/bin/whisper-cli ~/Library/Caches/com.onevox.onevox/bin/whisper-cli
+
+```
+
+---
+
 ### For TypeScript/Node Developers
 
 If you're coming from TypeScript/pnpm, see **[CHEATSHEET.md](CHEATSHEET.md)** for command equivalents!
@@ -110,8 +162,10 @@ cargo build     # = pnpm install + build
 cargo test      # = pnpm test
 cargo fmt       # = pnpm format
 ```
+
     libasound2-dev libx11-dev portaudio19-dev
-```
+
+````
 
 ### Installation (Future)
 
@@ -124,7 +178,7 @@ brew install onevox
 
 # Or download binary
 curl -L https://github.com/yourusername/onevox/releases/latest/download/onevox-macos.tar.gz | tar xz
-```
+````
 
 ### macOS Installer (Phase 8)
 
@@ -146,6 +200,7 @@ curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | 
 ```
 
 `curl|sh` options:
+
 ```bash
 # System install
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh -s -- --system
@@ -156,11 +211,14 @@ curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | 
 ```
 
 Releases are published automatically when you push a version tag:
+
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
 This creates release assets used by the installer:
+
 - `onevox-macos-arm64.tar.gz`
 - `onevox-macos-x86_64.tar.gz`
 
@@ -240,11 +298,13 @@ Onevox includes a **production-ready** terminal interface built with **OpenTUI**
 ### Quick Start
 
 **Prerequisites:** Install [Bun](https://bun.sh)
+
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```
 
 **Launch TUI:**
+
 ```bash
 # Method 1: Via Rust CLI (recommended - auto-installs dependencies)
 onevox tui
@@ -258,21 +318,23 @@ cd tui && bun install && bun start
 
 ### Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Switch tabs (Config ↔ History ↔ Help) |
-| `t` | Toggle dark/light theme |
-| `Ctrl+S` | Save configuration |
-| `?` | Show help overlay |
-| `q` / `Ctrl+C` | Quit |
+| Key            | Action                                  |
+| -------------- | --------------------------------------- |
+| `Tab`          | Switch tabs (Config ↔ History ↔ Help) |
+| `t`            | Toggle dark/light theme                 |
+| `Ctrl+S`       | Save configuration                      |
+| `?`            | Show help overlay                       |
+| `q` / `Ctrl+C` | Quit                                    |
 
 **Config Panel:**
+
 - `Tab` / `Shift+Tab` - Navigate fields
 - `Space` - Toggle switches
 - `←` / `→` - Adjust steppers
 - Click any control with mouse!
 
 **History Panel:**
+
 - `↑` / `↓` or `j` / `k` - Navigate entries
 - `c` - Copy transcription to clipboard
 - `e` - Export entry to file
@@ -350,6 +412,7 @@ auto_save = true
 ### History Format
 
 Each entry contains:
+
 - **ID**: Unique identifier
 - **Timestamp**: When the transcription occurred
 - **Text**: The transcribed content
@@ -360,6 +423,7 @@ Each entry contains:
 ### TUI Integration
 
 The Terminal UI includes a dedicated **History Panel** where you can:
+
 - Browse all past transcriptions
 - View detailed metadata
 - Copy transcriptions to clipboard
@@ -404,6 +468,7 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design.
 ### Current Phase: **Phase 8/8 Complete - Ready for Distribution** 🎉
 
 **What's Working:**
+
 - ✅ **Phase 1**: Core infrastructure (daemon, IPC, config)
 - ✅ **Phase 2**: Audio pipeline (capture, streaming, device selection)
 - ✅ **Phase 3**: Voice Activity Detection (energy-based VAD)
@@ -422,6 +487,7 @@ See [PROGRESS.md](PROGRESS.md) for detailed implementation status.
 ## 🛠️ Technology Stack
 
 ### Core (Rust)
+
 - **Language**: Rust 1.93+ (Edition 2024)
 - **Audio**: `cpal` for cross-platform capture
 - **VAD**: Energy-based VAD with adaptive thresholding
@@ -431,6 +497,7 @@ See [PROGRESS.md](PROGRESS.md) for detailed implementation status.
 - **IPC**: Unix domain sockets with `bincode`
 
 ### Terminal UI (TypeScript)
+
 - **Framework**: OpenTUI (flexbox-based TUI framework)
 - **Runtime**: Bun (fast TypeScript runtime)
 - **Config**: TOML parsing
@@ -442,13 +509,13 @@ See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for full dependency list.
 
 ## 📊 Performance Targets
 
-| Metric | Target | Hardware |
-|--------|--------|----------|
+| Metric                          | Target | Hardware           |
+| ------------------------------- | ------ | ------------------ |
 | End-to-end latency (1sec audio) | <350ms | M1 Pro, Tiny model |
-| Model inference (tiny) | <100ms | M1 Pro, Metal |
-| Hotkey activation | <10ms | Any |
-| Memory usage (idle) | <500MB | Any |
-| Memory usage (active) | <1.5GB | With base model |
+| Model inference (tiny)          | <100ms | M1 Pro, Metal      |
+| Hotkey activation               | <10ms  | Any                |
+| Memory usage (idle)             | <500MB | Any                |
+| Memory usage (active)           | <1.5GB | With base model    |
 
 See [PERFORMANCE.md](docs/PERFORMANCE.md) for benchmarks and optimization guide.
 
@@ -545,18 +612,21 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 🔮 Roadmap
 
 ### Version 0.1.0 (MVP) - Q2 2026
+
 - ✅ Core daemon infrastructure
 - ✅ macOS support
 - ✅ whisper.cpp integration (tiny/base models)
 - ✅ Basic TUI
 
 ### Version 0.2.0 - Q3 2026
+
 - ✅ Linux support
 - ✅ Multiple model backends (ONNX, Candle)
 - ✅ Advanced VAD
 - ✅ Performance optimizations
 
 ### Version 1.0.0 - Q4 2026
+
 - ✅ Windows support
 - ✅ Plugin system
 - ✅ Multi-language support
@@ -568,7 +638,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/onevox/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/onevox/discussions)
-- **Email**: your.email@example.com
+- **Email**: <your.email@example.com>
 
 ---
 
