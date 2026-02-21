@@ -306,8 +306,11 @@ export function createApp(
     state.theme = getTheme(newThemeName)
     
     // Save to config
-    if (!state.config.ui) state.config.ui = { theme: newThemeName }
-    else state.config.ui.theme = newThemeName
+    if (!state.config.ui) {
+      state.config.ui = { recording_overlay: true, theme: newThemeName }
+    } else {
+      state.config.ui.theme = newThemeName
+    }
     saveConfig(state.config)
     
     // Update all UI elements

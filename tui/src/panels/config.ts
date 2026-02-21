@@ -2,14 +2,15 @@
  * Config Panel — flat minimalist settings, always-visible sections.
  *
  * Sections:
- *   1. Model Selection
- *   2. Key Bindings
- *   3. Device Selection
- *   4. Audio Settings
- *   5. VAD Settings
- *   6. Post Processing
- *   7. Injection
- *   8. History
+ *   1. Daemon
+ *   2. Model Selection
+ *   3. Key Bindings
+ *   4. Device Selection
+ *   5. Audio Settings
+ *   6. VAD Settings
+ *   7. Post Processing
+ *   8. Injection
+ *   9. UI
  */
 
 import {
@@ -150,7 +151,40 @@ export function createConfigPanel(
     return content
   }
 
-  // ── 1. Model Selection ─────────────────────────────────────────────
+  // ── 1. Daemon ──────────────────────────────────────────────────────
+  const daemonContent = createSection("sec-daemon", "Daemon")
+
+  const daemonAutoStart = createToggle(renderer, {
+    id: "daemon-auto-start",
+    label: "Auto-start daemon",
+    value: config.daemon.auto_start,
+    theme,
+    onChange: (v) => { config.daemon.auto_start = v; markDirty() },
+  })
+
+  const logIdx = ["trace", "debug", "info", "warn", "error"].indexOf(config.daemon.log_level)
+  const daemonLogLevelField = createSelectField(renderer, {
+    id: "daemon-log-level",
+    label: "Log Level:",
+    options: [
+      { name: "trace", description: "Most verbose logging" },
+      { name: "debug", description: "Debug + info logs" },
+      { name: "info", description: "General operational logs" },
+      { name: "warn", description: "Warnings and errors only" },
+      { name: "error", description: "Errors only" },
+    ],
+    selectedIndex: logIdx >= 0 ? logIdx : 2,
+    theme,
+    onChange: (index) => {
+      config.daemon.log_level = ["trace", "debug", "info", "warn", "error"][index]
+      markDirty()
+    },
+  })
+
+  daemonContent.add(daemonAutoStart.root)
+  daemonContent.add(daemonLogLevelField.root)
+
+  // ── 2. Model Selection ─────────────────────────────────────────────
   const modelContent = createSection("sec-model", "Model Selection")
 
   const models = getModelRegistry()
@@ -184,7 +218,88 @@ export function createConfigPanel(
 
   modelContent.add(modelField.root)
 
-  // ── 2. Key Bindings ────────────────────────────────────────────────
+  const modelBackendIdx = ["whisper_cpp", "faster_whisper", "onnx", "candle"].indexOf(config.model.backend)
+  const modelBackendField = createSelectField(renderer, {
+    id: "model-backend-select",
+    label: "Backend:",
+    options: [
+      { name: "whisper_cpp", description: "whisper.cpp CLI backend" },
+      { name: "faster_whisper", description: "CTranslate2 backend" },
+      { name: "onnx", description: "ONNX Runtime backend" },
+      { name: "candle", description: "Rust Candle backend" },
+    ],
+    selectedIndex: modelBackendIdx >= 0 ? modelBackendIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.model.backend = ["whisper_cpp", "faster_whisper", "onnx", "candle"][index]
+      markDirty()
+    },
+  })
+
+  const modelDeviceIdx = ["auto", "cpu", "gpu"].indexOf(config.model.device)
+  const modelDeviceField = createSelectField(renderer, {
+    id: "model-device-select",
+    label: "Model Device:",
+    options: [
+      { name: "auto", description: "Automatic device selection" },
+      { name: "cpu", description: "CPU only" },
+      { name: "gpu", description: "GPU acceleration if available" },
+    ],
+    selectedIndex: modelDeviceIdx >= 0 ? modelDeviceIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.model.device = ["auto", "cpu", "gpu"][index]
+      markDirty()
+    },
+  })
+
+  const modelLanguageIdx = ["en", "auto"].indexOf(config.model.language)
+  const modelLanguageField = createSelectField(renderer, {
+    id: "model-language-select",
+    label: "Language:",
+    options: [
+      { name: "en", description: "English" },
+      { name: "auto", description: "Auto-detect language" },
+    ],
+    selectedIndex: modelLanguageIdx >= 0 ? modelLanguageIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.model.language = ["en", "auto"][index]
+      markDirty()
+    },
+  })
+
+  const modelTaskIdx = ["transcribe", "translate"].indexOf(config.model.task)
+  const modelTaskField = createSelectField(renderer, {
+    id: "model-task-select",
+    label: "Task:",
+    options: [
+      { name: "transcribe", description: "Speech to source language text" },
+      { name: "translate", description: "Speech translated to English" },
+    ],
+    selectedIndex: modelTaskIdx >= 0 ? modelTaskIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.model.task = ["transcribe", "translate"][index]
+      markDirty()
+    },
+  })
+
+  const modelPreload = createToggle(renderer, {
+    id: "model-preload",
+    label: "Preload model at startup",
+    value: config.model.preload,
+    theme,
+    onChange: (v) => { config.model.preload = v; markDirty() },
+  })
+
+  modelContent.add(modelBackendField.root)
+  modelContent.add(modelDeviceField.root)
+  modelContent.add(modelLanguageField.root)
+  modelContent.add(modelTaskField.root)
+  modelContent.add(modelPreload.root)
+
+  // ── 3. Key Bindings ────────────────────────────────────────────────
   const hotkeyContent = createSection("sec-hotkey", "Key Bindings")
 
   // Push-to-talk trigger
@@ -194,15 +309,6 @@ export function createConfigPanel(
     value: config.hotkey.trigger,
     theme,
     onChange: (combo) => { config.hotkey.trigger = combo; markDirty() },
-  })
-
-  // Toggle hotkey
-  const toggleCapture = createKeyCapture(renderer, {
-    id: "toggle-capture",
-    label: "Toggle hotkey:",
-    value: config.hotkey.toggle,
-    theme,
-    onChange: (combo) => { config.hotkey.toggle = combo; markDirty() },
   })
 
   const modeIdx = config.hotkey.mode === "toggle" ? 1 : 0
@@ -222,10 +328,9 @@ export function createConfigPanel(
   })
 
   hotkeyContent.add(triggerCapture.root)
-  hotkeyContent.add(toggleCapture.root)
   hotkeyContent.add(modeField.root)
 
-  // ── 3. Device Selection ────────────────────────────────────────
+  // ── 4. Device Selection ────────────────────────────────────────
   const deviceContent = createSection("sec-device", "Device Selection")
 
   const deviceLoading = new TextRenderable(renderer, {
@@ -282,12 +387,12 @@ export function createConfigPanel(
     deviceFieldRef = deviceField
 
     deviceContent.add(deviceField.root)
-    // Register in keyboard focus navigation (inserted before srStepper at index 4)
-    focusables.splice(4, 0, { type: "selectfield", instance: deviceField, scrollHint: 20 })
+    // Register in keyboard focus navigation (inserted before srStepper at index 10)
+    focusables.splice(10, 0, { type: "selectfield", instance: deviceField, scrollHint: 22 })
     bindMouseFocusHandlers()
   })
 
-  // ── 4. Audio Settings ──────────────────────────────────────────
+  // ── 5. Audio Settings ──────────────────────────────────────────
   const audioContent = createSection("sec-audio", "Audio Settings")
 
   const SR_VALUES = ["8000", "11025", "16000", "22050", "44100", "48000", "96000"]
@@ -313,7 +418,7 @@ export function createConfigPanel(
   audioContent.add(srStepper.root)
   audioContent.add(chunkStepper.root)
 
-  // ── 5. VAD Settings ────────────────────────────────────────────
+  // ── 6. VAD Settings ────────────────────────────────────────────
   const vadContent = createSection("sec-vad", "VAD (Voice Activity Detection)")
 
   const vadEnabled = createToggle(renderer, {
@@ -360,12 +465,54 @@ export function createConfigPanel(
     onChange: (v) => { config.vad.adaptive = v; markDirty() },
   })
 
+  const PRE_POST_VALUES = ["0", "100", "200", "300", "500", "750", "1000", "1500", "2000"]
+  const vadPreRollStepper = createStepper(renderer, {
+    id: "vad-pre-roll",
+    label: "Pre-roll (ms):",
+    values: PRE_POST_VALUES,
+    selectedIndex: Math.max(0, PRE_POST_VALUES.indexOf(config.vad.pre_roll_ms.toString())),
+    theme,
+    onChange: (v) => { config.vad.pre_roll_ms = parseInt(v, 10); markDirty() },
+  })
+
+  const vadPostRollStepper = createStepper(renderer, {
+    id: "vad-post-roll",
+    label: "Post-roll (ms):",
+    values: PRE_POST_VALUES,
+    selectedIndex: Math.max(0, PRE_POST_VALUES.indexOf(config.vad.post_roll_ms.toString())),
+    theme,
+    onChange: (v) => { config.vad.post_roll_ms = parseInt(v, 10); markDirty() },
+  })
+
+  const MIN_CHUNK_VALUES = ["1", "2", "3", "4", "5", "6", "8", "10"]
+  const vadMinSpeechStepper = createStepper(renderer, {
+    id: "vad-min-speech",
+    label: "Min speech chunks:",
+    values: MIN_CHUNK_VALUES,
+    selectedIndex: Math.max(0, MIN_CHUNK_VALUES.indexOf(config.vad.min_speech_chunks.toString())),
+    theme,
+    onChange: (v) => { config.vad.min_speech_chunks = parseInt(v, 10); markDirty() },
+  })
+
+  const vadMinSilenceStepper = createStepper(renderer, {
+    id: "vad-min-silence",
+    label: "Min silence chunks:",
+    values: MIN_CHUNK_VALUES,
+    selectedIndex: Math.max(0, MIN_CHUNK_VALUES.indexOf(config.vad.min_silence_chunks.toString())),
+    theme,
+    onChange: (v) => { config.vad.min_silence_chunks = parseInt(v, 10); markDirty() },
+  })
+
   vadContent.add(vadEnabled.root)
   vadContent.add(vadBackendField.root)
   vadContent.add(vadThresholdStepper.root)
   vadContent.add(vadAdaptive.root)
+  vadContent.add(vadPreRollStepper.root)
+  vadContent.add(vadPostRollStepper.root)
+  vadContent.add(vadMinSpeechStepper.root)
+  vadContent.add(vadMinSilenceStepper.root)
 
-  // ── 6. Post Processing ─────────────────────────────────────────
+  // ── 7. Post Processing ─────────────────────────────────────────
   const ppContent = createSection("sec-pp", "Post Processing")
 
   const ppPunctuation = createToggle(renderer, {
@@ -396,7 +543,7 @@ export function createConfigPanel(
   ppContent.add(ppCapitalize.root)
   ppContent.add(ppFiller.root)
 
-  // ── 7. Injection ───────────────────────────────────────────────
+  // ── 8. Injection ───────────────────────────────────────────────
   const injContent = createSection("sec-injection", "Text Injection")
 
   const injIdx = ["accessibility", "clipboard", "paste"].indexOf(config.injection.method)
@@ -426,32 +573,35 @@ export function createConfigPanel(
     onChange: (v) => { config.injection.paste_delay_ms = parseInt(v, 10); markDirty() },
   })
 
+  const FOCUS_SETTLE_VALUES = ["0", "20", "40", "60", "80", "100", "120", "150", "200", "300"]
+  const injFocusSettleStepper = createStepper(renderer, {
+    id: "inj-focus-settle",
+    label: "Focus settle (ms):",
+    values: FOCUS_SETTLE_VALUES,
+    selectedIndex: Math.max(
+      0,
+      FOCUS_SETTLE_VALUES.indexOf(config.injection.focus_settle_ms.toString()),
+    ),
+    theme,
+    onChange: (v) => { config.injection.focus_settle_ms = parseInt(v, 10); markDirty() },
+  })
+
   injContent.add(injMethodField.root)
   injContent.add(injDelayStepper.root)
+  injContent.add(injFocusSettleStepper.root)
 
-  // ── 8. History ─────────────────────────────────────────────────
-  const histContent = createSection("sec-history", "History Settings")
+  // ── 9. UI ──────────────────────────────────────────────────────
+  const uiContent = createSection("sec-ui", "UI")
 
-  const histEnabled = createToggle(renderer, {
-    id: "hist-enabled",
-    label: "Record history",
-    value: config.history.enabled,
+  const uiOverlayToggle = createToggle(renderer, {
+    id: "ui-recording-overlay",
+    label: "Recording overlay indicator",
+    value: config.ui.recording_overlay,
     theme,
-    onChange: (v) => { config.history.enabled = v; markDirty() },
+    onChange: (v) => { config.ui.recording_overlay = v; markDirty() },
   })
 
-  const MAX_ENTRIES_VALUES = ["100", "200", "500", "1000", "2000", "5000", "10000"]
-  const histMaxStepper = createStepper(renderer, {
-    id: "hist-max",
-    label: "Max entries:",
-    values: MAX_ENTRIES_VALUES,
-    selectedIndex: Math.max(0, MAX_ENTRIES_VALUES.indexOf(config.history.max_entries.toString())),
-    theme,
-    onChange: (v) => { config.history.max_entries = parseInt(v, 10); markDirty() },
-  })
-
-  histContent.add(histEnabled.root)
-  histContent.add(histMaxStepper.root)
+  uiContent.add(uiOverlayToggle.root)
 
   // ── (sections are already added to scrollBox via createSection) ────
 
@@ -466,24 +616,34 @@ export function createConfigPanel(
   // Populated after all widget declarations; deviceSelect spliced in async
   // scrollHints are approximate terminal-row offsets for each widget
   let focusables: FocusItem[] = [
-    { type: "selectfield", instance: modelField,         scrollHint: 0  },
-    { type: "keycapture", instance: triggerCapture,     scrollHint: 11 },
-    { type: "keycapture", instance: toggleCapture,      scrollHint: 12 },
-    { type: "selectfield", instance: modeField,          scrollHint: 14 },
-    // index 4 reserved for deviceSelect (inserted asynchronously → scrollHint 20)
-    { type: "stepper",    instance: srStepper,          scrollHint: 28 },
-    { type: "stepper",    instance: chunkStepper,       scrollHint: 29 },
-    { type: "toggle",     instance: vadEnabled,         scrollHint: 34 },
-    { type: "selectfield", instance: vadBackendField,    scrollHint: 36 },
-    { type: "stepper",    instance: vadThresholdStepper, scrollHint: 42 },
-    { type: "toggle",     instance: vadAdaptive,        scrollHint: 43 },
-    { type: "toggle",     instance: ppPunctuation,      scrollHint: 50 },
-    { type: "toggle",     instance: ppCapitalize,       scrollHint: 51 },
-    { type: "toggle",     instance: ppFiller,           scrollHint: 52 },
-    { type: "selectfield", instance: injMethodField,     scrollHint: 59 },
-    { type: "stepper",    instance: injDelayStepper,    scrollHint: 64 },
-    { type: "toggle",     instance: histEnabled,        scrollHint: 72 },
-    { type: "stepper",    instance: histMaxStepper,     scrollHint: 73 },
+    { type: "toggle",     instance: daemonAutoStart,      scrollHint: 0 },
+    { type: "selectfield", instance: daemonLogLevelField,  scrollHint: 2 },
+    { type: "selectfield", instance: modelField,           scrollHint: 6 },
+    { type: "selectfield", instance: modelBackendField,    scrollHint: 8 },
+    { type: "selectfield", instance: modelDeviceField,     scrollHint: 9 },
+    { type: "selectfield", instance: modelLanguageField,   scrollHint: 10 },
+    { type: "selectfield", instance: modelTaskField,       scrollHint: 11 },
+    { type: "toggle",     instance: modelPreload,          scrollHint: 12 },
+    { type: "keycapture", instance: triggerCapture,        scrollHint: 16 },
+    { type: "selectfield", instance: modeField,            scrollHint: 17 },
+    // index 10 reserved for deviceSelect (inserted asynchronously → scrollHint 22)
+    { type: "stepper",    instance: srStepper,             scrollHint: 26 },
+    { type: "stepper",    instance: chunkStepper,          scrollHint: 27 },
+    { type: "toggle",     instance: vadEnabled,            scrollHint: 32 },
+    { type: "selectfield", instance: vadBackendField,      scrollHint: 33 },
+    { type: "stepper",    instance: vadThresholdStepper,   scrollHint: 34 },
+    { type: "toggle",     instance: vadAdaptive,           scrollHint: 35 },
+    { type: "stepper",    instance: vadPreRollStepper,     scrollHint: 36 },
+    { type: "stepper",    instance: vadPostRollStepper,    scrollHint: 37 },
+    { type: "stepper",    instance: vadMinSpeechStepper,   scrollHint: 38 },
+    { type: "stepper",    instance: vadMinSilenceStepper,  scrollHint: 39 },
+    { type: "toggle",     instance: ppPunctuation,         scrollHint: 44 },
+    { type: "toggle",     instance: ppCapitalize,          scrollHint: 45 },
+    { type: "toggle",     instance: ppFiller,              scrollHint: 46 },
+    { type: "selectfield", instance: injMethodField,       scrollHint: 51 },
+    { type: "stepper",    instance: injDelayStepper,       scrollHint: 52 },
+    { type: "stepper",    instance: injFocusSettleStepper, scrollHint: 53 },
+    { type: "toggle",     instance: uiOverlayToggle,       scrollHint: 58 },
   ]
 
   let focusedIdx = -1
@@ -497,16 +657,33 @@ export function createConfigPanel(
     if (cur.type === "stepper")    cur.instance.blur()
   }
 
+  function getFocusRoot(item: FocusItem) {
+    if (item.type === "selectfield") return item.instance.root as any
+    if (item.type === "stepper") return item.instance.root as any
+    if (item.type === "toggle") return item.instance.root as any
+    return item.instance.root as any
+  }
+
   function ensureFocusedVisible(item: FocusItem) {
-    const currentTop = scrollBox.scrollTop || 0
-    const viewportRows = Math.max(10, (process.stdout.rows || 40) - 14)
-    const visibleBottom = currentTop + viewportRows - 1
-    if (item.scrollHint < currentTop) {
-      scrollBox.scrollTop = item.scrollHint
+    const node = getFocusRoot(item)
+    const itemTop = Number(node?.y ?? 0)
+    const itemHeight = Math.max(1, Number(node?.height ?? 1))
+    const itemBottom = itemTop + itemHeight - 1
+
+    const currentTop = Number(scrollBox.scrollTop || 0)
+    const viewportTop = Number((scrollBox as any).viewport?.y ?? 0)
+    const viewportRows = Math.max(
+      1,
+      Number((scrollBox as any).viewportHeight ?? (scrollBox as any).viewport?.height ?? 20),
+    )
+    const viewportBottom = viewportTop + viewportRows - 1
+
+    if (itemTop < viewportTop) {
+      scrollBox.scrollTop = Math.max(0, currentTop - (viewportTop - itemTop))
       return
     }
-    if (item.scrollHint > visibleBottom) {
-      scrollBox.scrollTop = Math.max(0, item.scrollHint - viewportRows + 3)
+    if (itemBottom > viewportBottom) {
+      scrollBox.scrollTop = Math.max(0, currentTop + (itemBottom - viewportBottom))
     }
   }
 
@@ -594,8 +771,10 @@ export function createConfigPanel(
     if (seq === "\x1b[A" || seq === "k") { focusPrev(); return true }
     // Escape: blur all and return to tabs
     if (seq === "\x1b")                   { blurAll(); callbacks.onEscape?.(); return true }
-    // Space: toggle toggles
-    if (seq === " ")                      { if (cur?.type === "toggle")  { cur.instance.toggle(); return true } }
+    // Space/Enter: toggle toggles
+    if (seq === " " || seq === "\r" || seq === "\n") {
+      if (cur?.type === "toggle")  { cur.instance.toggle(); return true }
+    }
     // Enter/Space: open selection popup
     if (seq === " " || seq === "\r" || seq === "\n") {
       if (cur?.type === "selectfield") { cur.instance.open(); return true }
@@ -633,13 +812,17 @@ export function createConfigPanel(
   function destroy() {
     blurAll()
     renderer.removeInputHandler(configInputHandler)
+    daemonLogLevelField.destroy()
     modelField.destroy()
+    modelBackendField.destroy()
+    modelDeviceField.destroy()
+    modelLanguageField.destroy()
+    modelTaskField.destroy()
     modeField.destroy()
     vadBackendField.destroy()
     injMethodField.destroy()
     deviceFieldRef?.destroy()
     triggerCapture.destroy()
-    toggleCapture.destroy()
   }
 
   return { root, save, focusFirst, blurAll, hasFocus, destroy }

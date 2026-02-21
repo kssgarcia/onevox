@@ -97,7 +97,6 @@ export interface DaemonConfig {
 
 export interface HotkeyConfig {
   trigger: string
-  toggle: string
   mode: string
 }
 
@@ -136,14 +135,11 @@ export interface PostProcessingConfig {
 export interface InjectionConfig {
   method: string
   paste_delay_ms: number
-}
-
-export interface HistoryConfigSection {
-  enabled: boolean
-  max_entries: number
+  focus_settle_ms: number
 }
 
 export interface UiConfig {
+  recording_overlay: boolean
   theme: "dark" | "light"
 }
 
@@ -155,8 +151,7 @@ export interface VoxConfig {
   model: ModelConfig
   post_processing: PostProcessingConfig
   injection: InjectionConfig
-  history: HistoryConfigSection
-  ui?: UiConfig
+  ui: UiConfig
 }
 
 // ── Defaults ─────────────────────────────────────────────────────────────
@@ -165,7 +160,6 @@ export const DEFAULT_CONFIG: VoxConfig = {
   daemon: { auto_start: true, log_level: "info" },
   hotkey: {
     trigger: "Cmd+Shift+0",
-    toggle: "Ctrl+Shift+Space",
     mode: "push-to-talk",
   },
   audio: { device: "default", sample_rate: 16000, chunk_duration_ms: 200 },
@@ -192,9 +186,8 @@ export const DEFAULT_CONFIG: VoxConfig = {
     auto_capitalize: true,
     remove_filler_words: false,
   },
-  injection: { method: "accessibility", paste_delay_ms: 50 },
-  history: { enabled: true, max_entries: 500 },
-  ui: { theme: "dark" },
+  injection: { method: "accessibility", paste_delay_ms: 50, focus_settle_ms: 80 },
+  ui: { recording_overlay: true, theme: "dark" },
 }
 
 // ── Path resolution ──────────────────────────────────────────────────────
