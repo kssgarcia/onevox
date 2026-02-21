@@ -221,11 +221,23 @@ The TUI is production-ready:
 
 ---
 
-## Phase 7: Optimization ⏸️ NOT STARTED
+## Phase 7: Optimization ✅ COMPLETED
 
-- [ ] Profiling
-- [ ] Benchmarks
-- [ ] Performance tuning
+### ✅ Completed
+
+- [x] **Profiling workflow established** (Criterion benchmark reports + CI artifacts)
+- [x] **Benchmarks implemented** (`audio_processing`, `vad_processing`, `pipeline_e2e`)
+- [x] **Performance tuning pass applied** (hot-path clone/log reductions and safer defaults)
+- [x] **Benchmark CI added** (`.github/workflows/benchmark.yml`)
+
+### 🎉 Phase 7 Complete
+
+Optimization infrastructure is now operational:
+
+- Repeatable Criterion benchmark suite in `benches/`
+- CI execution of benchmark targets on each PR/push to main/codex branches
+- Artifact upload for regression comparison (`target/criterion`)
+- End-to-end mock pipeline benchmark for stable latency tracking without external model dependencies
 
 ---
 
@@ -239,10 +251,10 @@ The TUI is production-ready:
 
 ## Current Status
 
-**Phase**: 6 of 8 ✅ COMPLETED  
-**Overall Progress**: ~85% (Phases 1-6 complete, fully functional)  
-**Next Phase**: Phase 7 - Optimization  
-**Next Task**: Performance profiling and benchmarking  
+**Phase**: 7 of 8 ✅ COMPLETED  
+**Overall Progress**: ~93% (Phases 1-7 complete, fully functional + benchmarked)  
+**Next Phase**: Phase 8 - Packaging  
+**Next Task**: macOS packaging and installer workflow  
 **Working Features**: Full end-to-end speech-to-text pipeline operational!
 
 ### ✅ What's Working NOW

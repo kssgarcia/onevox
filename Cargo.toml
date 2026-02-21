@@ -178,3 +178,15 @@ debug = true
 [profile.bench]
 inherits = "release"
 debug = true
+
+[[bench]]
+name = "audio_processing"
+harness = false
+
+[[bench]]
+name = "vad_processing"
+harness = false
+
+[[bench]]
+name = "pipeline_e2e"
+harness = false

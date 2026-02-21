@@ -1,0 +1,30 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main", "codex/**"]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run benchmark suites
+        run: |
+          cargo bench --bench audio_processing
+          cargo bench --bench vad_processing
+          cargo bench --bench pipeline_e2e
+
+      - name: Upload Criterion reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-reports
+          path: target/criterion
