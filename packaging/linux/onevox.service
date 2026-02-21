@@ -1,0 +1,36 @@
+[Unit]
+Description=Onevox Speech-to-Text Daemon
+Documentation=https://github.com/kssgarcia/onevox
+After=graphical-session.target sound.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/onevox daemon --foreground
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
+
+# Security hardening
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/onevox %h/.cache/onevox %h/.config/onevox
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=50%
+TasksMax=100
+
+[Install]
+WantedBy=default.target

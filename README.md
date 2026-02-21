@@ -1,15 +1,15 @@
 # Onevox
 
-Local speech-to-text daemon for macOS. Press a hotkey, speak, and your words appear in any app.
+Local speech-to-text daemon for **macOS**, **Linux**, and **Windows**. Press a hotkey, speak, and your words appear in any app.
 
 ## Quick Install
 
+### macOS
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
 ```
 
 Then grant permissions (required by macOS):
-
 ```bash
 # 1. Input Monitoring (for hotkey)
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
@@ -25,9 +25,34 @@ launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
 # 4. Microphone permission will prompt automatically when you press the hotkey
 ```
 
+### Linux
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/install_linux.sh | bash
+```
+
+Then setup groups and start service:
+```bash
+# Add user to required groups
+sudo usermod -aG audio,input $USER
+# Log out and back in
+
+# Start service
+systemctl --user start onevox
+systemctl --user enable onevox
+```
+
+### Windows
+Download the installer from [Releases](https://github.com/kssgarcia/onevox/releases) and run it.
+Grant microphone permission when prompted.
+
 ## Usage
 
-Press **Cmd+Shift+0**, speak, release. Text appears.
+Press the hotkey, speak, release. Text appears.
+
+**Default Hotkeys:**
+- macOS: `Cmd+Shift+0`
+- Linux: `Ctrl+Shift+Space`
+- Windows: `Ctrl+Shift+Space`
 
 ## Commands
 
@@ -43,27 +68,58 @@ onevox history list    # View transcription history
 onevox config show     # Show configuration
 ```
 
+### Platform-Specific Service Management
+
+**macOS:**
+```bash
+launchctl kickstart -k gui/$(id -u)/com.onevox.daemon  # Restart
+launchctl stop com.onevox.daemon                        # Stop
+```
+
+**Linux:**
+```bash
+systemctl --user start onevox    # Start
+systemctl --user stop onevox     # Stop
+systemctl --user status onevox   # Status
+journalctl --user -u onevox -f   # View logs
+```
+
+**Windows:**
+```powershell
+Start-Service Onevox    # Start
+Stop-Service Onevox     # Stop
+Get-Service Onevox      # Status
+```
+
 ## Configuration
 
-Config file: `~/Library/Application Support/com.onevox.onevox/config.toml`
+### Config File Locations
+
+- **macOS:** `~/Library/Application Support/com.onevox.onevox/config.toml`
+- **Linux:** `~/.config/onevox/config.toml`
+- **Windows:** `%APPDATA%\onevox\onevox\config\config.toml`
 
 ```bash
-# Edit config
-nano ~/Library/Application\ Support/com.onevox.onevox/config.toml
-
-# Or use onevox command
+# View config
 onevox config show
+
+# Initialize default config
+onevox config init
 ```
 
 Key settings:
-- `hotkey.trigger` - Change hotkey (default: "Cmd+Shift+0")
+- `hotkey.trigger` - Change hotkey (platform-specific defaults)
 - `hotkey.mode` - "push-to-talk" or "toggle"
 - `model.model_path` - Path to Whisper model
 - `audio.device` - Audio input device
 
 ## Models
 
-Models location: `~/Library/Application Support/com.onevox.onevox/models/`
+### Model Locations
+
+- **macOS:** `~/Library/Caches/com.onevox.onevox/models/`
+- **Linux:** `~/.cache/onevox/models/`
+- **Windows:** `%LOCALAPPDATA%\onevox\onevox\cache\models\`
 
 ```bash
 # List available models
@@ -72,20 +128,31 @@ onevox models list
 # Download a model
 onevox models download whisper-base.en
 
-# Models are stored in:
-~/Library/Application Support/com.onevox.onevox/models/whisper-base.en/
+# Check downloaded models
+onevox models downloaded
 ```
 
 Recommended: `whisper-base.en` (good balance of speed and accuracy)
 
 ## Logs
 
-```bash
-# View logs
-tail -f ~/Library/Logs/onevox/stdout.log
+### Log Locations
 
-# Log location
-~/Library/Logs/onevox/
+**macOS:**
+```bash
+tail -f ~/Library/Logs/onevox/stdout.log
+```
+
+**Linux:**
+```bash
+journalctl --user -u onevox -f
+# or
+tail -f ~/.local/share/onevox/logs/onevox.log
+```
+
+**Windows:**
+```powershell
+Get-Content "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Wait
 ```
 
 ## Build from Source
@@ -107,12 +174,24 @@ cargo build --release
 
 ## Uninstall
 
+**macOS:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_macos.sh | sh
 ```
 
+**Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_linux.sh | bash
+```
+
+**Windows:**
+```
+Use "Add or Remove Programs" in Windows Settings
+```
+
 ## Troubleshooting
 
+### macOS
 **Hotkey not working?**
 - Grant Input Monitoring permission
 - Restart: `launchctl kickstart -k gui/$(id -u)/com.onevox.daemon`
@@ -125,16 +204,52 @@ curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/unins
 - Grant Microphone permission
 - Check device: `onevox devices list`
 
-**Check status:**
+### Linux
+**Hotkey not working?**
+- Add user to input group: `sudo usermod -aG input $USER`
+- Log out and back in
+- Check for conflicting hotkeys in your DE
+
+**No audio?**
+- Add user to audio group: `sudo usermod -aG audio $USER`
+- Check devices: `onevox devices list`
+- Verify PulseAudio/ALSA: `pactl list sources short`
+
+**Wayland issues?**
+- Some compositors have limited global hotkey support
+- Try X11 session as fallback
+
+### Windows
+**Hotkey not working?**
+- Check Windows Defender isn't blocking
+- Ensure no other app uses the same hotkey
+- Try running as Administrator
+
+**No audio?**
+- Check microphone permissions in Settings → Privacy
+- Ensure microphone is set as default device
+
+**Check status (all platforms):**
 ```bash
 onevox status
-tail -f ~/Library/Logs/onevox/stdout.log
 ```
 
 ## Requirements
 
-- macOS 13.0+
+### macOS
+- macOS 13.0 or later
 - Apple Silicon or Intel
+- ~500MB disk space for models
+
+### Linux
+- X11 or Wayland display server
+- PulseAudio or ALSA
+- systemd (optional, for service management)
+- ~500MB disk space for models
+
+### Windows
+- Windows 10 version 1809 or later
+- Windows 11 recommended
 - ~500MB disk space for models
 
 ## License

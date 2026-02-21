@@ -93,10 +93,10 @@ pub trait ModelRuntime: Send + Sync {
     }
 
     /// Transcribe a speech segment
-    fn transcribe_segment(&mut self, segment: &SpeechSegment) -> crate::Result<Transcription> {
-        let samples = segment.get_samples();
+    fn transcribe_segment(&mut self, segment: &mut SpeechSegment) -> crate::Result<Transcription> {
         let sample_rate = segment.sample_rate();
-        self.transcribe(&samples, sample_rate)
+        let samples = segment.get_samples();
+        self.transcribe(samples, sample_rate)
     }
 
     /// Unload the model and free resources

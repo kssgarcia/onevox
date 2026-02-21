@@ -42,9 +42,9 @@ fn bench_pipeline_audio_to_text_mock(c: &mut Criterion) {
                 }
             }
 
-            if let Some(segment) = maybe_segment {
+            if let Some(mut segment) = maybe_segment {
                 let samples = segment.get_samples();
-                let _ = model.transcribe(black_box(&samples), 16_000);
+                let _ = model.transcribe(black_box(samples), 16_000);
             }
         });
     });

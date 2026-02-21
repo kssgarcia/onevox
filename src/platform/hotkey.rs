@@ -27,6 +27,19 @@ pub struct HotkeyConfig {
 
 impl Default for HotkeyConfig {
     fn default() -> Self {
+        // Platform-specific default hotkeys
+        #[cfg(target_os = "macos")]
+        let default_hotkey = "Cmd+Shift+0";
+        
+        #[cfg(target_os = "linux")]
+        let default_hotkey = "Ctrl+Shift+Space";
+        
+        #[cfg(target_os = "windows")]
+        let default_hotkey = "Ctrl+Shift+Space";
+        
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        let default_hotkey = "Ctrl+Shift+Space";
+        
         Self {
             modifiers: vec!["Cmd".to_string(), "Shift".to_string()],
             key: "Space".to_string(),

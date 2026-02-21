@@ -1,5 +1,8 @@
 # Onevox Configuration Example
-# Copy this file to ~/.config/onevox/config.toml (Linux/macOS) or %APPDATA%\onevox\config.toml (Windows)
+# Copy this file to the appropriate location for your platform:
+# - macOS: ~/Library/Application Support/com.onevox.onevox/config.toml
+# - Linux: ~/.config/onevox/config.toml
+# - Windows: %APPDATA%\onevox\config.toml
 
 [daemon]
 # Start daemon automatically on system boot
@@ -12,10 +15,15 @@ log_level = "debug"
 log_retention_days = 7
 
 [hotkey]
-# Global hotkey combination
-# macOS: "Cmd+Shift+Space", "Ctrl+Option+D", etc.
-# Linux: "Ctrl+Shift+Space", "Alt+D", etc.
-# Windows: "Win+Shift+Space", "Ctrl+Alt+D", etc.
+# Global hotkey combination (platform-specific defaults)
+# macOS: "Cmd+Shift+0"
+# Linux: "Ctrl+Shift+Space"
+# Windows: "Ctrl+Shift+Space"
+#
+# Examples:
+# - macOS: "Cmd+Shift+Space", "Ctrl+Option+D"
+# - Linux: "Ctrl+Shift+Space", "Alt+D", "Super+Space"
+# - Windows: "Win+Shift+Space", "Ctrl+Alt+D"
 trigger = "Cmd+Shift+0"
 
 # Mode: "push-to-talk" (hold to record) or "toggle" (press once to start, again to stop)

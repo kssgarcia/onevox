@@ -36,6 +36,8 @@ pub struct SpeechSegment {
     pub duration_ms: u64,
     /// Timestamp of first chunk
     pub start_time: std::time::Instant,
+    /// Cached concatenated samples (lazy initialization)
+    cached_samples: Option<Vec<f32>>,
 }
 
 impl SpeechSegment {
@@ -51,15 +53,25 @@ impl SpeechSegment {
             chunks,
             duration_ms,
             start_time,
+            cached_samples: None,
         }
     }
 
-    /// Get all samples concatenated
-    pub fn get_samples(&self) -> Vec<f32> {
-        self.chunks
-            .iter()
-            .flat_map(|chunk| chunk.samples.iter().copied())
-            .collect()
+    /// Get all samples concatenated (with caching)
+    pub fn get_samples(&mut self) -> &[f32] {
+        if self.cached_samples.is_none() {
+            // Pre-calculate total size for efficient allocation
+            let total_samples: usize = self.chunks.iter().map(|c| c.samples.len()).sum();
+            let mut samples = Vec::with_capacity(total_samples);
+            
+            for chunk in &self.chunks {
+                samples.extend_from_slice(&chunk.samples);
+            }
+            
+            self.cached_samples = Some(samples);
+        }
+        
+        self.cached_samples.as_ref().unwrap()
     }
 
     /// Get sample rate (from first chunk)

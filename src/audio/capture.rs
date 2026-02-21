@@ -6,10 +6,13 @@ use super::buffer::AudioChunk;
 use super::devices::AudioDeviceManager;
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{Device, Sample as CpalSample, SampleFormat, Stream, StreamConfig};
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 /// Parameters for building an audio stream
 struct StreamParams {
@@ -19,6 +22,67 @@ struct StreamParams {
     device_sample_rate: u32,
     is_running: Arc<AtomicBool>,
     channel_open: Arc<AtomicBool>,
+}
+
+/// Audio resampler for converting between sample rates
+struct AudioResampler {
+    resampler: SincFixedIn<f32>,
+    input_buffer: Vec<Vec<f32>>,
+    output_buffer: Vec<Vec<f32>>,
+}
+
+impl AudioResampler {
+    /// Create a new resampler
+    fn new(from_rate: u32, to_rate: u32, chunk_size: usize) -> crate::Result<Self> {
+        let resample_ratio = to_rate as f64 / from_rate as f64;
+        
+        // Configure high-quality sinc resampler
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+
+        let resampler = SincFixedIn::<f32>::new(
+            resample_ratio,
+            2.0, // max_resample_ratio_relative
+            params,
+            chunk_size,
+            1, // mono channel
+        )
+        .map_err(|e| crate::Error::Audio(format!("Failed to create resampler: {}", e)))?;
+
+        let input_buffer = resampler.input_buffer_allocate(true);
+        let output_buffer = resampler.output_buffer_allocate(true);
+
+        info!(
+            "Created resampler: {}Hz -> {}Hz (ratio: {:.4})",
+            from_rate, to_rate, resample_ratio
+        );
+
+        Ok(Self {
+            resampler,
+            input_buffer,
+            output_buffer,
+        })
+    }
+
+    /// Resample audio samples
+    fn resample(&mut self, input: &[f32]) -> crate::Result<Vec<f32>> {
+        // Copy input to resampler buffer
+        self.input_buffer[0][..input.len()].copy_from_slice(input);
+
+        // Perform resampling
+        let (_, out_len) = self
+            .resampler
+            .process_into_buffer(&self.input_buffer, &mut self.output_buffer, None)
+            .map_err(|e| crate::Error::Audio(format!("Resampling failed: {}", e)))?;
+
+        // Extract output samples
+        Ok(self.output_buffer[0][..out_len].to_vec())
+    }
 }
 
 /// Audio capture configuration
@@ -214,6 +278,22 @@ impl AudioCapture {
 
         let mut local_accumulator = Vec::with_capacity(chunk_size);
         let needs_resampling = device_sample_rate != target_sample_rate;
+        
+        // Create resampler if needed
+        let mut resampler = if needs_resampling {
+            match AudioResampler::new(device_sample_rate, target_sample_rate, chunk_size) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    warn!("Failed to create resampler, audio quality may be degraded: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let mut dropped_chunks = 0u64;
+        let mut last_warning = std::time::Instant::now();
 
         let stream = device
             .build_input_stream(
@@ -235,10 +315,17 @@ impl AudioCapture {
                                 &mut local_accumulator,
                                 Vec::with_capacity(chunk_size),
                             );
-                            let chunk = if needs_resampling {
-                                // TODO: Implement resampling
-                                // For now, just use the samples as-is
-                                AudioChunk::new(samples, device_sample_rate)
+                            
+                            // Resample if necessary
+                            let chunk = if let Some(ref mut resampler) = resampler {
+                                match resampler.resample(&samples) {
+                                    Ok(resampled) => AudioChunk::new(resampled, target_sample_rate),
+                                    Err(e) => {
+                                        // Fallback to original samples on error
+                                        warn!("Resampling error, using original samples: {}", e);
+                                        AudioChunk::new(samples, device_sample_rate)
+                                    }
+                                }
                             } else {
                                 AudioChunk::new(samples, target_sample_rate)
                             };
@@ -246,12 +333,24 @@ impl AudioCapture {
                             // Send chunk (with backpressure handling)
                             // Use try_send to avoid blocking the audio thread
                             match chunk_tx.try_send(chunk) {
-                                Ok(_) => {}
+                                Ok(_) => {
+                                    // Reset dropped counter on success
+                                    if dropped_chunks > 0 {
+                                        dropped_chunks = 0;
+                                    }
+                                }
                                 Err(mpsc::error::TrySendError::Full(_)) => {
                                     // Buffer full - drop this chunk to avoid blocking audio callback
-                                    trace!(
-                                        "Audio buffer full, dropping chunk (transcription too slow)"
-                                    );
+                                    dropped_chunks += 1;
+                                    
+                                    // Warn periodically about dropped chunks
+                                    if last_warning.elapsed().as_secs() >= 5 {
+                                        warn!(
+                                            "Audio buffer full, dropped {} chunks (transcription too slow)",
+                                            dropped_chunks
+                                        );
+                                        last_warning = std::time::Instant::now();
+                                    }
                                 }
                                 Err(mpsc::error::TrySendError::Closed(_)) => {
                                     if channel_open.swap(false, Ordering::Relaxed) {

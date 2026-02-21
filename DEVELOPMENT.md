@@ -6,7 +6,7 @@
 cargo build --release
 ```
 
-Binary: `./target/release/onevox`
+Binary: `./target/release/onevox` (macOS/Linux) or `.\target\release\onevox.exe` (Windows)
 
 ## Run
 
@@ -15,14 +15,26 @@ Binary: `./target/release/onevox`
 ./target/release/onevox daemon --foreground
 
 # Or install locally
+# macOS
 ./scripts/install_macos.sh
+
+# Linux
+./scripts/install_linux.sh
+
+# Windows
+# Run as administrator
+cargo build --release
+# Then run manually or set up as Windows Service
 ```
 
 ## Test
 
 ```bash
-# Test hotkey
+# Test hotkey (use platform-specific key combo)
+# macOS
 ./target/release/onevox test-hotkey --hotkey "Cmd+Shift+0"
+# Linux/Windows
+./target/release/onevox test-hotkey --hotkey "Ctrl+Shift+Space"
 
 # Test audio
 ./target/release/onevox test-audio --duration 3
@@ -36,11 +48,30 @@ Binary: `./target/release/onevox`
 
 ## Package
 
+### macOS
 ```bash
 # Create app bundle
 ./scripts/package_macos_app.sh
 
 # Output: dist/Onevox.app
+```
+
+### Linux
+```bash
+# Build release binary
+cargo build --release
+
+# Create tarball
+tar -czf onevox-linux-x64.tar.gz -C target/release onevox scripts/install_linux.sh scripts/uninstall_linux.sh
+```
+
+### Windows
+```bash
+# Build release binary
+cargo build --release
+
+# Create zip
+# (Use 7-Zip or PowerShell Compress-Archive)
 ```
 
 ## Release
@@ -141,16 +172,25 @@ Key crates:
 
 Default config: `config.example.toml`
 
-User config: `~/Library/Application Support/com.onevox.onevox/config.toml`
+User config locations:
+- macOS: `~/Library/Application Support/com.onevox.onevox/config.toml`
+- Linux: `~/.config/onevox/config.toml`
+- Windows: `%APPDATA%\onevox\config.toml`
 
 ## Models
 
-Models stored in: `~/Library/Application Support/com.onevox.onevox/models/`
+Models stored in:
+- macOS: `~/Library/Application Support/com.onevox.onevox/models/`
+- Linux: `~/.local/share/onevox/models/`
+- Windows: `%APPDATA%\onevox\models\`
 
 Downloaded from HuggingFace: `ggerganov/whisper.cpp`
 
 ## Logs
 
-Daemon logs: `~/Library/Logs/onevox/stdout.log`
+Daemon logs:
+- macOS: `~/Library/Logs/onevox/stdout.log`
+- Linux: `~/.local/share/onevox/logs/onevox.log` or `journalctl --user -u onevox`
+- Windows: `%APPDATA%\onevox\logs\onevox.log`
 
 Set log level: `RUST_LOG=debug onevox daemon --foreground`

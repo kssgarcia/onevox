@@ -812,14 +812,14 @@ async fn main() -> Result<()> {
             while start.elapsed().as_secs() < duration {
                 if let Ok(chunk) = chunk_rx.try_recv() {
                     match vad_processor.process(chunk)? {
-                        Some(segment) => {
+                        Some(mut segment) => {
                             transcription_count += 1;
                             println!("\n🎙️  Speech segment #{}:", transcription_count);
                             println!("  Duration: {}ms", segment.duration_ms);
                             println!("  Chunks: {}", segment.len());
 
                             // Transcribe the segment
-                            let transcription = model.transcribe_segment(&segment)?;
+                            let transcription = model.transcribe_segment(&mut segment)?;
                             println!("  📝 Transcription: \"{}\"", transcription.text);
                             println!(
                                 "  ⏱️  Processing time: {}ms",

@@ -5,10 +5,11 @@
 use crate::config::Config;
 use crate::history::HistoryManager;
 use crate::ipc::protocol::{DaemonState as State, DaemonStatus};
+use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
-use sysinfo::System;
+use sysinfo::{Pid, System};
 
 /// Shared daemon state
 pub struct DaemonState {
@@ -37,7 +38,7 @@ pub struct DaemonState {
     is_dictating: bool,
 
     /// System info provider
-    sys_info: System,
+    sys_info: Mutex<System>,
 
     /// History manager
     history_manager: Arc<HistoryManager>,
@@ -59,16 +60,22 @@ impl DaemonState {
             .expect("Failed to create fallback history manager")
         });
 
+        let pid = std::process::id();
+        let mut sys_info = System::new_all();
+        
+        // Initial refresh for current process
+        sys_info.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
         Self {
             config,
             start_time: Instant::now(),
-            pid: std::process::id(),
+            pid,
             state: State::Starting,
             shutdown_requested: Arc::new(AtomicBool::new(false)),
             model_loaded: false,
             model_name: None,
             is_dictating: false,
-            sys_info: System::new(),
+            sys_info: Mutex::new(sys_info),
             history_manager: Arc::new(history_manager),
         }
     }
@@ -90,16 +97,22 @@ impl DaemonState {
                 .expect("Failed to create fallback history manager")
             });
 
+        let pid = std::process::id();
+        let mut sys_info = System::new_all();
+        
+        // Initial refresh for current process
+        sys_info.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
         Self {
             config,
             start_time: Instant::now(),
-            pid: std::process::id(),
+            pid,
             state: State::Starting,
             shutdown_requested: Arc::new(AtomicBool::new(false)),
             model_loaded: false,
             model_name: None,
             is_dictating: false,
-            sys_info: System::new(),
+            sys_info: Mutex::new(sys_info),
             history_manager: Arc::new(history_manager),
         }
     }
@@ -191,18 +204,32 @@ impl DaemonState {
 
     /// Get memory usage in bytes
     fn get_memory_usage(&self) -> u64 {
-        // Use sysinfo to get process memory
-        // For now, return a placeholder
-        // TODO: Implement actual memory tracking
-        0
+        let pid = Pid::from_u32(self.pid);
+        let mut sys_info = self.sys_info.lock();
+        
+        sys_info.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), false);
+        
+        if let Some(process) = sys_info.process(pid) {
+            process.memory()
+        } else {
+            tracing::warn!("Failed to get process memory usage");
+            0
+        }
     }
 
     /// Get CPU usage percentage
     fn get_cpu_usage(&self) -> f32 {
-        // Use sysinfo to get CPU usage
-        // For now, return a placeholder
-        // TODO: Implement actual CPU tracking
-        0.0
+        let pid = Pid::from_u32(self.pid);
+        let mut sys_info = self.sys_info.lock();
+        
+        sys_info.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), false);
+        
+        if let Some(process) = sys_info.process(pid) {
+            process.cpu_usage()
+        } else {
+            tracing::warn!("Failed to get process CPU usage");
+            0.0
+        }
     }
 
     /// Reload configuration

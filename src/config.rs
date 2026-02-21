@@ -96,13 +96,26 @@ pub struct HistoryConfig {
 
 impl Default for Config {
     fn default() -> Self {
+        // Platform-specific default hotkey
+        #[cfg(target_os = "macos")]
+        let default_hotkey = "Cmd+Shift+0";
+        
+        #[cfg(target_os = "linux")]
+        let default_hotkey = "Ctrl+Shift+Space";
+        
+        #[cfg(target_os = "windows")]
+        let default_hotkey = "Ctrl+Shift+Space";
+        
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        let default_hotkey = "Ctrl+Shift+Space";
+        
         Self {
             daemon: DaemonConfig {
                 auto_start: true,
                 log_level: "info".to_string(),
             },
             hotkey: HotkeyConfig {
-                trigger: "Cmd+Shift+0".to_string(),
+                trigger: default_hotkey.to_string(),
                 mode: "push-to-talk".to_string(),
             },
             audio: AudioConfig {

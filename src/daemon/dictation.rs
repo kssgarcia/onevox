@@ -384,11 +384,11 @@ impl DictationEngine {
                     indicator.processing();
 
                     // Create a speech segment from all collected chunks
-                    let segment = crate::vad::SpeechSegment::new(collected_chunks);
+                    let mut segment = crate::vad::SpeechSegment::new(collected_chunks);
 
                     // DEBUG: Analyze captured audio
-                    let samples = segment.get_samples();
                     let sample_rate = segment.sample_rate();
+                    let samples = segment.get_samples();
 
                     // Calculate audio statistics
                     let duration_secs = samples.len() as f32 / sample_rate as f32;
@@ -482,14 +482,14 @@ impl DictationEngine {
 
     async fn transcribe_with_model(
         model: Arc<Mutex<Box<dyn ModelRuntime>>>,
-        segment: crate::vad::SpeechSegment,
+        mut segment: crate::vad::SpeechSegment,
     ) -> std::result::Result<Transcription, String> {
         match tokio::task::spawn_blocking(move || {
             let mut guard = model
                 .lock()
                 .map_err(|_| "Model mutex poisoned".to_string())?;
             guard
-                .transcribe_segment(&segment)
+                .transcribe_segment(&mut segment)
                 .map_err(|e| e.to_string())
         })
         .await

@@ -7,6 +7,7 @@
 pub mod audio;
 pub mod config;
 pub mod daemon;
+pub mod health;
 pub mod history;
 pub mod indicator;
 pub mod ipc;
@@ -18,6 +19,7 @@ pub mod vad;
 // Re-export commonly used types
 pub use config::Config;
 pub use daemon::Daemon;
+pub use health::{HealthCheck, HealthChecker, HealthMonitor, HealthStatus};
 
 /// Result type alias for onevox operations
 pub type Result<T> = std::result::Result<T, Error>;

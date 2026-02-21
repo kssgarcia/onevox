@@ -25,6 +25,10 @@ impl ModelDownloader {
         let client = reqwest::Client::builder()
             .user_agent("onevox/0.1.0")
             .timeout(std::time::Duration::from_secs(300)) // 5 minute timeout
+            .connect_timeout(std::time::Duration::from_secs(30)) // 30 second connect timeout
+            .pool_max_idle_per_host(10) // Connection pooling
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .tcp_keepalive(std::time::Duration::from_secs(60))
             .build()
             .context("Failed to create HTTP client")?;
 
@@ -292,8 +296,36 @@ impl ModelDownloader {
         Ok(model_dir)
     }
 
-    /// Download a single file with progress bar
+    /// Download a single file with progress bar and retry logic
     async fn download_file(&self, url: &str, dest: &Path) -> Result<()> {
+        const MAX_RETRIES: u32 = 3;
+        const INITIAL_BACKOFF: u64 = 1000; // 1 second
+        
+        let mut last_error = None;
+        
+        for attempt in 1..=MAX_RETRIES {
+            match self.download_file_attempt(url, dest).await {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    last_error = Some(e);
+                    
+                    if attempt < MAX_RETRIES {
+                        let backoff_ms = INITIAL_BACKOFF * 2u64.pow(attempt - 1);
+                        warn!(
+                            "Download attempt {} failed, retrying in {}ms...",
+                            attempt, backoff_ms
+                        );
+                        tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
+                    }
+                }
+            }
+        }
+        
+        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Download failed after {} retries", MAX_RETRIES)))
+    }
+    
+    /// Single download attempt
+    async fn download_file_attempt(&self, url: &str, dest: &Path) -> Result<()> {
         // Send request
         let response = self
             .client
