@@ -155,6 +155,17 @@ curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | 
   ONEVOX_VERSION=v0.1.0 sh
 ```
 
+Releases are published automatically when you push a version tag:
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+This creates release assets used by the installer:
+- `onevox-macos-arm64.tar.gz`
+- `onevox-macos-x86_64.tar.gz`
+
+Note: TUI sources are bundled inside `Onevox.app` resources. `onevox tui` still requires [Bun](https://bun.sh) on the target machine.
+
 ### Usage
 
 ```bash

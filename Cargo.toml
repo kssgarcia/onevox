@@ -2,10 +2,10 @@
 name = "onevox"
 version = "0.1.0"
 edition = "2024"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Kevin Sepulveda"]
 description = "Ultra-fast, privacy-first local speech-to-text daemon"
 license = "MIT"
-repository = "https://github.com/yourusername/onevox"
+repository = "https://github.com/kssgarcia/onevox"
 keywords = ["speech-to-text", "whisper", "dictation", "accessibility", "daemon"]
 categories = ["accessibility", "multimedia::audio", "command-line-utilities"]
 rust-version = "1.93"

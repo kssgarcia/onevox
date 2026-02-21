@@ -43,4 +43,11 @@ cp "$ROOT_DIR/target/release/onevox" "$APP_BIN"
 chmod +x "$APP_BIN"
 cp "$ROOT_DIR/packaging/macos/Info.plist" "$APP_PLIST"
 
+echo "Bundling TUI resources..."
+mkdir -p "$APP_DIR/Contents/Resources/tui"
+rsync -a --delete \
+  --exclude "node_modules" \
+  --exclude ".DS_Store" \
+  "$ROOT_DIR/tui/" "$APP_DIR/Contents/Resources/tui/"
+
 echo "App bundle created: $APP_DIR"
