@@ -57,20 +57,26 @@ pub fn launch() -> Result<()> {
 
 /// Find the TUI directory by walking up from the binary location
 fn find_tui_directory() -> Result<PathBuf> {
-    let mut current = std::env::current_exe()
+    // Get the actual binary path (resolve symlinks)
+    let current_exe = std::env::current_exe()
         .map_err(|e| crate::Error::Other(format!("Failed to get current exe path: {}", e)))?;
+    
+    let resolved_exe = std::fs::canonicalize(&current_exe)
+        .unwrap_or_else(|_| current_exe.clone());
 
     // Installed app layout: Onevox.app/Contents/MacOS/onevox
     // Bundled TUI path:      Onevox.app/Contents/Resources/tui
-    if let Some(contents_dir) = current.parent().and_then(|p| p.parent()) {
-        let bundled_tui = contents_dir.join("Resources").join("tui");
-        if bundled_tui.exists() && bundled_tui.is_dir() {
-            return Ok(bundled_tui);
+    if let Some(macos_dir) = resolved_exe.parent() {
+        if let Some(contents_dir) = macos_dir.parent() {
+            let bundled_tui = contents_dir.join("Resources").join("tui");
+            if bundled_tui.exists() && bundled_tui.is_dir() {
+                return Ok(bundled_tui);
+            }
         }
     }
 
     // Try to find the project root by looking for Cargo.toml
-    // Walk up from the binary location
+    let mut current = resolved_exe.clone();
     for _ in 0..10 {
         current.pop();
         let tui_dir = current.join("tui");

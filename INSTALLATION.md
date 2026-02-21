@@ -32,6 +32,10 @@ Add `Onevox.app` and toggle ON.
 launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
 ```
 
+```bash
+tail -30 ~/Library/Logs/onevox/stdout.log
+```
+
 **Important**: You must restart the daemon after granting permissions!
 
 ### 4. Microphone (for audio) - APPEARS AUTOMATICALLY
