@@ -8,9 +8,9 @@ curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | 
 
 ## Grant Permissions
 
-macOS requires manual permission grants:
+macOS requires manual permission grants **in this order**:
 
-### 1. Input Monitoring (for hotkey)
+### 1. Input Monitoring (for hotkey) - FIRST
 
 ```bash
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
@@ -18,7 +18,7 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEven
 
 Add `Onevox.app` and toggle ON.
 
-### 2. Accessibility (for text injection)
+### 2. Accessibility (for text injection) - SECOND
 
 ```bash
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
@@ -26,19 +26,19 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 
 Add `Onevox.app` and toggle ON.
 
-### 3. Microphone (for audio)
-
-```bash
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
-```
-
-Toggle Onevox ON (appears after first use).
-
-### 4. Restart Daemon
+### 3. Restart Daemon - REQUIRED
 
 ```bash
 launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
 ```
+
+**Important**: You must restart the daemon after granting permissions!
+
+### 4. Microphone (for audio) - APPEARS AUTOMATICALLY
+
+The microphone permission will appear automatically when you first press the hotkey (Cmd+Shift+0). macOS will prompt you to grant it.
+
+If it doesn't appear in System Settings, it means the daemon hasn't tried to use the microphone yet. Press the hotkey to trigger the prompt.
 
 ## Verify
 

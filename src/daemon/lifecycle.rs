@@ -91,15 +91,40 @@ impl Lifecycle {
                     Arc::clone(state.history_manager())
                 };
 
-                match DictationEngine::with_history(config, history_manager) {
-                    Ok(mut engine) => {
-                        info!("✅ Dictation engine initialized");
-                        if let Err(e) = engine.start().await {
-                            error!("Dictation engine error: {}", e);
+                // Try to initialize dictation engine with retries
+                let mut retry_count = 0;
+                let max_retries = 3;
+                
+                loop {
+                    match DictationEngine::with_history(config.clone(), Arc::clone(&history_manager)) {
+                        Ok(mut engine) => {
+                            info!("✅ Dictation engine initialized");
+                            if let Err(e) = engine.start().await {
+                                error!("Dictation engine error: {}", e);
+                            }
+                            break;
                         }
-                    }
-                    Err(e) => {
-                        error!("Failed to create dictation engine: {}", e);
+                        Err(e) => {
+                            if retry_count == 0 {
+                                error!("Failed to create dictation engine: {}", e);
+                                error!("⚠️  This is usually a permission issue. Please grant:");
+                                error!("   1. Input Monitoring permission");
+                                error!("   2. Accessibility permission");
+                                error!("   Then restart: launchctl kickstart -k gui/$(id -u)/com.onevox.daemon");
+                            }
+                            
+                            retry_count += 1;
+                            if retry_count >= max_retries {
+                                error!("❌ Dictation engine failed after {} attempts", max_retries);
+                                error!("   Daemon will continue running but hotkeys won't work");
+                                error!("   Grant permissions and restart the daemon");
+                                break;
+                            }
+                            
+                            // Wait before retry
+                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                            info!("🔄 Retrying dictation engine initialization ({}/{})", retry_count, max_retries);
+                        }
                     }
                 }
             });

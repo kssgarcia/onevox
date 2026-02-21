@@ -11,13 +11,18 @@ curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | 
 Then grant permissions (required by macOS):
 
 ```bash
-# Open System Settings and add Onevox.app to:
-# 1. Privacy & Security → Input Monitoring (for hotkey)
-# 2. Privacy & Security → Accessibility (for text injection)
-# 3. Privacy & Security → Microphone (for audio)
+# 1. Input Monitoring (for hotkey)
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+# Add Onevox.app and toggle ON
 
-# Restart daemon
+# 2. Accessibility (for text injection)
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+# Add Onevox.app and toggle ON
+
+# 3. Restart daemon (REQUIRED!)
 launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
+
+# 4. Microphone permission will prompt automatically when you press the hotkey
 ```
 
 ## Usage
