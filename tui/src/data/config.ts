@@ -2,8 +2,8 @@
  * Config data access — reads/writes the onevox config.toml file.
  *
  * Platform paths:
- *   Windows: %APPDATA%\onevox\config.toml
- *   macOS:   ~/Library/Application Support/onevox/config.toml
+ *   Windows: %APPDATA%\onevox\onevox\config\config.toml
+ *   macOS:   ~/Library/Application Support/com.onevox.onevox/config.toml
  *   Linux:   ~/.config/onevox/config.toml
  */
 
@@ -196,10 +196,10 @@ export function configDir(): string {
   if (process.env.ONEVOX_CONFIG_DIR) return process.env.ONEVOX_CONFIG_DIR
   if (process.env.VOX_CONFIG_DIR) return process.env.VOX_CONFIG_DIR
   if (process.platform === "win32") {
-    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "onevox")
+    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "onevox", "onevox", "config")
   }
   if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Application Support", "onevox")
+    return join(homedir(), "Library", "Application Support", "com.onevox.onevox")
   }
   return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "onevox")
 }
