@@ -196,6 +196,34 @@ impl IpcServer {
                 // TODO: Implement model unloading
                 Response::Ok("Model unloaded (not yet implemented)".to_string())
             }
+
+            Command::GetHistory => {
+                info!("Get history command received");
+                let state = state.read().await;
+                match state.history_manager().get_all() {
+                    Ok(entries) => Response::History(entries),
+                    Err(e) => Response::Error(format!("Failed to get history: {}", e)),
+                }
+            }
+
+            Command::DeleteHistoryEntry { id } => {
+                info!("Delete history entry command received: {}", id);
+                let state = state.read().await;
+                match state.history_manager().delete_entry(id) {
+                    Ok(true) => Response::Ok(format!("Entry {} deleted", id)),
+                    Ok(false) => Response::Error(format!("Entry {} not found", id)),
+                    Err(e) => Response::Error(format!("Failed to delete entry: {}", e)),
+                }
+            }
+
+            Command::ClearHistory => {
+                info!("Clear history command received");
+                let state = state.read().await;
+                match state.history_manager().clear() {
+                    Ok(()) => Response::Ok("History cleared".to_string()),
+                    Err(e) => Response::Error(format!("Failed to clear history: {}", e)),
+                }
+            }
         }
     }
 

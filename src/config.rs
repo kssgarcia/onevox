@@ -22,6 +22,8 @@ pub struct Config {
     pub post_processing: PostProcessingConfig,
     #[serde(default)]
     pub injection: InjectionConfig,
+    #[serde(default)]
+    pub history: HistoryConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +87,13 @@ pub struct InjectionConfig {
     pub focus_settle_ms: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryConfig {
+    pub enabled: bool,
+    pub max_entries: usize,
+    pub auto_save: bool,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -106,6 +115,7 @@ impl Default for Config {
             model: ModelConfig::default(),
             post_processing: PostProcessingConfig::default(),
             injection: InjectionConfig::default(),
+            history: HistoryConfig::default(),
         }
     }
 }
@@ -162,6 +172,16 @@ impl Default for InjectionConfig {
             method: "accessibility".to_string(),
             paste_delay_ms: 50,
             focus_settle_ms: default_focus_settle_ms(),
+        }
+    }
+}
+
+impl Default for HistoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_entries: 1000,
+            auto_save: true,
         }
     }
 }

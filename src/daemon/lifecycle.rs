@@ -75,10 +75,17 @@ impl Lifecycle {
         // Initialize and start dictation engine in the background
         // We'll use a separate thread since HotkeyManager is not Send
         let config = self.config.clone();
+        let state_clone = Arc::clone(&self.state);
         let _dictation_handle = std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
-                match DictationEngine::new(config) {
+                // Get history manager from state
+                let history_manager = {
+                    let state = state_clone.read().await;
+                    Arc::clone(state.history_manager())
+                };
+
+                match DictationEngine::with_history(config, history_manager) {
                     Ok(mut engine) => {
                         info!("✅ Dictation engine initialized");
                         if let Err(e) = engine.start().await {

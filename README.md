@@ -29,6 +29,7 @@ It's designed for developers, power users, and anyone who values:
 - ✅ **Model Management**: Download and manage multiple Whisper models
 - ✅ **Text Injection**: Automatic text insertion via accessibility API
 - ✅ **Terminal UI**: Professional TUI with dark/light themes
+- ✅ **History Tracking**: Full transcription history with export support
 - ✅ **Configuration System**: Full TOML-based config with hot-reload
 - 🚧 **Cross-Platform**: macOS complete, Linux/Windows in progress
 
@@ -153,6 +154,13 @@ onevox tui
 
 # Stop daemon
 onevox stop
+
+# View transcription history
+onevox history list           # Show recent transcriptions
+onevox history list --limit 5 # Show last 5 entries
+onevox history delete <id>    # Delete a specific entry
+onevox history clear          # Clear all history (with confirmation)
+onevox history export         # Export history to text file
 ```
 
 ### Quick Test (Real Transcription)
@@ -222,16 +230,100 @@ cd tui && bun install && bun start
 - Click any control with mouse!
 
 **History Panel:**
-- `↑` / `↓` - Navigate entries
-- `c` - Copy transcription
-- `d` - Delete entry
-- `Enter` - Expand details
+- `↑` / `↓` or `j` / `k` - Navigate entries
+- `c` - Copy transcription to clipboard
+- `e` - Export entry to file
+- `dd` or `x` - Delete entry (Vim-style)
+- `D` (Shift+d) - Clear all history
+- `Enter` - Expand full details
 
 ### Documentation
 
 - **Full Guide:** [docs/TUI_INTEGRATION.md](docs/TUI_INTEGRATION.md)
 - **Architecture:** [docs/TUI.md](docs/TUI.md)
 - **Quick Start:** [tui/README.md](tui/README.md)
+
+---
+
+## 📜 History Management
+
+Onevox automatically tracks all your transcriptions with timestamps, model information, and performance metrics. History is stored locally in JSON format.
+
+### Features
+
+- **Automatic Tracking**: Every transcription is logged with metadata
+- **Persistent Storage**: History survives daemon restarts
+- **Configurable Limits**: Set maximum entries to manage disk space
+- **Privacy Controls**: Easy deletion or complete clearing
+- **Export Support**: Export history for backup or analysis
+
+### CLI Commands
+
+```bash
+# View recent transcriptions
+onevox history list
+
+# Limit output
+onevox history list --limit 10
+
+# Delete a specific entry
+onevox history delete 42
+
+# Clear all history (with confirmation)
+onevox history clear
+
+# Force clear without confirmation
+onevox history clear --yes
+
+# Export to text file
+onevox history export
+onevox history export --output my-transcriptions.txt
+```
+
+### Storage Location
+
+History is stored in platform-specific locations:
+
+- **macOS**: `~/Library/Application Support/onevox/history.json`
+- **Linux**: `~/.local/share/onevox/history.json`
+- **Windows**: `%APPDATA%\onevox\history.json`
+
+### Configuration
+
+Edit your `config.toml` to customize history behavior:
+
+```toml
+[history]
+# Enable/disable history tracking
+enabled = true
+
+# Maximum entries to keep (oldest are auto-removed)
+max_entries = 1000
+
+# Auto-save after each transcription (vs. only on shutdown)
+auto_save = true
+```
+
+### History Format
+
+Each entry contains:
+- **ID**: Unique identifier
+- **Timestamp**: When the transcription occurred
+- **Text**: The transcribed content
+- **Model**: Which model was used
+- **Duration**: Processing time in milliseconds
+- **Confidence**: Transcription confidence score (if available)
+
+### TUI Integration
+
+The Terminal UI includes a dedicated **History Panel** where you can:
+- Browse all past transcriptions
+- View detailed metadata
+- Copy transcriptions to clipboard
+- Delete individual entries
+- All with full keyboard and mouse support
+
+Press `Tab` in the TUI to navigate to the History panel.
 
 ---
 

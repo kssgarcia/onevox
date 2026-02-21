@@ -5,6 +5,7 @@
 
 use crate::audio::{AudioEngine, CaptureConfig};
 use crate::config::Config;
+use crate::history::{HistoryEntry, HistoryManager};
 use crate::indicator::RecordingIndicator;
 use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCppCli};
 use crate::platform::{HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector};
@@ -32,6 +33,9 @@ pub struct DictationEngine {
     /// Model runtime
     model: Arc<Mutex<Box<dyn ModelRuntime>>>,
 
+    /// History manager
+    history_manager: Arc<HistoryManager>,
+
     /// Is currently dictating
     is_dictating: Arc<AtomicBool>,
 
@@ -45,6 +49,18 @@ pub struct DictationEngine {
 impl DictationEngine {
     /// Create a new dictation engine
     pub fn new(config: Config) -> Result<Self> {
+        info!("Initializing dictation engine");
+
+        // Create history manager
+        let history_config = config.history.clone();
+        let history_manager = HistoryManager::new(history_config)
+            .map_err(|e| anyhow::anyhow!("Failed to create history manager: {}", e))?;
+
+        Self::with_history(config, Arc::new(history_manager))
+    }
+
+    /// Create a new dictation engine with an existing history manager
+    pub fn with_history(config: Config, history_manager: Arc<HistoryManager>) -> Result<Self> {
         info!("Initializing dictation engine");
 
         // Create hotkey manager
@@ -79,6 +95,7 @@ impl DictationEngine {
             text_injector,
             audio_engine,
             model: Arc::new(Mutex::new(model)),
+            history_manager,
             is_dictating: Arc::new(AtomicBool::new(false)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
         })
@@ -184,6 +201,8 @@ impl DictationEngine {
         let is_dictating = Arc::clone(&self.is_dictating);
         let injector = self.text_injector.clone();
         let model = Arc::clone(&self.model);
+        let model_name = self.config.model.model_path.clone();
+        let history_manager = Arc::clone(&self.history_manager);
         let vad_enabled = self.config.vad.enabled;
         let indicator = Arc::clone(&self.indicator);
         let focus_settle_ms = self.config.injection.focus_settle_ms;
@@ -210,42 +229,58 @@ impl DictationEngine {
                     .await
                     {
                         Ok(Some(chunk)) => {
-                            // Process through VAD
-                            match vad_processor.process(chunk) {
-                                Ok(Some(segment)) => {
-                                    info!("🎯 Speech segment detected ({} chunks)", segment.len());
-                                    indicator.processing();
+                                // Process through VAD
+                                match vad_processor.process(chunk) {
+                                    Ok(Some(segment)) => {
+                                        info!("🎯 Speech segment detected ({} chunks)", segment.len());
+                                        indicator.processing();
 
-                                    // Transcribe
-                                    match Self::transcribe_with_model(Arc::clone(&model), segment).await {
-                                        Ok(transcript) => {
-                                            info!("📝 Transcription: {}", transcript.text);
+                                        // Transcribe
+                                        let model_clone = Arc::clone(&model);
+                                        let model_name_clone = model_name.clone();
+                                        let history_clone = Arc::clone(&history_manager);
+                                        
+                                        match Self::transcribe_with_model(model_clone, segment).await {
+                                            Ok(transcript) => {
+                                                info!("📝 Transcription: {}", transcript.text);
 
-                                            // Hide overlay before injection so target app keeps focus.
-                                            indicator.hide();
-                                            if focus_settle_ms > 0 {
-                                                tokio::time::sleep(tokio::time::Duration::from_millis(
-                                                    focus_settle_ms as u64,
-                                                ))
-                                                .await;
+                                                // Record to history
+                                                let history_entry = HistoryEntry::new(
+                                                    transcript.text.clone(),
+                                                    model_name_clone,
+                                                    transcript.processing_time_ms,
+                                                    transcript.confidence,
+                                                );
+                                                
+                                                if let Err(e) = history_clone.add_entry(history_entry) {
+                                                    error!("Failed to record history: {}", e);
+                                                }
+
+                                                // Hide overlay before injection so target app keeps focus.
+                                                indicator.hide();
+                                                if focus_settle_ms > 0 {
+                                                    tokio::time::sleep(tokio::time::Duration::from_millis(
+                                                        focus_settle_ms as u64,
+                                                    ))
+                                                    .await;
+                                                }
+
+                                                // Inject text into active application
+                                                if let Err(e) = injector.inject(&transcript.text) {
+                                                    error!("Failed to inject text: {}", e);
+                                                } else {
+                                                    info!("✅ Text injected successfully");
+                                                }
                                             }
-
-                                            // Inject text into active application
-                                            if let Err(e) = injector.inject(&transcript.text) {
-                                                error!("Failed to inject text: {}", e);
-                                            } else {
-                                                info!("✅ Text injected successfully");
+                                            Err(e) => {
+                                                error!("Transcription failed: {}", e);
                                             }
                                         }
-                                        Err(e) => {
-                                            error!("Transcription failed: {}", e);
+
+                                        if is_dictating.load(Ordering::SeqCst) {
+                                            indicator.recording();
                                         }
                                     }
-
-                                    if is_dictating.load(Ordering::SeqCst) {
-                                        indicator.recording();
-                                    }
-                                }
                                 Ok(None) => {
                                     // No complete segment yet
                                 }
@@ -334,6 +369,18 @@ impl DictationEngine {
                     match Self::transcribe_with_model(Arc::clone(&model), segment).await {
                         Ok(transcript) => {
                             info!("📝 Transcription: {}", transcript.text);
+
+                            // Record to history
+                            let history_entry = HistoryEntry::new(
+                                transcript.text.clone(),
+                                model_name,
+                                transcript.processing_time_ms,
+                                transcript.confidence,
+                            );
+                            
+                            if let Err(e) = history_manager.add_entry(history_entry) {
+                                error!("Failed to record history: {}", e);
+                            }
 
                             // Hide overlay before injection so target app keeps focus.
                             indicator.hide();
@@ -447,6 +494,11 @@ impl DictationEngine {
     /// Check if currently dictating
     pub fn is_dictating(&self) -> bool {
         self.is_dictating.load(Ordering::SeqCst)
+    }
+
+    /// Get reference to history manager
+    pub fn history_manager(&self) -> &Arc<HistoryManager> {
+        &self.history_manager
     }
 }
 

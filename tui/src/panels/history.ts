@@ -5,7 +5,7 @@
  *   - Newest-first card list in a ScrollBox
  *   - Per-card actions: Copy, Export, Expand, Delete
  *   - Full-text expansion in a popup overlay
- *   - Keyboard nav: Up/Down, c=copy, e=export, Enter=expand, d=delete, D=clear
+ *   - Keyboard nav: Up/Down/j/k, c=copy, e=export, Enter=expand, dd/x=delete, D=clear all
  */
 
 import {
@@ -27,6 +27,7 @@ import {
   removeEntry,
   clearHistory,
   saveHistory,
+  loadHistory,
 } from "../data/history.js"
 import { createCard, type CardInstance } from "../components/card.js"
 import { createConfirmPopup } from "../components/confirm-popup.js"
@@ -52,6 +53,8 @@ export function createHistoryPanel(
   let cards: CardInstance[] = []
   let expandedPopup: BoxRenderable | null = null
   let hasFocus = false
+  let lastKeyPress: { key: string; time: number } | null = null
+  let isRebuilding = false // Prevent duplicate rebuilds
   
   const theme = state.theme
 
@@ -91,7 +94,7 @@ export function createHistoryPanel(
   topBar.add(countText)
 
   // ── Scroll container ─────────────────────────────────────────────────
-  const scrollBox = new ScrollBoxRenderable(renderer, {
+  let scrollBox = new ScrollBoxRenderable(renderer, {
     id: "history-scroll",
     width: "100%" as any,
     height: "100%" as any,
@@ -104,16 +107,32 @@ export function createHistoryPanel(
   // ── Build cards ──────────────────────────────────────────────────────
 
   function buildCards() {
-    // Clear existing
+    // Prevent duplicate rebuilds
+    if (isRebuilding) {
+      return
+    }
+    isRebuilding = true
+    
+    // Clear existing cards array
     cards = []
+    
+    // Remove old scrollBox and create a new one (cleanest approach)
     try {
-      const children = (scrollBox as any).content?.children
-      if (children) {
-        while (children.length > 0) {
-          scrollBox.remove(children[0].id)
-        }
-      }
-    } catch {}
+      root.remove("history-scroll")
+    } catch (e) {
+      // Doesn't exist
+    }
+    
+    // Create fresh scrollBox
+    scrollBox = new ScrollBoxRenderable(renderer, {
+      id: "history-scroll",
+      width: "100%" as any,
+      height: "100%" as any,
+      viewportCulling: true,
+    })
+    
+    // Add it back to root
+    root.add(scrollBox)
 
     const entries = newestFirst(state.history)
     countText.content = `${entries.length} entries`
@@ -151,6 +170,8 @@ export function createHistoryPanel(
       emptyBox.add(emptyText)
       emptyBox.add(emptyHint)
       scrollBox.add(emptyBox)
+      
+      isRebuilding = false
       return
     }
 
@@ -199,6 +220,8 @@ export function createHistoryPanel(
     if (hasFocus && cards.length > 0) {
       updateSelection()
     }
+    
+    isRebuilding = false
   }
 
   function updateSelection() {
@@ -352,11 +375,17 @@ export function createHistoryPanel(
       message: `Delete this transcription?\n"${truncateText(entry.text, 50)}"`,
       theme,
       onConfirm: () => {
+        // Update in-memory state
         state.history = removeEntry(state.history, entry.id)
+        // Save to disk
         saveHistory(state.history)
+        // Reload from disk to ensure consistency
+        state.history = loadHistory()
+        // Adjust selection if needed
         if (selectedIndex >= newestFirst(state.history).length) {
           selectedIndex = Math.max(0, newestFirst(state.history).length - 1)
         }
+        // Rebuild immediately
         buildCards()
         callbacks.onStatusMessage("✓ Entry deleted")
         setTimeout(() => callbacks.onStatusMessage(""), 2000)
@@ -373,9 +402,14 @@ export function createHistoryPanel(
       message: `Delete all ${state.history.length} transcription entries?\nThis cannot be undone.`,
       theme,
       onConfirm: () => {
+        // Clear history
         state.history = clearHistory()
+        // Save empty array to disk
         saveHistory(state.history)
+        // Reload from disk to ensure consistency
+        state.history = loadHistory()
         selectedIndex = 0
+        // Rebuild immediately
         buildCards()
         callbacks.onStatusMessage("✓ All entries cleared")
         setTimeout(() => callbacks.onStatusMessage(""), 2000)
@@ -394,6 +428,30 @@ export function createHistoryPanel(
 
     const entries = newestFirst(state.history)
     if (entries.length === 0) return
+
+    // Check for 'dd' Vim-style deletion
+    const now = Date.now()
+    if (key.name === "d" && !key.shift && !key.ctrl) {
+      // Check if this is a second 'd' within 500ms
+      if (lastKeyPress?.key === "d" && now - lastKeyPress.time < 500) {
+        // This is 'dd' - delete the entry
+        const entry = getSelectedEntry()
+        if (entry) deleteEntry(entry)
+        lastKeyPress = null // Reset
+        return
+      } else {
+        // First 'd' - store it and wait
+        lastKeyPress = { key: "d", time: now }
+        // Clear after timeout
+        setTimeout(() => {
+          if (lastKeyPress?.key === "d") lastKeyPress = null
+        }, 500)
+        return
+      }
+    } else {
+      // Any other key resets the dd sequence
+      lastKeyPress = null
+    }
 
     // Navigation: down/j
     if (key.name === "down" || key.name === "j") {
@@ -438,8 +496,8 @@ export function createHistoryPanel(
       return
     }
     
-    // d: delete
-    if (key.name === "d" && !key.shift) {
+    // x: delete (alternative to dd)
+    if (key.name === "x" && !key.shift && !key.ctrl) {
       const entry = getSelectedEntry()
       if (entry) deleteEntry(entry)
       return

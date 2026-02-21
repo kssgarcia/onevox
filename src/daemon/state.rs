@@ -3,6 +3,7 @@
 //! Centralized state for the daemon process.
 
 use crate::config::Config;
+use crate::history::HistoryManager;
 use crate::ipc::protocol::{DaemonState as State, DaemonStatus};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -37,11 +38,27 @@ pub struct DaemonState {
 
     /// System info provider
     sys_info: System,
+
+    /// History manager
+    history_manager: Arc<HistoryManager>,
 }
 
 impl DaemonState {
     /// Create a new daemon state
     pub fn new(config: Config) -> Self {
+        // Create history manager
+        let history_config = config.history.clone();
+        let history_manager = HistoryManager::new(history_config).unwrap_or_else(|e| {
+            tracing::warn!("Failed to create history manager: {}", e);
+            // Create a disabled history manager as fallback
+            HistoryManager::new(crate::config::HistoryConfig {
+                enabled: false,
+                max_entries: 0,
+                auto_save: false,
+            })
+            .expect("Failed to create fallback history manager")
+        });
+
         Self {
             config,
             start_time: Instant::now(),
@@ -52,6 +69,7 @@ impl DaemonState {
             model_name: None,
             is_dictating: false,
             sys_info: System::new(),
+            history_manager: Arc::new(history_manager),
         }
     }
 
@@ -162,5 +180,10 @@ impl DaemonState {
         self.config = new_config;
         tracing::info!("Configuration reloaded");
         Ok(())
+    }
+
+    /// Get reference to history manager
+    pub fn history_manager(&self) -> &Arc<HistoryManager> {
+        &self.history_manager
     }
 }

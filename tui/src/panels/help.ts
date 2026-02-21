@@ -70,7 +70,7 @@ export function createHelpOverlay(
         ["Enter", "Expand full transcription text"],
         ["c", "Copy selected entry to clipboard"],
         ["e", "Export selected entry to file"],
-        ["d", "Delete selected entry"],
+        ["dd  or  x", "Delete selected entry (Vim-style)"],
         ["D (Shift+d)", "Clear all history"],
       ],
     },

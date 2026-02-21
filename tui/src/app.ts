@@ -7,7 +7,7 @@
  * │ ┌─────────────────────────────────────────┐  │
  * │ │  Content area (History or Config panel) │  │
  * │ └─────────────────────────────────────────┘  │
- * │  Tab: switch tabs | ?: help | q: quit        │
+ * │  ↑/↓ j/k Move | dd/x Delete | D Clear All    │
  * └─────────────────────────────────────────────┘
  */
 
@@ -195,11 +195,18 @@ export function createApp(
   let focusMode: "tabs" | "content" = "tabs"
 
   function refreshStatusHints() {
-    const general = "Esc Top  Enter Open  ↑/↓ j/k Move  ? Help  t Theme  Ctrl+C Quit"
     if (focusMode === "tabs") {
-      statusLeft.content = `${general}  |  ←/→ h/l Tabs`
+      // General navigation when tabs are focused
+      statusLeft.content = "←/→ h/l Tabs  Enter Open  ? Help  t Theme  Ctrl+C Quit"
     } else {
-      statusLeft.content = `${general}  |  Esc -> Tabs`
+      // Content-specific hints based on active tab
+      if (state.activeTab === 0) {
+        // History tab hints
+        statusLeft.content = "↑/↓ j/k Move  c Copy  e Export  dd/x Delete  D Clear All  Esc Tabs"
+      } else {
+        // Config tab hints
+        statusLeft.content = "↑/↓ j/k Move  ←/→ h/l Change  Space Toggle  Ctrl+S Save  Esc Tabs"
+      }
     }
     statusRight.content = `● ${state.theme.name === "dark" ? "Dark" : "Light"} Mode`
   }
@@ -293,6 +300,8 @@ export function createApp(
       showConfig()
       if (configPanel) configPanel.focusFirst()
     }
+    // Refresh hints to show tab-specific shortcuts
+    refreshStatusHints()
   })
 
   // Show initial tab

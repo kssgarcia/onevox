@@ -60,6 +60,15 @@ pub enum Command {
 
     /// Unload current model
     UnloadModel,
+
+    /// Get transcription history
+    GetHistory,
+
+    /// Delete a specific history entry
+    DeleteHistoryEntry { id: u64 },
+
+    /// Clear all history
+    ClearHistory,
 }
 
 /// Responses from the daemon
@@ -85,6 +94,9 @@ pub enum Response {
 
     /// Pong response
     Pong,
+
+    /// History entries
+    History(Vec<crate::history::HistoryEntry>),
 }
 
 /// Daemon status information

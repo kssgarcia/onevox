@@ -53,6 +53,12 @@ enum Commands {
         action: ModelAction,
     },
 
+    /// View and manage transcription history
+    History {
+        #[command(subcommand)]
+        action: HistoryAction,
+    },
+
     /// Test audio capture (dev tool)
     TestAudio {
         /// Duration in seconds
@@ -143,6 +149,36 @@ enum ModelAction {
     Info {
         /// Model ID
         model_id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum HistoryAction {
+    /// List all transcription history
+    List {
+        /// Number of recent entries to show (0 = all)
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Delete a specific history entry
+    Delete {
+        /// Entry ID to delete
+        id: u64,
+    },
+
+    /// Clear all history
+    Clear {
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+
+    /// Export history to a file
+    Export {
+        /// Output file path
+        #[arg(short, long, default_value = "transcription-history.txt")]
+        output: String,
     },
 }
 
@@ -445,6 +481,168 @@ async fn main() -> Result<()> {
                 }
 
                 Ok(())
+            }
+        },
+
+        Commands::History { action } => match action {
+            HistoryAction::List { limit } => {
+                let mut client = onevox::ipc::IpcClient::default();
+                
+                match client.get_history().await {
+                    Ok(mut entries) => {
+                        if entries.is_empty() {
+                            println!("📝 No transcription history yet");
+                            println!("💡 Start dictating to build your history!");
+                            return Ok(());
+                        }
+
+                        // Sort by timestamp, newest first
+                        entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+                        // Apply limit
+                        let to_show = if limit == 0 || limit >= entries.len() {
+                            entries.len()
+                        } else {
+                            limit
+                        };
+
+                        println!("📝 Transcription History ({} entries)\n", entries.len());
+                        println!("Showing {} most recent:\n", to_show);
+
+                        for (i, entry) in entries.iter().take(to_show).enumerate() {
+                            // Format timestamp
+                            let datetime = chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
+                                .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                            let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S");
+
+                            println!("─────────────────────────────────────────");
+                            println!("#{} [ID: {}]", i + 1, entry.id);
+                            println!("📅 {}", formatted_time);
+                            println!("🤖 Model: {}", entry.model);
+                            println!("⏱️  Duration: {}ms", entry.duration_ms);
+                            if let Some(conf) = entry.confidence {
+                                println!("📊 Confidence: {:.1}%", conf * 100.0);
+                            }
+                            println!("\n💬 \"{}\"", entry.text);
+                            println!();
+                        }
+
+                        if entries.len() > to_show {
+                            println!("... and {} more entries", entries.len() - to_show);
+                            println!("💡 Use --limit 0 to show all entries");
+                        }
+
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to get history: {}", e);
+                        eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            HistoryAction::Delete { id } => {
+                let mut client = onevox::ipc::IpcClient::default();
+                
+                match client.delete_history_entry(id).await {
+                    Ok(_) => {
+                        println!("✅ Deleted history entry #{}", id);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to delete entry: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            HistoryAction::Clear { yes } => {
+                if !yes {
+                    println!("⚠️  This will delete ALL transcription history.");
+                    print!("Are you sure? (y/N): ");
+                    use std::io::{self, Write};
+                    io::stdout().flush().unwrap();
+                    
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input).unwrap();
+                    
+                    if !input.trim().eq_ignore_ascii_case("y") {
+                        println!("Cancelled.");
+                        return Ok(());
+                    }
+                }
+
+                let mut client = onevox::ipc::IpcClient::default();
+                
+                match client.clear_history().await {
+                    Ok(_) => {
+                        println!("✅ All history cleared");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to clear history: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            HistoryAction::Export { output } => {
+                use std::fs::File;
+                use std::io::Write;
+
+                let mut client = onevox::ipc::IpcClient::default();
+                
+                match client.get_history().await {
+                    Ok(mut entries) => {
+                        if entries.is_empty() {
+                            println!("📝 No history to export");
+                            return Ok(());
+                        }
+
+                        // Sort by timestamp
+                        entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+                        // Write to file
+                        let mut file = File::create(&output).map_err(|e| {
+                            onevox::Error::Other(format!("Failed to create file: {}", e))
+                        })?;
+
+                        writeln!(file, "Onevox Transcription History").map_err(|e| {
+                            onevox::Error::Other(format!("Failed to write: {}", e))
+                        })?;
+                        writeln!(file, "Generated: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")).map_err(|e| {
+                            onevox::Error::Other(format!("Failed to write: {}", e))
+                        })?;
+                        writeln!(file, "Total entries: {}\n", entries.len()).map_err(|e| {
+                            onevox::Error::Other(format!("Failed to write: {}", e))
+                        })?;
+                        writeln!(file, "============================================================\n").map_err(|e| {
+                            onevox::Error::Other(format!("Failed to write: {}", e))
+                        })?;
+
+                        let entry_count = entries.len();
+                        for entry in entries {
+                            let datetime = chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
+                                .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                            let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S");
+
+                            writeln!(file, "[{}] ({}ms) {}", formatted_time, entry.duration_ms, entry.model).map_err(|e| {
+                                onevox::Error::Other(format!("Failed to write: {}", e))
+                            })?;
+                            writeln!(file, "{}\n", entry.text).map_err(|e| {
+                                onevox::Error::Other(format!("Failed to write: {}", e))
+                            })?;
+                        }
+
+                        println!("✅ Exported {} entries to {}", entry_count, output);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to get history: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             }
         },
 

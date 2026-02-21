@@ -153,6 +153,18 @@ refresh_rate = 10
 # Theme: "dark", "light"
 theme = "dark"
 
+[history]
+# Enable transcription history tracking
+enabled = true
+
+# Maximum number of history entries to keep
+# Oldest entries are automatically removed when limit is reached
+max_entries = 1000
+
+# Automatically save history after each transcription
+# If false, history is only saved on daemon shutdown
+auto_save = true
+
 [telemetry]
 # Enable performance metrics collection
 enabled = true

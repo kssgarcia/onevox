@@ -129,4 +129,31 @@ impl IpcClient {
             _ => Err(anyhow::anyhow!("Unexpected response")),
         }
     }
+
+    /// Get transcription history
+    pub async fn get_history(&mut self) -> Result<Vec<crate::history::HistoryEntry>> {
+        match self.send_command(Command::GetHistory).await? {
+            Response::History(entries) => Ok(entries),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
+
+    /// Delete a specific history entry
+    pub async fn delete_history_entry(&mut self, id: u64) -> Result<()> {
+        match self.send_command(Command::DeleteHistoryEntry { id }).await? {
+            Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
+
+    /// Clear all history
+    pub async fn clear_history(&mut self) -> Result<()> {
+        match self.send_command(Command::ClearHistory).await? {
+            Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
 }
