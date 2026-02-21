@@ -84,7 +84,7 @@ tui/
 The TUI communicates with the ONEVOX daemon through:
 
 1. **Direct file I/O** - Reads/writes `config.toml` and `history.json`
-2. **CLI subprocess** - Shells out to `vox` binary for device listing, model management
+2. **CLI subprocess** - Shells out to `onevox` binary for device listing, model management
 
 ## License
 

@@ -1,7 +1,7 @@
 {
   "name": "onevox-tui",
   "version": "0.1.0",
-  "description": "ONEVOX – OpenTUI-based terminal interface for vox speech-to-text",
+  "description": "ONEVOX – OpenTUI-based terminal interface for onevox speech-to-text",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

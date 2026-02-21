@@ -100,7 +100,6 @@ to add command `onevox` (mac):
 sudo ln -sf /Users/kevinsepulveda/Documents/onevox/target/release/onevox /usr/local/bin/onevox
 onevox --help
 ```
-
 ### For TypeScript/Node Developers
 
 If you're coming from TypeScript/pnpm, see **[CHEATSHEET.md](CHEATSHEET.md)** for command equivalents!
@@ -125,6 +124,35 @@ brew install onevox
 
 # Or download binary
 curl -L https://github.com/yourusername/onevox/releases/latest/download/onevox-macos.tar.gz | tar xz
+```
+
+### macOS Installer (Phase 8)
+
+```bash
+# One-line installer (curl|sh)
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
+
+# User-level install to ~/Applications + launchd autostart
+./scripts/install_macos.sh
+
+# System install to /Applications + launchd autostart
+./scripts/install_macos.sh --system
+
+# Build only: create dist/Onevox.app
+./scripts/package_macos_app.sh
+
+# Uninstall app + launchd agent
+./scripts/uninstall_macos.sh
+```
+
+`curl|sh` options:
+```bash
+# System install
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh -s -- --system
+
+# Pin a release tag
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | \
+  ONEVOX_VERSION=v0.1.0 sh
 ```
 
 ### Usage
@@ -362,7 +390,7 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design.
 
 ## 📋 Project Status
 
-### Current Phase: **Phase 6/8 Complete - Fully Functional!** 🎉
+### Current Phase: **Phase 8/8 Complete - Ready for Distribution** 🎉
 
 **What's Working:**
 - ✅ **Phase 1**: Core infrastructure (daemon, IPC, config)
@@ -371,8 +399,8 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design.
 - ✅ **Phase 4**: Model runtime (Whisper.cpp CLI, real transcription)
 - ✅ **Phase 5**: Platform integration (global hotkeys, text injection - macOS)
 - ✅ **Phase 6**: Terminal UI (production-ready TUI with themes)
-- 🚧 **Phase 7**: Performance optimization (next up)
-- 🚧 **Phase 8**: Packaging & distribution (planned)
+- ✅ **Phase 7**: Performance optimization (benchmarks + benchmark CI)
+- ✅ **Phase 8**: Packaging & distribution (macOS app + launchd + installer)
 
 **You can use Onevox for real dictation on macOS right now!**
 

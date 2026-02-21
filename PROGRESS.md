@@ -241,20 +241,34 @@ Optimization infrastructure is now operational:
 
 ---
 
-## Phase 8: Packaging ⏸️ NOT STARTED
+## Phase 8: Packaging ✅ COMPLETED
 
-- [ ] macOS .app bundle
-- [ ] launchd plist
-- [ ] Installation script
+### ✅ Completed
+
+- [x] **macOS .app bundle packaging** (`scripts/package_macos_app.sh`)
+- [x] **launchd autostart integration** (`scripts/install_macos.sh` creates and loads `~/Library/LaunchAgents/com.onevox.daemon.plist`)
+- [x] **Installation script** (user and system install modes)
+- [x] **Uninstallation cleanup script** (`scripts/uninstall_macos.sh`)
+- [x] **Packaging assets** (`packaging/macos/Info.plist`)
+
+### 🎉 Phase 8 Complete
+
+Distribution tooling is now implemented for macOS:
+
+- Build release binary and wrap it in `Onevox.app`
+- Install app to `~/Applications` (or `/Applications` with `--system`)
+- Register daemon for auto-start via launchd
+- Keep logs in `~/Library/Logs/onevox`
+- Clean uninstall path for app + launch agent
 
 ---
 
 ## Current Status
 
-**Phase**: 7 of 8 ✅ COMPLETED  
-**Overall Progress**: ~93% (Phases 1-7 complete, fully functional + benchmarked)  
-**Next Phase**: Phase 8 - Packaging  
-**Next Task**: macOS packaging and installer workflow  
+**Phase**: 8 of 8 ✅ COMPLETED  
+**Overall Progress**: ~100% (Phases 1-8 complete)  
+**Next Phase**: Post-release hardening and cross-platform distribution  
+**Next Task**: Linux packaging + Homebrew formula + release automation  
 **Working Features**: Full end-to-end speech-to-text pipeline operational!
 
 ### ✅ What's Working NOW

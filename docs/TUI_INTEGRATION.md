@@ -108,7 +108,7 @@ The TUI interacts with the Rust binary for:
 │  ├─ panels/help.ts     (shortcuts)      │
 │  ├─ data/config.ts     (TOML I/O)       │
 │  ├─ data/history.ts    (JSON I/O)       │
-│  └─ data/cli.ts        (vox binary)     │
+│  └─ data/cli.ts        (onevox binary)     │
 └─────────────────┬───────────────────────┘
                   │
                   ▼
@@ -117,7 +117,7 @@ The TUI interacts with the Rust binary for:
 │                                         │
 │  ├─ config.toml  (shared file)          │
 │  ├─ history.json (shared file)          │
-│  └─ vox binary   (CLI commands)         │
+│  └─ onevox binary   (CLI commands)         │
 └─────────────────────────────────────────┘
 ```
 

@@ -1,6 +1,6 @@
 # ONEVOX TUI — Architecture & Implementation
 
-> Terminal user interface for the Vox speech-to-text engine, built with
+> Terminal user interface for the onevox speech-to-text engine, built with
 > [OpenTUI](https://github.com/nicholasgasior/opentui) and
 > [Bun](https://bun.sh).
 
@@ -25,10 +25,10 @@
 
 ## Overview
 
-The TUI provides a rich terminal interface for configuring and operating the Vox
+The TUI provides a rich terminal interface for configuring and operating the onevox
 speech-to-text daemon. It is a **standalone TypeScript application** that runs
 under Bun and communicates with the Rust backend either by reading/writing config
-files directly or by shelling out to the compiled `vox` binary for runtime
+files directly or by shelling out to the compiled `onevox` binary for runtime
 operations (device listing, model management, daemon status).
 
 The interface follows a **flat, light-themed, minimalist design** with no
@@ -45,7 +45,7 @@ background tints, bold section headers, and color contrast.
 | UI Framework  | `@opentui/core` — flex-based TUI       |
 | Config Format | TOML (hand-rolled parser, no ext dep)  |
 | History Store | JSON (flat file)                       |
-| Backend CLI   | `vox` Rust binary via `Bun.spawn()`    |
+| Backend CLI   | `onevox` Rust binary via `Bun.spawn()`    |
 | Build         | `bun build --target bun`              |
 
 ---
@@ -66,7 +66,7 @@ tui/
 │   │   ├── stepper.ts            # ◀ value ▶ numeric selector
 │   │   └── toggle.ts             # On/Off slide toggle
 │   ├── data/                     # Data access & CLI wrapper
-│   │   ├── cli.ts                # Shells to `vox` binary, device listing
+│   │   ├── cli.ts                # Shells to `onevox` binary, device listing
 │   │   ├── config.ts             # TOML config read/write
 │   │   └── history.ts            # JSON history read/write
 │   └── panels/                   # Full-screen content panels
@@ -214,7 +214,7 @@ Modal confirmation with semi-transparent backdrop:
 
 ### Config (`data/config.ts`)
 
-- **Path resolution**: `%APPDATA%\vox\config.toml` (Win), `~/Library/Application Support/vox/config.toml` (macOS), `~/.config/vox/config.toml` (Linux)
+- **Path resolution**: `%APPDATA%\onevox\config.toml` (Win), `~/Library/Application Support/onevox/config.toml` (macOS), `~/.config/onevox/config.toml` (Linux)
 - **Format**: TOML, parsed with a hand-rolled regex parser (no external dependency)
 - **Load**: Deep-merges file values over `DEFAULT_CONFIG` — missing keys get defaults
 - **Save**: Serializes each section as `[section]` with `key = value` lines
@@ -234,25 +234,25 @@ Modal confirmation with semi-transparent backdrop:
 
 ### CLI Wrapper (`data/cli.ts`)
 
-Shells out to the compiled `vox` binary for operations that require the Rust
+Shells out to the compiled `onevox` binary for operations that require the Rust
 runtime (audio device enumeration, model download, daemon status).
 
 **Binary resolution** (`voxBin()`):
 
 1. Check `$VOX_BIN` environment variable
-2. Walk upward from `import.meta.dir` looking for `Cargo.toml` → use `target/release/vox` or `target/debug/vox`
+2. Walk upward from `import.meta.dir` looking for `Cargo.toml` → use `target/release/onevox` or `target/debug/onevox`
 3. Walk upward from `process.cwd()` as fallback
-4. Fall back to `"vox"` on `$PATH`
+4. Fall back to `"onevox"` on `$PATH`
 
 **Device listing** (`listDevicesWithError()`):
 
-1. Run `vox devices list`, parse output lines matching `N. DeviceName (default) - 48000Hz, 2 ch`
+1. Run `onevox devices list`, parse output lines matching `N. DeviceName (default) - 48000Hz, 2 ch`
 2. On Windows, if no devices found, fall back to PowerShell `Get-CimInstance Win32_SoundDevice`
 3. Return `{ devices, error }` so the UI can display errors
 
 ### History (`data/history.ts`)
 
-- **Path**: `%APPDATA%\vox\history.json` (Win), `~/Library/Application Support/vox/history.json` (macOS), `~/.local/share/vox/history.json` (Linux)
+- **Path**: `%APPDATA%\onevox\history.json` (Win), `~/Library/Application Support/onevox/history.json` (macOS), `~/.local/share/onevox/history.json` (Linux)
 - **Format**: JSON array of `HistoryEntry` objects
 - Utility functions: `newestFirst()`, `formatTimestamp()`, `formatDuration()`, `truncateText()`
 
@@ -401,18 +401,18 @@ when the daemon reloads its config.
 ### 2. CLI Subprocess (`data/cli.ts`)
 
 For runtime operations that require CPAL or other native libraries, the TUI
-shells out to the compiled `vox` binary:
+shells out to the compiled `onevox` binary:
 
 | Operation       | Command                 | Notes                              |
 | --------------- | ----------------------- | ---------------------------------- |
-| List devices    | `vox devices list`      | Parses stdout, Windows PS fallback |
-| List models     | `vox models downloaded` | Checks which models are on disk    |
-| Download model  | `vox models download X` | Triggers download                  |
-| Remove model    | `vox models remove X`   | Deletes model files                |
-| Daemon status   | `vox status`            | Connection check                   |
+| List devices    | `onevox devices list`      | Parses stdout, Windows PS fallback |
+| List models     | `onevox models downloaded` | Checks which models are on disk    |
+| Download model  | `onevox models download X` | Triggers download                  |
+| Remove model    | `onevox models remove X`   | Deletes model files                |
+| Daemon status   | `onevox status`            | Connection check                   |
 
 The binary is located by walking up from the TUI's source directory until
-`Cargo.toml` is found, then checking `target/release/vox` and `target/debug/vox`.
+`Cargo.toml` is found, then checking `target/release/onevox` and `target/debug/onevox`.
 
 ### IPC Protocol (future)
 
@@ -443,7 +443,7 @@ instead of spawning subprocesses.
 - [x] Config persistence — TOML read/write, deep-merge with defaults
 - [x] History persistence — JSON read/write
 - [x] Help overlay — `?` toggles full keyboard shortcut reference
-- [x] Device listing — `vox devices list` with Windows PowerShell fallback
+- [x] Device listing — `onevox devices list` with Windows PowerShell fallback
 - [x] Binary auto-discovery — walks up to `Cargo.toml` for `target/` binaries
 - [x] Error surfacing — device/binary errors shown in UI, not silently swallowed
 
@@ -488,7 +488,7 @@ bun build src/index.ts --outdir dist --target bun
 
 | Variable  | Purpose                                    |
 | --------- | ------------------------------------------ |
-| `VOX_BIN` | Override path to the `vox` binary          |
+| `VOX_BIN` | Override path to the `onevox` binary          |
 
 ---
 

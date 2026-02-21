@@ -162,7 +162,7 @@ cargo build --release
 │  ├─ panels/help.ts     (shortcuts)      │
 │  ├─ data/config.ts     (TOML I/O)       │
 │  ├─ data/history.ts    (JSON I/O)       │
-│  └─ data/cli.ts        (vox wrapper)    │
+│  └─ data/cli.ts        (onevox wrapper)    │
 └─────────────────┬───────────────────────┘
                   │
                   ▼
@@ -171,7 +171,7 @@ cargo build --release
 │                                         │
 │  ├─ config.toml  (shared file)          │
 │  ├─ history.json (shared file)          │
-│  └─ vox binary   (subprocess calls)     │
+│  └─ onevox binary   (subprocess calls)     │
 └─────────────────────────────────────────┘
 ```
 

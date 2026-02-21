@@ -188,7 +188,7 @@ q / Ctrl+C  Quit
 
 Your theme preference is automatically saved to:
 
-**Config File:** `~/.config/vox/config.toml` (macOS/Linux)
+**Config File:** `~/.config/onevox/config.toml` (macOS/Linux)
 
 ```toml
 [ui]
