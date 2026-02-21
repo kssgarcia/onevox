@@ -1,6 +1,6 @@
 [package]
 name = "onevox"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Kevin Sepulveda"]
 description = "Ultra-fast, privacy-first local speech-to-text daemon"
@@ -31,10 +31,10 @@ hound = "3.5"
 rubato = "0.15"
 ringbuf = "0.4"
 dasp = "0.11"
-rustfft = "6.2"  # Fast FFT for mel spectrogram computation
+rustfft = "6.2" # Fast FFT for mel spectrogram computation
 
 # Utilities
-tempfile = "3.8"  # Temporary files for whisper-cli integration
+tempfile = "3.8" # Temporary files for whisper-cli integration
 
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
@@ -48,17 +48,24 @@ thiserror = "2.0"
 
 # Logging and tracing
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "fmt",
+  "json",
+] }
 tracing-appender = "0.2"
 
 # CLI and utilities
 clap = { version = "4.5", features = ["derive"] }
-directories = "5.0"  # Professional cross-platform directory discovery
+directories = "5.0"                               # Professional cross-platform directory discovery
 chrono = "0.4"
 
 # HTTP client for model downloads
-reqwest = { version = "0.12", features = ["stream", "rustls-tls"], default-features = false }
-indicatif = "0.17"  # Progress bars for downloads
+reqwest = { version = "0.12", features = [
+  "stream",
+  "rustls-tls",
+], default-features = false }
+indicatif = "0.17" # Progress bars for downloads
 
 # Concurrency
 crossbeam = "0.8"
@@ -74,15 +81,15 @@ notify = "7.0"
 sysinfo = "0.33"
 
 # Platform integration
-handy-keys = "0.2.1"  # Cross-platform global keyboard shortcuts
-enigo = "0.6"  # Keyboard/mouse simulation for text injection
+handy-keys = "0.2.1" # Cross-platform global keyboard shortcuts
+enigo = "0.6"        # Keyboard/mouse simulation for text injection
 
 # Unix-specific dependencies
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [features]
-default = ["overlay-indicator"]  # Enable desktop recording overlay by default
+default = ["overlay-indicator"] # Enable desktop recording overlay by default
 
 # Model backends
 faster-whisper = ["pyo3", "pyo3-asyncio"]

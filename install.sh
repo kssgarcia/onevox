@@ -195,6 +195,11 @@ cat > "$LAUNCHD_PLIST" <<EOF
     <string>daemon</string>
     <string>--foreground</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
@@ -204,7 +209,11 @@ cat > "$LAUNCHD_PLIST" <<EOF
   <key>StandardErrorPath</key>
   <string>$LOG_DIR/stderr.log</string>
   <key>ProcessType</key>
-  <string>Background</string>
+  <string>Interactive</string>
+  <key>LimitLoadToSessionType</key>
+  <array>
+    <string>Aqua</string>
+  </array>
 </dict>
 </plist>
 EOF
@@ -240,6 +249,34 @@ echo "App: $APP_PATH"
 echo "CLI: $CLI_LINK_PATH"
 echo "Agent: $LAUNCHD_PLIST"
 echo "Logs: $LOG_DIR"
+echo ""
+echo "⚠️  IMPORTANT: Grant Permissions"
+echo "For Onevox to work, you need to grant these permissions:"
+echo ""
+echo "1. Input Monitoring (for hotkey detection):"
+echo "   System Settings → Privacy & Security → Input Monitoring"
+echo "   Add and enable: $APP_PATH"
+echo ""
+echo "2. Accessibility (for text injection):"
+echo "   System Settings → Privacy & Security → Accessibility"
+echo "   Add and enable: $APP_PATH"
+echo ""
+echo "3. Microphone (for audio capture):"
+echo "   System Settings → Privacy & Security → Microphone"
+echo "   Add and enable: $APP_PATH"
+echo ""
+echo "After granting permissions, restart the daemon:"
+echo "  launchctl kickstart -k gui/\$(id -u)/$LAUNCHD_LABEL"
+echo ""
+echo "💡 Quick setup helper (opens System Settings for you):"
+echo "  1. Run: open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'"
+echo "  2. Add Onevox.app and toggle ON"
+echo "  3. Run: open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'"
+echo "  4. Add Onevox.app and toggle ON"
+echo "  5. Restart: launchctl kickstart -k gui/\$(id -u)/$LAUNCHD_LABEL"
+echo ""
+echo "💡 To check permissions and diagnose issues:"
+echo "  curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/check_permissions.sh | sh"
 
 if ! command -v onevox >/dev/null 2>&1; then
   if [ "$CLI_LINK_PATH" = "$HOME/.local/bin/onevox" ]; then

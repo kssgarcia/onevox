@@ -31,7 +31,7 @@ impl IpcServer {
             listener: None,
             state,
             request_limiter: Arc::new(Mutex::new(HashMap::new())),
-            min_request_interval: Duration::from_millis(50),
+            min_request_interval: Duration::from_millis(10), // Reduced from 50ms to allow faster commands
         }
     }
 
@@ -135,7 +135,14 @@ impl IpcServer {
         request_limiter: &Arc<Mutex<HashMap<u32, Instant>>>,
         client_uid: u32,
         min_request_interval: Duration,
+        command: &Command,
     ) -> Result<()> {
+        // Skip rate limiting for critical commands
+        match command {
+            Command::Shutdown | Command::Ping => return Ok(()),
+            _ => {}
+        }
+
         let now = Instant::now();
         let mut limiter = request_limiter.lock().await;
 
@@ -160,7 +167,6 @@ impl IpcServer {
 
         // SECURITY: Verify client credentials first
         let client_uid = Self::verify_client_credentials(&stream)?;
-        Self::check_rate_limit(&request_limiter, client_uid, min_request_interval).await?;
 
         // Read message length (4 bytes)
         let mut len_bytes = [0u8; 4];
@@ -181,9 +187,16 @@ impl IpcServer {
         let message: Message = bincode::deserialize(&message_buf)?;
         debug!("Received message: {:?}", message);
 
-        // Process command
-        let response = match message.payload {
-            Payload::Request(command) => Self::handle_command(command, &state).await,
+        // Check rate limit based on command type
+        let response = match &message.payload {
+            Payload::Request(command) => {
+                // Check rate limit (skips for critical commands)
+                if let Err(e) = Self::check_rate_limit(&request_limiter, client_uid, min_request_interval, command).await {
+                    Response::Error(format!("Rate limited: {}", e))
+                } else {
+                    Self::handle_command(command.clone(), &state).await
+                }
+            }
             _ => Response::Error("Invalid message type".to_string()),
         };
 
