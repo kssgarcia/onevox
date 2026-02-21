@@ -39,6 +39,9 @@ pub struct DictationEngine {
     /// Is currently dictating
     is_dictating: Arc<AtomicBool>,
 
+    /// Toggle state (for toggle mode)
+    is_toggle_active: Arc<AtomicBool>,
+
     /// Shutdown signal
     shutdown_signal: Arc<AtomicBool>,
 
@@ -97,6 +100,7 @@ impl DictationEngine {
             model: Arc::new(Mutex::new(model)),
             history_manager,
             is_dictating: Arc::new(AtomicBool::new(false)),
+            is_toggle_active: Arc::new(AtomicBool::new(false)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -160,17 +164,43 @@ impl DictationEngine {
 
     /// Handle hotkey event
     async fn handle_hotkey_event(&mut self, event: HotkeyEvent) {
-        match event {
-            HotkeyEvent::Pressed => {
-                info!("🎹 Hotkey pressed - starting dictation");
-                if let Err(e) = self.start_dictation().await {
-                    error!("Failed to start dictation: {}", e);
+        let mode = &self.config.hotkey.mode;
+
+        if mode == "toggle" {
+            // Toggle mode: press once to start, press again to stop
+            if let HotkeyEvent::Pressed = event {
+                let is_active = self.is_toggle_active.load(Ordering::SeqCst);
+                if is_active {
+                    // Currently recording, stop it
+                    info!("🎹 Hotkey pressed (toggle mode) - stopping dictation");
+                    self.is_toggle_active.store(false, Ordering::SeqCst);
+                    if let Err(e) = self.stop_dictation().await {
+                        error!("Failed to stop dictation: {}", e);
+                    }
+                } else {
+                    // Not recording, start it
+                    info!("🎹 Hotkey pressed (toggle mode) - starting dictation");
+                    self.is_toggle_active.store(true, Ordering::SeqCst);
+                    if let Err(e) = self.start_dictation().await {
+                        error!("Failed to start dictation: {}", e);
+                    }
                 }
             }
-            HotkeyEvent::Released => {
-                info!("🎹 Hotkey released - stopping dictation");
-                if let Err(e) = self.stop_dictation().await {
-                    error!("Failed to stop dictation: {}", e);
+            // Ignore Released events in toggle mode
+        } else {
+            // Push-to-talk mode: hold to record
+            match event {
+                HotkeyEvent::Pressed => {
+                    info!("🎹 Hotkey pressed (push-to-talk mode) - starting dictation");
+                    if let Err(e) = self.start_dictation().await {
+                        error!("Failed to start dictation: {}", e);
+                    }
+                }
+                HotkeyEvent::Released => {
+                    info!("🎹 Hotkey released (push-to-talk mode) - stopping dictation");
+                    if let Err(e) = self.stop_dictation().await {
+                        error!("Failed to stop dictation: {}", e);
+                    }
                 }
             }
         }
@@ -427,6 +457,11 @@ impl DictationEngine {
 
         // Stop audio capture
         self.audio_engine.stop_capture()?;
+        
+        // On macOS, give the audio system time to fully release the device
+        // This prevents audio quality degradation issues specific to CoreAudio
+        #[cfg(target_os = "macos")]
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         Ok(())
     }

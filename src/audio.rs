@@ -36,6 +36,11 @@ impl AudioEngine {
         &mut self,
         config: CaptureConfig,
     ) -> crate::Result<tokio::sync::mpsc::UnboundedReceiver<AudioChunk>> {
+        // Ensure any existing capture is fully stopped before starting a new one
+        if let Some(mut existing_capture) = self.capture.take() {
+            existing_capture.stop()?;
+        }
+        
         let mut capture = AudioCapture::new(config);
         let rx = capture.start()?;
         self.capture = Some(capture);
@@ -62,5 +67,12 @@ impl AudioEngine {
 impl Default for AudioEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for AudioEngine {
+    fn drop(&mut self) {
+        // Ensure audio is properly stopped when engine is dropped
+        let _ = self.stop_capture();
     }
 }

@@ -181,8 +181,7 @@ impl AudioCapture {
             .build_input_stream(
                 config,
                 move |data: &[T], _: &cpal::InputCallbackInfo| {
-                    if !is_running.load(Ordering::Relaxed)
-                        || !channel_open.load(Ordering::Relaxed)
+                    if !is_running.load(Ordering::Relaxed) || !channel_open.load(Ordering::Relaxed)
                     {
                         return;
                     }
@@ -194,8 +193,10 @@ impl AudioCapture {
 
                         // When we have enough samples for a chunk
                         if local_accumulator.len() >= chunk_size {
-                            let samples =
-                                std::mem::replace(&mut local_accumulator, Vec::with_capacity(chunk_size));
+                            let samples = std::mem::replace(
+                                &mut local_accumulator,
+                                Vec::with_capacity(chunk_size),
+                            );
                             let chunk = if needs_resampling {
                                 // TODO: Implement resampling
                                 // For now, just use the samples as-is
@@ -234,6 +235,10 @@ impl AudioCapture {
         self.is_running.store(false, Ordering::SeqCst);
 
         if let Some(stream) = self.stream.take() {
+            // Explicitly pause the stream before dropping to ensure proper cleanup
+            if let Err(e) = stream.pause() {
+                error!("Failed to pause audio stream: {}", e);
+            }
             drop(stream);
         }
 

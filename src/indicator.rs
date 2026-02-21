@@ -192,6 +192,7 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
             phase_start: Instant,
             positioned: bool,
             last_state_poll: Instant,
+            frozen_phase: f32,
         }
 
         impl OverlayApp {
@@ -239,6 +240,11 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
                         match state {
                             Some(mode) => {
                                 if mode != self.mode {
+                                    // Mode changed - freeze the phase if switching to Processing
+                                    if mode == IndicatorMode::Processing {
+                                        self.frozen_phase =
+                                            self.phase_start.elapsed().as_secs_f32();
+                                    }
                                     self.mode = mode;
                                 }
                             }
@@ -250,7 +256,12 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
                     }
                 }
 
-                let elapsed = self.phase_start.elapsed().as_secs_f32();
+                // Use frozen phase for processing mode, live elapsed time for recording
+                let elapsed = match self.mode {
+                    IndicatorMode::Recording => self.phase_start.elapsed().as_secs_f32(),
+                    IndicatorMode::Processing => self.frozen_phase,
+                };
+
                 egui::CentralPanel::default()
                     .frame(
                         egui::Frame::new()
@@ -322,6 +333,7 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
                     phase_start: Instant::now(),
                     positioned: false,
                     last_state_poll: Instant::now(),
+                    frozen_phase: 0.0,
                 }))
             }),
         )
