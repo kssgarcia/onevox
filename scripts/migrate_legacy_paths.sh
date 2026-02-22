@@ -70,14 +70,6 @@ chmod 700 "$NEW_CONFIG"
 if [ -d "$OLD_CACHE" ]; then
     echo "📂 Migrating cache data..."
     
-    # Migrate whisper-cli binary
-    if [ -f "$OLD_CACHE/bin/whisper-cli" ]; then
-        echo "  → whisper-cli binary"
-        mkdir -p "$NEW_CACHE/bin"
-        cp -p "$OLD_CACHE/bin/whisper-cli" "$NEW_CACHE/bin/whisper-cli"
-        chmod +x "$NEW_CACHE/bin/whisper-cli"
-    fi
-    
     # Migrate models
     if [ -d "$OLD_CACHE/models" ]; then
         echo "  → AI models"
@@ -116,9 +108,9 @@ echo "📊 Verification:"
 echo ""
 
 # Verify files
-if [ -f "$NEW_CACHE/bin/whisper-cli" ]; then
-    SIZE=$(du -h "$NEW_CACHE/bin/whisper-cli" | awk '{print $1}')
-    echo "  ✅ whisper-cli binary ($SIZE)"
+if [ -d "$NEW_CACHE/models" ]; then
+    MODEL_COUNT=$(find "$NEW_CACHE/models" -name "*.bin" 2>/dev/null | wc -l)
+    echo "  ✅ $MODEL_COUNT model file(s) migrated"
 fi
 
 if [ -d "$NEW_CACHE/models" ]; then

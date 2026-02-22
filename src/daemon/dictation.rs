@@ -7,7 +7,7 @@ use crate::audio::{AudioEngine, CaptureConfig};
 use crate::config::Config;
 use crate::history::{HistoryEntry, HistoryManager};
 use crate::indicator::RecordingIndicator;
-use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCppCli};
+use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCpp};
 use crate::platform::{
     HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector,
 };
@@ -81,8 +81,8 @@ impl DictationEngine {
         // Create audio engine
         let audio_engine = AudioEngine::new();
 
-        // Create Whisper CLI model
-        let mut model: Box<dyn ModelRuntime> = Box::new(WhisperCppCli::new(None));
+        // Create Whisper.cpp model (native bindings)
+        let mut model: Box<dyn ModelRuntime> = Box::new(WhisperCpp::new()?);
         let model_config = ModelConfig {
             model_path: config.model.model_path.clone(),
             language: config.model.language.clone(),

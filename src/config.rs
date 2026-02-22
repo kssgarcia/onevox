@@ -160,7 +160,7 @@ impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             backend: "whisper_cpp".to_string(),
-            model_path: "ggml-base.en.bin".to_string(),
+            model_path: "ggml-base.en".to_string(),  // Model ID, not full filename
             device: "auto".to_string(),
             language: "en".to_string(),
             task: "transcribe".to_string(),

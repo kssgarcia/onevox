@@ -77,14 +77,16 @@ min_silence_chunks = 3
 adaptive = true
 
 [model]
-# Model backend: "whisper_cpp", "faster_whisper", "onnx", "candle"
+# Model backend: "whisper_cpp" (native, recommended), "candle" (experimental)
 backend = "whisper_cpp"
 
-# Path to model file (absolute or relative to ~/.onevox/models/)
-# Download models from: https://huggingface.co/ggerganov/whisper.cpp
-model_path = "ggml-base.en.bin"
+# Model identifier (without .bin extension)
+# The model file should be in: ~/.cache/onevox/models/<model_id>/<model_id>.bin
+# Download models with: onevox models download ggml-base.en
+# Available models: ggml-tiny.en, ggml-base.en, ggml-small.en, ggml-medium.en, ggml-large-v3
+model_path = "ggml-base.en"
 
-# Compute device: "auto", "cpu", "cuda", "metal"
+# Compute device: "auto", "cpu", "gpu"
 # "auto" will select GPU if available, otherwise CPU
 device = "auto"
 
@@ -97,25 +99,6 @@ task = "transcribe"
 
 # Load model at daemon startup (reduces first-transcription latency)
 preload = true
-
-# Model-specific configurations
-[model.whisper_cpp]
-# Number of CPU threads (only used if device = "cpu")
-# 0 = auto-detect, or specify 2, 4, 8, etc.
-n_threads = 0
-
-# Enable GPU acceleration (Metal/CUDA)
-use_gpu = true
-
-# Enable Flash Attention (faster, if supported)
-use_flash_attn = true
-
-[model.faster_whisper]
-# CTranslate2 compute type: "default", "int8", "int8_float16", "float16"
-compute_type = "int8"
-
-# Beam size for decoding (higher = more accurate, slower)
-beam_size = 5
 
 [post_processing]
 # Automatically add punctuation (experimental)

@@ -162,8 +162,14 @@ Get-Content "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Wait
 git clone https://github.com/kssgarcia/onevox.git
 cd onevox
 
-# Build
+# Build with default features (native whisper.cpp)
 cargo build --release
+
+# Or with GPU acceleration
+cargo build --release --features metal      # macOS
+cargo build --release --features cuda       # Linux/Windows NVIDIA
+cargo build --release --features vulkan     # Cross-platform GPU
+cargo build --release --features openblas   # CPU optimization
 
 # Run
 ./target/release/onevox daemon --foreground
@@ -171,6 +177,19 @@ cargo build --release
 # Or install locally
 ./scripts/install_macos.sh
 ```
+
+### Backend Architecture
+
+OneVox uses **native whisper.cpp bindings** as the primary backend for maximum stability and performance:
+
+- ✅ No subprocess overhead
+- ✅ No Python or external runtime dependencies
+- ✅ Cross-platform stability (Linux, macOS, Windows)
+- ✅ GPU acceleration support (Metal, CUDA, Vulkan, OpenBLAS)
+- ✅ Deterministic performance
+- ✅ Easy distribution
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
 
 ## Uninstall
 
@@ -261,3 +280,5 @@ MIT
 - [QUICKREF.md](QUICKREF.md) - Quick reference card
 - [INSTALLATION.md](INSTALLATION.md) - Detailed installation and troubleshooting
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Build, test, and development guide
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Model pipeline architecture and design decisions
+- [MIGRATION.md](MIGRATION.md) - Migration guide for backend refactoring

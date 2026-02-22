@@ -310,7 +310,13 @@ cargo build --release
 ```bash
 # Xcode Command Line Tools
 xcode-select --install
+
+# Build with proper configuration
+CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
+  cargo build --release
 ```
+
+**Troubleshooting macOS builds:** See DEVELOPMENT.md for detailed build instructions and troubleshooting.
 
 **Linux (Ubuntu/Debian):**
 ```bash
