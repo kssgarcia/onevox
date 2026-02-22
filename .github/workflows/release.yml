@@ -31,7 +31,11 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build release binary
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: |
+          CC=clang CXX=clang++ \
+          SDKROOT=$(xcrun --show-sdk-path) \
+          MACOSX_DEPLOYMENT_TARGET=13.0 \
+          cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Create app bundle
         run: |
@@ -55,3 +59,69 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/release/${{ matrix.asset_name }}
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libasound2-dev libpulse-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Strip binary
+        run: strip target/release/onevox
+
+      - name: Create tarball
+        run: |
+          mkdir -p dist/release
+          mkdir -p "dist/onevox-${{ github.ref_name }}-linux-x86_64"
+          cp target/release/onevox "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
+          cp scripts/install_linux.sh "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
+          cp scripts/uninstall_linux.sh "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
+          cp README.md "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
+          cp config.example.toml "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
+          cd dist
+          tar -czf "release/onevox-${{ github.ref_name }}-linux-x86_64.tar.gz" "onevox-${{ github.ref_name }}-linux-x86_64"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/*.tar.gz
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Create ZIP archive
+        run: |
+          mkdir -p dist/release
+          mkdir -p "dist/onevox-${{ github.ref_name }}-windows-x64"
+          copy target\release\onevox.exe "dist\onevox-${{ github.ref_name }}-windows-x64\"
+          copy README.md "dist\onevox-${{ github.ref_name }}-windows-x64\"
+          copy config.example.toml "dist\onevox-${{ github.ref_name }}-windows-x64\"
+          cd dist
+          Compress-Archive -Path "onevox-${{ github.ref_name }}-windows-x64" -DestinationPath "release/onevox-${{ github.ref_name }}-windows-x64.zip"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/*.zip
