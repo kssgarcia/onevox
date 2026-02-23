@@ -36,7 +36,7 @@ logs/
 *.gguf
 
 # Configuration (may contain secrets)
-config.toml
+./config.toml
 !config.example.toml
 
 # Audio test files
