@@ -45,10 +45,10 @@ case "$PLATFORM" in
         echo ""
         echo "📦 Creating tarball..."
         cd dist
-        tar -czf "onevox-${VERSION}-macos-${ARCH}.tar.gz" Onevox.app
+        tar -czf "onevox-macos-${ARCH}.tar.gz" Onevox.app
         cd ..
         
-        echo -e "${GREEN}✅ Created: dist/onevox-${VERSION}-macos-${ARCH}.tar.gz${NC}"
+        echo -e "${GREEN}✅ Created: dist/onevox-macos-${ARCH}.tar.gz${NC}"
         ;;
         
     linux)
@@ -63,7 +63,7 @@ case "$PLATFORM" in
         
         echo ""
         echo "📦 Creating tarball..."
-        RELEASE_DIR="onevox-${VERSION}-linux-${ARCH}"
+        RELEASE_DIR="onevox-linux-${ARCH}"
         mkdir -p "dist/${RELEASE_DIR}"
         cp target/release/onevox "dist/${RELEASE_DIR}/"
         cp scripts/install_linux.sh "dist/${RELEASE_DIR}/"

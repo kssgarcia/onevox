@@ -100,14 +100,14 @@ jobs:
       - name: Create tarball
         run: |
           mkdir -p dist/release
-          mkdir -p "dist/onevox-${{ github.ref_name }}-linux-x86_64"
-          cp target/release/onevox "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
-          cp scripts/install_linux.sh "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
-          cp scripts/uninstall_linux.sh "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
-          cp README.md "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
-          cp config.example.toml "dist/onevox-${{ github.ref_name }}-linux-x86_64/"
+          mkdir -p "dist/onevox-linux-x86_64"
+          cp target/release/onevox "dist/onevox-linux-x86_64/"
+          cp scripts/install_linux.sh "dist/onevox-linux-x86_64/"
+          cp scripts/uninstall_linux.sh "dist/onevox-linux-x86_64/"
+          cp README.md "dist/onevox-linux-x86_64/"
+          cp config.example.toml "dist/onevox-linux-x86_64/"
           cd dist
-          tar -czf "release/onevox-${{ github.ref_name }}-linux-x86_64.tar.gz" "onevox-${{ github.ref_name }}-linux-x86_64"
+          tar -czf "release/onevox-linux-x86_64.tar.gz" "onevox-linux-x86_64"
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2

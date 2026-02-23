@@ -81,10 +81,11 @@ check_dependencies() {
 
 # Download and extract
 download_onevox() {
-    echo_info "Downloading Onevox $VERSION..."
+    echo_info "Downloading Onevox $VERSION..." >&2
     
     local TMP_DIR=$(mktemp -d)
-    trap "rm -rf $TMP_DIR" EXIT
+    local EXTRACT_DIR="$TMP_DIR/extract"
+    mkdir -p "$EXTRACT_DIR"
     
     if [ "$VERSION" = "latest" ]; then
         URL="https://github.com/$REPO/releases/latest/download/$ASSET"
@@ -92,18 +93,25 @@ download_onevox() {
         URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET"
     fi
     
-    echo_info "Downloading from: $URL"
+    echo_info "Downloading from: $URL" >&2
     curl -fsSL "$URL" -o "$TMP_DIR/$ASSET"
     
-    echo_info "Extracting..."
-    tar -xzf "$TMP_DIR/$ASSET" -C "$TMP_DIR"
+    echo_info "Extracting..." >&2
+    tar -xzf "$TMP_DIR/$ASSET" -C "$EXTRACT_DIR"
     
     # Find the binary
-    BINARY=$(find "$TMP_DIR" -name "onevox" -type f | head -n 1)
+    BINARY=$(find "$EXTRACT_DIR" -name "onevox" -type f 2>/dev/null | head -n 1 || true)
+    
     if [ -z "$BINARY" ]; then
-        echo_error "Binary not found in archive"
+        echo_error "Binary not found in archive" >&2
+        echo_error "All files in archive:" >&2
+        find "$EXTRACT_DIR" -type f >&2
+        rm -rf "$TMP_DIR"
         exit 1
     fi
+    
+    # Make sure it's executable
+    chmod +x "$BINARY"
     
     echo "$BINARY"
 }
@@ -285,6 +293,11 @@ main() {
     
     BINARY=$(download_onevox)
     install_binary "$BINARY"
+    
+    # Clean up temp directory
+    TMP_DIR=$(dirname "$(dirname "$BINARY")")
+    rm -rf "$TMP_DIR"
+    
     install_service
     install_desktop_entry
     create_config
