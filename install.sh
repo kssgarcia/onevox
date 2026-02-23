@@ -179,6 +179,8 @@ else
   <string>13.0</string>
   <key>LSUIElement</key>
   <true/>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Onevox needs microphone access to transcribe your voice input.</string>
 </dict>
 </plist>
 EOF
@@ -257,21 +259,23 @@ echo ""
 echo "⚠️  IMPORTANT: Grant Permissions IN ORDER"
 echo "For Onevox to work, you need to grant these permissions:"
 echo ""
-echo "1. Input Monitoring (for hotkey detection):"
+echo "1. Microphone (CRITICAL - for audio capture):"
+echo "   open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'"
+echo "   Add Onevox.app and toggle ON"
+echo ""
+echo "2. Input Monitoring (for hotkey detection):"
 echo "   open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'"
 echo "   Add Onevox.app and toggle ON"
 echo ""
-echo "2. Accessibility (for text injection):"
+echo "3. Accessibility (for text injection):"
 echo "   open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'"
 echo "   Add Onevox.app and toggle ON"
 echo ""
-echo "3. Restart daemon (REQUIRED after granting permissions):"
+echo "4. Restart daemon (REQUIRED after granting permissions):"
 echo "   launchctl kickstart -k gui/\$(id -u)/$LAUNCHD_LABEL"
 echo ""
-echo "4. Microphone (for audio capture):"
-echo "   Will prompt automatically when you first press Cmd+Shift+0"
-echo ""
 echo "💡 Quick setup:"
+echo "  open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'"
 echo "  open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'"
 echo "  open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'"
 echo "  launchctl kickstart -k gui/\$(id -u)/$LAUNCHD_LABEL"

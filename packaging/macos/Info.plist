@@ -21,5 +21,7 @@
   <string>13.0</string>
   <key>LSUIElement</key>
   <true/>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Onevox needs microphone access to transcribe your voice input.</string>
 </dict>
 </plist>
