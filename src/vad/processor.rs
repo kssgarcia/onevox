@@ -63,14 +63,14 @@ impl SpeechSegment {
             // Pre-calculate total size for efficient allocation
             let total_samples: usize = self.chunks.iter().map(|c| c.samples.len()).sum();
             let mut samples = Vec::with_capacity(total_samples);
-            
+
             for chunk in &self.chunks {
                 samples.extend_from_slice(&chunk.samples);
             }
-            
+
             self.cached_samples = Some(samples);
         }
-        
+
         self.cached_samples.as_ref().unwrap()
     }
 

@@ -85,7 +85,11 @@ if [ -z "$ASSET" ]; then
   case "$ARCH" in
     arm64|aarch64) ASSET="onevox-macos-arm64.tar.gz" ;;
     x86_64|amd64) ASSET="onevox-macos-x86_64.tar.gz" ;;
-    *) ASSET="onevox-macos.tar.gz" ;;
+    *) 
+      echo "Unsupported architecture: $ARCH" >&2
+      echo "Supported: arm64 (Apple Silicon), x86_64 (Intel)" >&2
+      exit 1
+      ;;
   esac
 fi
 

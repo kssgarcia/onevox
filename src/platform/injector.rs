@@ -85,18 +85,13 @@ impl Default for TextInjector {
 }
 
 /// Injection strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InjectionStrategy {
     /// Type text directly
+    #[default]
     Type,
     /// Copy to clipboard and paste
     Clipboard,
-}
-
-impl Default for InjectionStrategy {
-    fn default() -> Self {
-        Self::Type
-    }
 }
 
 #[cfg(test)]

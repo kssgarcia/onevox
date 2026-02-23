@@ -512,7 +512,7 @@ async fn main() -> Result<()> {
                             let datetime =
                                 chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
                                     .or_else(|| chrono::DateTime::from_timestamp(0, 0))
-                                    .unwrap_or_else(|| chrono::DateTime::UNIX_EPOCH);
+                                    .unwrap_or(chrono::DateTime::UNIX_EPOCH);
                             let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S");
 
                             println!("─────────────────────────────────────────");
@@ -634,7 +634,7 @@ async fn main() -> Result<()> {
                             let datetime =
                                 chrono::DateTime::from_timestamp(entry.timestamp as i64, 0)
                                     .or_else(|| chrono::DateTime::from_timestamp(0, 0))
-                                    .unwrap_or_else(|| chrono::DateTime::UNIX_EPOCH);
+                                    .unwrap_or(chrono::DateTime::UNIX_EPOCH);
                             let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S");
 
                             writeln!(
@@ -913,7 +913,7 @@ async fn main() -> Result<()> {
 
                 // Show a reminder every 10 seconds if no events received
                 if event_count == 0
-                    && start.elapsed().as_secs() % 10 == 0
+                    && start.elapsed().as_secs().is_multiple_of(10)
                     && start.elapsed().as_secs() > 0
                 {
                     println!(

@@ -119,15 +119,15 @@ impl ModelDownloader {
     async fn download_file(&self, url: &str, dest: &Path) -> Result<()> {
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF: u64 = 1000; // 1 second
-        
+
         let mut last_error = None;
-        
+
         for attempt in 1..=MAX_RETRIES {
             match self.download_file_attempt(url, dest).await {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     last_error = Some(e);
-                    
+
                     if attempt < MAX_RETRIES {
                         let backoff_ms = INITIAL_BACKOFF * 2u64.pow(attempt - 1);
                         warn!(
@@ -139,10 +139,11 @@ impl ModelDownloader {
                 }
             }
         }
-        
-        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Download failed after {} retries", MAX_RETRIES)))
+
+        Err(last_error
+            .unwrap_or_else(|| anyhow::anyhow!("Download failed after {} retries", MAX_RETRIES)))
     }
-    
+
     /// Single download attempt
     async fn download_file_attempt(&self, url: &str, dest: &Path) -> Result<()> {
         // Send request
@@ -286,10 +287,10 @@ impl ModelDownloader {
             .context("Failed to read cache directory")?;
 
         while let Some(entry) = entries.next_entry().await? {
-            if entry.file_type().await?.is_dir() {
-                if let Some(name) = entry.file_name().to_str() {
-                    models.push(name.to_string());
-                }
+            if entry.file_type().await?.is_dir()
+                && let Some(name) = entry.file_name().to_str()
+            {
+                models.push(name.to_string());
             }
         }
 
@@ -331,10 +332,11 @@ impl ModelDownloader {
 }
 
 fn parse_sha256_from_output(output: &str) -> Option<String> {
-    if let Some(first) = output.split_whitespace().next() {
-        if first.len() == 64 && first.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Some(first.to_string());
-        }
+    if let Some(first) = output.split_whitespace().next()
+        && first.len() == 64
+        && first.chars().all(|c| c.is_ascii_hexdigit())
+    {
+        return Some(first.to_string());
     }
 
     output

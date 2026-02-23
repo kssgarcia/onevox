@@ -99,16 +99,16 @@ impl Default for Config {
         // Platform-specific default hotkey
         #[cfg(target_os = "macos")]
         let default_hotkey = "Cmd+Shift+0";
-        
+
         #[cfg(target_os = "linux")]
         let default_hotkey = "Ctrl+Shift+Space";
-        
+
         #[cfg(target_os = "windows")]
         let default_hotkey = "Ctrl+Shift+Space";
-        
+
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         let default_hotkey = "Ctrl+Shift+Space";
-        
+
         Self {
             daemon: DaemonConfig {
                 auto_start: true,
@@ -160,7 +160,7 @@ impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             backend: "whisper_cpp".to_string(),
-            model_path: "ggml-base.en".to_string(),  // Model ID, not full filename
+            model_path: "ggml-base.en".to_string(), // Model ID, not full filename
             device: "auto".to_string(),
             language: "en".to_string(),
             task: "transcribe".to_string(),

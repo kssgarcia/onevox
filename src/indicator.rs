@@ -274,15 +274,15 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
                             .outer_margin(egui::Margin::ZERO),
                     )
                     .show(ctx, |ui| {
-                        if !self.positioned {
-                            if let Some(size) = ctx.input(|i| i.viewport().monitor_size) {
-                                let x = ((size.x - WINDOW_WIDTH) * 0.5).max(0.0);
-                                let y = (size.y - WINDOW_HEIGHT - BOTTOM_MARGIN).max(0.0);
-                                ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(
-                                    egui::pos2(x, y),
-                                ));
-                                self.positioned = true;
-                            }
+                        if !self.positioned
+                            && let Some(size) = ctx.input(|i| i.viewport().monitor_size)
+                        {
+                            let x = ((size.x - WINDOW_WIDTH) * 0.5).max(0.0);
+                            let y = (size.y - WINDOW_HEIGHT - BOTTOM_MARGIN).max(0.0);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(
+                                egui::pos2(x, y),
+                            ));
+                            self.positioned = true;
                         }
 
                         self.draw_waveform(ui, elapsed);
@@ -302,6 +302,7 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
             .with_mouse_passthrough(true)
             .with_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT]);
 
+        #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
         let mut native_options = eframe::NativeOptions {
             viewport,
             ..Default::default()

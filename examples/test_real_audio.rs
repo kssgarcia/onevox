@@ -4,15 +4,10 @@
 
 use anyhow::Result;
 use onevox::models::runtime::{ModelConfig, ModelRuntime};
-use onevox::models::whisper_onnx::WhisperOnnx;
+use onevox::models::whisper_cpp::WhisperCpp;
 use std::path::PathBuf;
 
 fn main() -> Result<()> {
-    // Set up ONNX Runtime
-    unsafe {
-        std::env::set_var("ORT_DYLIB_PATH", "/opt/homebrew/lib/libonnxruntime.dylib");
-    }
-
     println!("🎯 Testing Whisper with real captured audio\n");
 
     // Find the latest captured audio file
@@ -60,10 +55,10 @@ fn main() -> Result<()> {
 
     // Create and load model
     println!("🔄 Loading Whisper model...");
-    let mut model = WhisperOnnx::new()?;
+    let mut model = WhisperCpp::new()?;
 
     let config = ModelConfig {
-        model_path: "whisper-tiny.en".to_string(), // Model ID, not full path
+        model_path: "ggml-base.en".to_string(), // Model ID for whisper.cpp
         language: "en".to_string(),
         use_gpu: false,
         n_threads: 4,

@@ -3,7 +3,7 @@
 //! Launches the OpenTUI-based TypeScript TUI for interactive configuration and monitoring.
 
 use crate::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Launch the OpenTUI-based terminal interface
@@ -60,18 +60,17 @@ fn find_tui_directory() -> Result<PathBuf> {
     // Get the actual binary path (resolve symlinks)
     let current_exe = std::env::current_exe()
         .map_err(|e| crate::Error::Other(format!("Failed to get current exe path: {}", e)))?;
-    
-    let resolved_exe = std::fs::canonicalize(&current_exe)
-        .unwrap_or_else(|_| current_exe.clone());
+
+    let resolved_exe = std::fs::canonicalize(&current_exe).unwrap_or_else(|_| current_exe.clone());
 
     // Installed app layout: Onevox.app/Contents/MacOS/onevox
     // Bundled TUI path:      Onevox.app/Contents/Resources/tui
-    if let Some(macos_dir) = resolved_exe.parent() {
-        if let Some(contents_dir) = macos_dir.parent() {
-            let bundled_tui = contents_dir.join("Resources").join("tui");
-            if bundled_tui.exists() && bundled_tui.is_dir() {
-                return Ok(bundled_tui);
-            }
+    if let Some(macos_dir) = resolved_exe.parent()
+        && let Some(contents_dir) = macos_dir.parent()
+    {
+        let bundled_tui = contents_dir.join("Resources").join("tui");
+        if bundled_tui.exists() && bundled_tui.is_dir() {
+            return Ok(bundled_tui);
         }
     }
 
@@ -112,7 +111,7 @@ fn is_bun_installed() -> bool {
 }
 
 /// Check if node_modules exists
-fn has_node_modules(tui_dir: &PathBuf) -> bool {
+fn has_node_modules(tui_dir: &Path) -> bool {
     tui_dir.join("node_modules").exists()
 }
 

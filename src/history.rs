@@ -105,10 +105,10 @@ impl HistoryManager {
         };
 
         // Load existing history
-        if manager.config.enabled {
-            if let Err(e) = manager.load().await {
-                warn!("Failed to load history: {}", e);
-            }
+        if manager.config.enabled
+            && let Err(e) = manager.load().await
+        {
+            warn!("Failed to load history: {}", e);
         }
 
         Ok(manager)

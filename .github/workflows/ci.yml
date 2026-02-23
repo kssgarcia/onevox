@@ -2,18 +2,19 @@ name: CI
 
 on:
   push:
-    branches: ["main", "codex/**"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
 jobs:
   check:
-    name: Cargo Check (${{ matrix.os }})
+    name: Check & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
+        # Windows excluded - Unix sockets not supported yet
 
     steps:
       - name: Checkout
@@ -21,6 +22,26 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -28,11 +49,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             pkg-config \
+            libasound2-dev \
+            libpulse-dev \
             libx11-dev \
             libxext-dev \
             libxfixes-dev \
             libxi-dev \
             libxtst-dev
+
+      - name: Set whisper.cpp build flags for macOS
+        if: runner.os == 'macOS'
+        run: |
+          # Use generic ARM64 target instead of native to avoid i8mm issues on CI
+          echo "CFLAGS=-march=armv8-a" >> $GITHUB_ENV
+          echo "CXXFLAGS=-march=armv8-a" >> $GITHUB_ENV
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --lib --bins --tests --locked -- -D warnings
 
       - name: Cargo check
         run: cargo check --locked --all-targets

@@ -146,10 +146,10 @@ impl IpcServer {
         let now = Instant::now();
         let mut limiter = request_limiter.lock().await;
 
-        if let Some(last_request) = limiter.get(&client_uid) {
-            if now.duration_since(*last_request) < min_request_interval {
-                return Err(anyhow::anyhow!("Rate limited"));
-            }
+        if let Some(last_request) = limiter.get(&client_uid)
+            && now.duration_since(*last_request) < min_request_interval
+        {
+            return Err(anyhow::anyhow!("Rate limited"));
         }
 
         limiter.insert(client_uid, now);
@@ -191,7 +191,14 @@ impl IpcServer {
         let response = match &message.payload {
             Payload::Request(command) => {
                 // Check rate limit (skips for critical commands)
-                if let Err(e) = Self::check_rate_limit(&request_limiter, client_uid, min_request_interval, command).await {
+                if let Err(e) = Self::check_rate_limit(
+                    &request_limiter,
+                    client_uid,
+                    min_request_interval,
+                    command,
+                )
+                .await
+                {
                     Response::Error(format!("Rate limited: {}", e))
                 } else {
                     Self::handle_command(command.clone(), &state).await

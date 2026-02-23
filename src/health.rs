@@ -62,7 +62,11 @@ impl ComponentCheck {
         }
     }
 
-    pub fn unhealthy(name: impl Into<String>, message: impl Into<String>, duration_ms: u64) -> Self {
+    pub fn unhealthy(
+        name: impl Into<String>,
+        message: impl Into<String>,
+        duration_ms: u64,
+    ) -> Self {
         Self {
             name: name.into(),
             status: HealthStatus::Unhealthy,
@@ -87,10 +91,10 @@ pub struct HealthChecker {
 impl Default for HealthChecker {
     fn default() -> Self {
         Self {
-            memory_warning_threshold: 500 * 1024 * 1024, // 500 MB
+            memory_warning_threshold: 500 * 1024 * 1024,   // 500 MB
             memory_critical_threshold: 1024 * 1024 * 1024, // 1 GB
-            cpu_warning_threshold: 50.0, // 50%
-            cpu_critical_threshold: 80.0, // 80%
+            cpu_warning_threshold: 50.0,                   // 50%
+            cpu_critical_threshold: 80.0,                  // 80%
         }
     }
 }
@@ -191,7 +195,7 @@ impl HealthChecker {
 
     async fn check_ipc(&self) -> ComponentCheck {
         let start = Instant::now();
-        
+
         match crate::platform::ipc_socket_path() {
             Ok(socket_path) => {
                 if socket_path.exists() {
@@ -226,7 +230,7 @@ impl HealthChecker {
 
     async fn check_audio(&self) -> ComponentCheck {
         let start = Instant::now();
-        
+
         // Try to list audio devices
         let audio_engine = crate::audio::AudioEngine::new();
         match audio_engine.list_devices() {

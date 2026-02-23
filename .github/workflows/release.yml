@@ -70,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libasound2-dev libpulse-dev
+          sudo apt-get install -y build-essential cmake libasound2-dev libpulse-dev pkg-config
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -97,31 +97,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/release/*.tar.gz
-
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build release binary
-        run: cargo build --release --locked
-
-      - name: Create ZIP archive
-        run: |
-          mkdir -p dist/release
-          mkdir -p "dist/onevox-${{ github.ref_name }}-windows-x64"
-          copy target\release\onevox.exe "dist\onevox-${{ github.ref_name }}-windows-x64\"
-          copy README.md "dist\onevox-${{ github.ref_name }}-windows-x64\"
-          copy config.example.toml "dist\onevox-${{ github.ref_name }}-windows-x64\"
-          cd dist
-          Compress-Archive -Path "onevox-${{ github.ref_name }}-windows-x64" -DestinationPath "release/onevox-${{ github.ref_name }}-windows-x64.zip"
-
-      - name: Upload release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/release/*.zip

@@ -94,7 +94,7 @@ impl Lifecycle {
                 // Try to initialize dictation engine with retries
                 let mut retry_count = 0;
                 let max_retries = 3;
-                
+
                 loop {
                     match DictationEngine::with_history(config.clone(), Arc::clone(&history_manager)) {
                         Ok(mut engine) => {
@@ -112,7 +112,7 @@ impl Lifecycle {
                                 error!("   2. Accessibility permission");
                                 error!("   Then restart: launchctl kickstart -k gui/$(id -u)/com.onevox.daemon");
                             }
-                            
+
                             retry_count += 1;
                             if retry_count >= max_retries {
                                 error!("❌ Dictation engine failed after {} attempts", max_retries);
@@ -120,7 +120,7 @@ impl Lifecycle {
                                 error!("   Grant permissions and restart the daemon");
                                 break;
                             }
-                            
+
                             // Wait before retry
                             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                             info!("🔄 Retrying dictation engine initialization ({}/{})", retry_count, max_retries);

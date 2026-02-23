@@ -4,6 +4,16 @@ Local speech-to-text daemon for **macOS**, **Linux**, and **Windows**. Press a h
 
 ## Quick Install
 
+### Pre-built Releases
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/kssgarcia/onevox/releases):
+
+- **macOS ARM64** (Apple Silicon): `onevox-macos-arm64.tar.gz`
+- **macOS x86_64** (Intel): `onevox-macos-x86_64.tar.gz`
+- **Linux x86_64**: `onevox-v{version}-linux-x86_64.tar.gz`
+
+Or use the automated installers below:
+
 ### macOS
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh

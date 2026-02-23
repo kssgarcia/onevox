@@ -35,7 +35,7 @@ impl AudioResampler {
     /// Create a new resampler
     fn new(from_rate: u32, to_rate: u32, chunk_size: usize) -> crate::Result<Self> {
         let resample_ratio = to_rate as f64 / from_rate as f64;
-        
+
         // Configure high-quality sinc resampler
         let params = SincInterpolationParameters {
             sinc_len: 256,
@@ -278,13 +278,16 @@ impl AudioCapture {
 
         let mut local_accumulator = Vec::with_capacity(chunk_size);
         let needs_resampling = device_sample_rate != target_sample_rate;
-        
+
         // Create resampler if needed
         let mut resampler = if needs_resampling {
             match AudioResampler::new(device_sample_rate, target_sample_rate, chunk_size) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Failed to create resampler, audio quality may be degraded: {}", e);
+                    warn!(
+                        "Failed to create resampler, audio quality may be degraded: {}",
+                        e
+                    );
                     None
                 }
             }
@@ -315,7 +318,7 @@ impl AudioCapture {
                                 &mut local_accumulator,
                                 Vec::with_capacity(chunk_size),
                             );
-                            
+
                             // Resample if necessary
                             let chunk = if let Some(ref mut resampler) = resampler {
                                 match resampler.resample(&samples) {
@@ -342,7 +345,7 @@ impl AudioCapture {
                                 Err(mpsc::error::TrySendError::Full(_)) => {
                                     // Buffer full - drop this chunk to avoid blocking audio callback
                                     dropped_chunks += 1;
-                                    
+
                                     // Warn periodically about dropped chunks
                                     if last_warning.elapsed().as_secs() >= 5 {
                                         warn!(

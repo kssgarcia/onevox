@@ -41,8 +41,8 @@ impl WhisperCpp {
         }
 
         // Get the models directory
-        let models_dir = crate::platform::paths::models_dir()
-            .unwrap_or_else(|_| PathBuf::from("./models"));
+        let models_dir =
+            crate::platform::paths::models_dir().unwrap_or_else(|_| PathBuf::from("./models"));
 
         // Try different possible locations in order of likelihood
         let possible_paths = vec![
@@ -51,7 +51,9 @@ impl WhisperCpp {
             // 2. In subdirectory: models/model-id/model-id.bin
             models_dir.join(model_id).join(format!("{}.bin", model_id)),
             // 3. In subdirectory with .bin extension: models/model-id.bin/model-id.bin
-            models_dir.join(format!("{}.bin", model_id)).join(format!("{}.bin", model_id)),
+            models_dir
+                .join(format!("{}.bin", model_id))
+                .join(format!("{}.bin", model_id)),
             // 4. Standard naming: model_id/ggml-model.bin
             models_dir.join(model_id).join("ggml-model.bin"),
             // 5. If model_id already has .bin, try as-is in subdirectory

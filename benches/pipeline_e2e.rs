@@ -34,11 +34,11 @@ fn bench_pipeline_audio_to_text_mock(c: &mut Criterion) {
 
             let mut maybe_segment = None;
             for _ in 0..4 {
-                if let Ok(seg) = processor.process(silence_chunk.clone()) {
-                    if seg.is_some() {
-                        maybe_segment = seg;
-                        break;
-                    }
+                if let Ok(seg) = processor.process(silence_chunk.clone())
+                    && seg.is_some()
+                {
+                    maybe_segment = seg;
+                    break;
                 }
             }
 

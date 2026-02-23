@@ -62,7 +62,7 @@ impl DaemonState {
 
         let pid = std::process::id();
         let mut sys_info = System::new_all();
-        
+
         // Initial refresh for current process
         sys_info.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
@@ -99,7 +99,7 @@ impl DaemonState {
 
         let pid = std::process::id();
         let mut sys_info = System::new_all();
-        
+
         // Initial refresh for current process
         sys_info.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
@@ -206,9 +206,9 @@ impl DaemonState {
     fn get_memory_usage(&self) -> u64 {
         let pid = Pid::from_u32(self.pid);
         let mut sys_info = self.sys_info.lock();
-        
+
         sys_info.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), false);
-        
+
         if let Some(process) = sys_info.process(pid) {
             process.memory()
         } else {
@@ -221,9 +221,9 @@ impl DaemonState {
     fn get_cpu_usage(&self) -> f32 {
         let pid = Pid::from_u32(self.pid);
         let mut sys_info = self.sys_info.lock();
-        
+
         sys_info.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), false);
-        
+
         if let Some(process) = sys_info.process(pid) {
             process.cpu_usage()
         } else {
