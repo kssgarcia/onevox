@@ -30,6 +30,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Set build flags for ARM64
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          echo "CFLAGS=-march=armv8-a" >> $GITHUB_ENV
+          echo "CXXFLAGS=-march=armv8-a" >> $GITHUB_ENV
+
       - name: Build release binary
         run: |
           CC=clang CXX=clang++ \
@@ -70,7 +76,17 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libasound2-dev libpulse-dev pkg-config
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            libasound2-dev \
+            libpulse-dev \
+            libx11-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libxi-dev \
+            libxtst-dev
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
