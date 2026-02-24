@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -66,6 +69,22 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+      - name: Patch whisper.cpp CMake (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Fetch dependencies first
+          cargo fetch
+          # Extract whisper-rs-sys to trigger whisper.cpp download
+          cargo build --lib 2>&1 || true
+          # Find and patch all whisper.cpp CMakeLists.txt files
+          find target -type f -name "CMakeLists.txt" -path "*/whisper.cpp/CMakeLists.txt" | while read cmake_file; do
+            echo "Patching $cmake_file"
+            # Use perl for cross-platform in-place editing
+            perl -i -pe 's/^(\s*)add_subdirectory\((tests|examples)\)/#$1add_subdirectory($2) # Patched by CI/' "$cmake_file"
+          done
+          # Clean whisper-rs-sys to force rebuild with patched CMakeLists.txt
+          cargo clean -p whisper-rs-sys
 
       - name: Run clippy
         run: cargo clippy --lib --bins --tests --locked -- -D warnings

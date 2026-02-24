@@ -10,6 +10,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use sysinfo::{Pid, System};
+use tokio::sync::mpsc;
+
+/// Message types for dictation control
+pub enum DictationCommand {
+    Start,
+    Stop,
+}
 
 /// Shared daemon state
 pub struct DaemonState {
@@ -35,13 +42,16 @@ pub struct DaemonState {
     model_name: Option<String>,
 
     /// Is currently dictating
-    is_dictating: bool,
+    is_dictating: Arc<AtomicBool>,
 
     /// System info provider
     sys_info: Mutex<System>,
 
     /// History manager
     history_manager: Arc<HistoryManager>,
+
+    /// Channel to send commands to dictation engine
+    dictation_tx: Option<mpsc::UnboundedSender<DictationCommand>>,
 }
 
 impl DaemonState {
@@ -74,9 +84,10 @@ impl DaemonState {
             shutdown_requested: Arc::new(AtomicBool::new(false)),
             model_loaded: false,
             model_name: None,
-            is_dictating: false,
+            is_dictating: Arc::new(AtomicBool::new(false)),
             sys_info: Mutex::new(sys_info),
             history_manager: Arc::new(history_manager),
+            dictation_tx: None,
         }
     }
 
@@ -111,9 +122,10 @@ impl DaemonState {
             shutdown_requested: Arc::new(AtomicBool::new(false)),
             model_loaded: false,
             model_name: None,
-            is_dictating: false,
+            is_dictating: Arc::new(AtomicBool::new(false)),
             sys_info: Mutex::new(sys_info),
             history_manager: Arc::new(history_manager),
+            dictation_tx: None,
         }
     }
 
@@ -128,7 +140,7 @@ impl DaemonState {
             state: self.state,
             model_loaded: self.model_loaded,
             model_name: self.model_name.clone(),
-            is_dictating: self.is_dictating,
+            is_dictating: self.is_dictating.load(Ordering::SeqCst),
             memory_usage_bytes: self.get_memory_usage(),
             cpu_usage_percent: self.get_cpu_usage(),
         }
@@ -194,12 +206,48 @@ impl DaemonState {
 
     /// Set dictating state
     pub fn set_dictating(&mut self, is_dictating: bool) {
-        self.is_dictating = is_dictating;
+        self.is_dictating.store(is_dictating, Ordering::SeqCst);
         if is_dictating {
             self.set_active();
         } else {
             self.set_ready();
         }
+    }
+
+    /// Set dictation command channel
+    pub fn set_dictation_channel(&mut self, tx: mpsc::UnboundedSender<DictationCommand>) {
+        self.dictation_tx = Some(tx);
+    }
+
+    /// Start dictation via IPC
+    pub fn start_dictation(&self) -> crate::Result<()> {
+        if let Some(tx) = &self.dictation_tx {
+            tx.send(DictationCommand::Start)
+                .map_err(|_| crate::Error::Other("Dictation engine not available".to_string()))?;
+            Ok(())
+        } else {
+            Err(crate::Error::Other(
+                "Dictation engine not initialized".to_string(),
+            ))
+        }
+    }
+
+    /// Stop dictation via IPC
+    pub fn stop_dictation(&self) -> crate::Result<()> {
+        if let Some(tx) = &self.dictation_tx {
+            tx.send(DictationCommand::Stop)
+                .map_err(|_| crate::Error::Other("Dictation engine not available".to_string()))?;
+            Ok(())
+        } else {
+            Err(crate::Error::Other(
+                "Dictation engine not initialized".to_string(),
+            ))
+        }
+    }
+
+    /// Get is_dictating flag for sharing with dictation engine
+    pub fn is_dictating_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.is_dictating)
     }
 
     /// Get memory usage in bytes

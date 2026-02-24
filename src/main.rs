@@ -87,6 +87,12 @@ enum Commands {
         hotkey: String,
     },
 
+    /// Start dictation (for Wayland/manual triggering)
+    StartDictation,
+
+    /// Stop dictation (for Wayland/manual triggering)
+    StopDictation,
+
     /// Internal overlay indicator process
     #[command(hide = true)]
     Indicator {
@@ -854,6 +860,38 @@ async fn main() -> Result<()> {
             println!("  Total transcriptions: {}", transcription_count);
 
             Ok(())
+        }
+
+        Commands::StartDictation => {
+            println!("🎤 Starting dictation...");
+            let mut client = onevox::ipc::IpcClient::default();
+            match client.start_dictation().await {
+                Ok(_) => {
+                    println!("✅ Dictation started");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to start dictation: {}", e);
+                    eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::StopDictation => {
+            println!("🛑 Stopping dictation...");
+            let mut client = onevox::ipc::IpcClient::default();
+            match client.stop_dictation().await {
+                Ok(_) => {
+                    println!("✅ Dictation stopped");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to stop dictation: {}", e);
+                    eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
         }
 
         Commands::Indicator { mode } => {

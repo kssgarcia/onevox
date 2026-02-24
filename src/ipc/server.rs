@@ -254,14 +254,20 @@ impl IpcServer {
 
             Command::StartDictation => {
                 info!("Start dictation command received");
-                // TODO: Implement dictation start
-                Response::Ok("Dictation started (not yet implemented)".to_string())
+                let state = state.read().await;
+                match state.start_dictation() {
+                    Ok(()) => Response::Success,
+                    Err(e) => Response::Error(format!("Failed to start dictation: {}", e)),
+                }
             }
 
             Command::StopDictation => {
                 info!("Stop dictation command received");
-                // TODO: Implement dictation stop
-                Response::Ok("Dictation stopped (not yet implemented)".to_string())
+                let state = state.read().await;
+                match state.stop_dictation() {
+                    Ok(()) => Response::Success,
+                    Err(e) => Response::Error(format!("Failed to stop dictation: {}", e)),
+                }
             }
 
             Command::ListDevices => {

@@ -212,7 +212,7 @@ impl DictationEngine {
     }
 
     /// Start dictation session
-    async fn start_dictation(&mut self) -> Result<()> {
+    pub async fn start_dictation(&mut self) -> Result<()> {
         if self.is_dictating.load(Ordering::SeqCst) {
             warn!("Already dictating, ignoring start request");
             return Ok(());
@@ -459,7 +459,7 @@ impl DictationEngine {
     }
 
     /// Stop dictation session
-    async fn stop_dictation(&mut self) -> Result<()> {
+    pub async fn stop_dictation(&mut self) -> Result<()> {
         if !self.is_dictating.load(Ordering::SeqCst) {
             warn!("Not dictating, ignoring stop request");
             return Ok(());

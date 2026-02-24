@@ -118,6 +118,10 @@ version = "0.15"
 optional = true
 default-features = false
 
+[patch.crates-io]
+# Patch whisper-rs-sys to fix CMake build issues in CI
+# whisper-rs-sys = { git = "https://github.com/tazz4843/whisper-rs", rev = "main" }
+
 [dependencies.candle-core]
 version = "0.8"
 optional = true

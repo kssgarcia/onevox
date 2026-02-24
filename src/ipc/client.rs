@@ -143,4 +143,22 @@ impl IpcClient {
             _ => Err(anyhow::anyhow!("Unexpected response")),
         }
     }
+
+    /// Start dictation
+    pub async fn start_dictation(&mut self) -> Result<()> {
+        match self.send_command(Command::StartDictation).await? {
+            Response::Success | Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
+
+    /// Stop dictation
+    pub async fn stop_dictation(&mut self) -> Result<()> {
+        match self.send_command(Command::StopDictation).await? {
+            Response::Success | Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
 }

@@ -91,6 +91,15 @@ impl Lifecycle {
                     Arc::clone(state.history_manager())
                 };
 
+                // Create command channel for IPC control
+                let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::unbounded_channel();
+
+                // Register the channel with state so IPC can send commands
+                {
+                    let mut state = state_clone.write().await;
+                    state.set_dictation_channel(cmd_tx);
+                }
+
                 // Try to initialize dictation engine with retries
                 let mut retry_count = 0;
                 let max_retries = 3;
@@ -99,8 +108,44 @@ impl Lifecycle {
                     match DictationEngine::with_history(config.clone(), Arc::clone(&history_manager)) {
                         Ok(mut engine) => {
                             info!("✅ Dictation engine initialized");
-                            if let Err(e) = engine.start().await {
-                                error!("Dictation engine error: {}", e);
+
+                            // Start the engine's hotkey listener in a background thread
+                            // This engine instance handles hotkey events
+                            let config_for_hotkey = config.clone();
+                            let history_for_hotkey = Arc::clone(&history_manager);
+                            std::thread::spawn(move || {
+                                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                                rt.block_on(async {
+                                    match DictationEngine::with_history(config_for_hotkey, history_for_hotkey) {
+                                        Ok(mut hotkey_engine) => {
+                                            if let Err(e) = hotkey_engine.start().await {
+                                                error!("Dictation engine hotkey listener error: {}", e);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to create engine for hotkey listener: {}", e);
+                                        }
+                                    }
+                                });
+                            });
+
+                            // Listen for IPC commands in the main loop
+                            // This engine instance handles IPC commands
+                            while let Some(cmd) = cmd_rx.recv().await {
+                                match cmd {
+                                    crate::daemon::state::DictationCommand::Start => {
+                                        info!("📡 IPC command: Start dictation");
+                                        if let Err(e) = engine.start_dictation().await {
+                                            error!("Failed to start dictation: {}", e);
+                                        }
+                                    }
+                                    crate::daemon::state::DictationCommand::Stop => {
+                                        info!("📡 IPC command: Stop dictation");
+                                        if let Err(e) = engine.stop_dictation().await {
+                                            error!("Failed to stop dictation: {}", e);
+                                        }
+                                    }
+                                }
                             }
                             break;
                         }

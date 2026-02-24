@@ -76,6 +76,10 @@ onevox models list     # List available models
 onevox models download <model-id>  # Download a model
 onevox history list    # View transcription history
 onevox config show     # Show configuration
+
+# Wayland/Manual Control (see WAYLAND.md)
+onevox start-dictation # Start recording (for Wayland keybindings)
+onevox stop-dictation  # Stop and transcribe (for Wayland keybindings)
 ```
 
 ### Platform-Specific Service Management
@@ -245,8 +249,11 @@ Use "Add or Remove Programs" in Windows Settings
 - Verify PulseAudio/ALSA: `pactl list sources short`
 
 **Wayland issues?**
-- Some compositors have limited global hotkey support
-- Try X11 session as fallback
+- Wayland's security model prevents global hotkey detection
+- **Solution**: Use manual keybindings! See [WAYLAND.md](WAYLAND.md) for setup
+- Bind `onevox start-dictation` and `onevox stop-dictation` to your compositor keys
+- Works with Hyprland, Sway, and other Wayland compositors
+- Alternative: Use X11 session for automatic hotkey support
 
 ### Windows
 **Hotkey not working?**
