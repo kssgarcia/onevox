@@ -230,7 +230,18 @@ impl DictationEngine {
             buffer_capacity_secs: 2,
         };
 
-        let mut audio_rx = self.audio_engine.start_capture(capture_config)?;
+        let audio_rx = match self.audio_engine.start_capture(capture_config) {
+            Ok(rx) => rx,
+            Err(e) => {
+                // Failed to start - clean up state
+                error!("Failed to start audio capture: {}", e);
+                self.is_dictating.store(false, Ordering::SeqCst);
+                self.indicator.hide();
+                return Err(e.into());
+            }
+        };
+
+        let mut audio_rx = audio_rx;
 
         // Clone needed values for the processing task
         let is_dictating = Arc::clone(&self.is_dictating);

@@ -85,8 +85,9 @@ impl AudioDeviceManager {
             .ok_or_else(|| crate::Error::Audio("No default input device found".to_string()))
     }
 
-    /// Get device by name
+    /// Get device by name, with fallback to default
     pub fn get_device_by_name(&self, name: &str) -> crate::Result<Device> {
+        // Try to find the exact device
         for device in self
             .host
             .input_devices()
@@ -99,7 +100,12 @@ impl AudioDeviceManager {
             }
         }
 
-        Err(crate::Error::Audio(format!("Device '{}' not found", name)))
+        // Device not found - try default as fallback
+        tracing::warn!(
+            "Device '{}' not found, falling back to default input device",
+            name
+        );
+        self.default_input_device()
     }
 
     /// Get device config
