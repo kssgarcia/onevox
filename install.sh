@@ -256,6 +256,17 @@ echo "CLI: $CLI_LINK_PATH"
 echo "Agent: $LAUNCHD_PLIST"
 echo "Logs: $LOG_DIR"
 echo ""
+
+# Download default model
+echo "📥 Downloading default model (ggml-base.en)..."
+echo "This may take a few minutes..."
+if "$APP_BIN" models download ggml-base.en 2>&1 | grep -q "already downloaded"; then
+  echo "✅ Default model already present"
+else
+  echo "✅ Default model downloaded successfully"
+fi
+echo ""
+
 echo "⚠️  IMPORTANT: Grant Permissions IN ORDER"
 echo "For Onevox to work, you need to grant these permissions:"
 echo ""

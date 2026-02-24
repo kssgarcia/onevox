@@ -208,11 +208,29 @@ export function createConfigPanel(
     })),
     selectedIndex: currentModelIdx >= 0 ? currentModelIdx : 0,
     theme,
-    onChange: (index) => {
-      config.model.model_path = `${models[index].id}.bin`
+    onChange: async (index) => {
+      const selectedModel = models[index]
+      const modelId = selectedModel.id
+      
+      config.model.model_path = `${modelId}.bin`
       markDirty()
-      callbacks.onStatusMessage(`Model → ${models[index].name}`)
-      setTimeout(() => callbacks.onStatusMessage(""), 1500)
+      callbacks.onStatusMessage(`Model → ${selectedModel.name}`)
+      
+      // Auto-download if not present
+      const isDownloaded = await cli.isModelDownloaded(modelId)
+      if (!isDownloaded) {
+        callbacks.onStatusMessage(`📥 Downloading ${selectedModel.name}...`)
+        try {
+          await cli.downloadModel(modelId)
+          callbacks.onStatusMessage(`✅ ${selectedModel.name} downloaded`)
+          setTimeout(() => callbacks.onStatusMessage(""), 2000)
+        } catch (err) {
+          callbacks.onStatusMessage(`❌ Download failed: ${err}`)
+          setTimeout(() => callbacks.onStatusMessage(""), 3000)
+        }
+      } else {
+        setTimeout(() => callbacks.onStatusMessage(""), 1500)
+      }
     },
   })
 

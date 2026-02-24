@@ -147,20 +147,13 @@ After=graphical-session.target
 Type=simple
 ExecStart=%h/.local/bin/onevox daemon --foreground
 Restart=on-failure
-RestartSec=5s
+RestartSec=3
 StandardOutput=journal
 StandardError=journal
 
-# Security hardening
-PrivateTmp=true
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=%h/.local/share/onevox %h/.cache/onevox %h/.config/onevox
-
-# Resource limits
-MemoryMax=1G
-CPUQuota=50%
+# Resource limits (optional, can be adjusted per system)
+MemoryMax=2G
+CPUQuota=80%
 
 [Install]
 WantedBy=default.target
@@ -205,6 +198,18 @@ create_config() {
     
     if [ ! -f "$CONFIG_DIR/config.toml" ]; then
         "$INSTALL_DIR/onevox" config init || true
+    fi
+}
+
+# Download default model
+download_default_model() {
+    echo_info "Downloading default model (ggml-base.en)..."
+    echo_info "This may take a few minutes..."
+    
+    if "$INSTALL_DIR/onevox" models download ggml-base.en 2>&1 | grep -q "already downloaded"; then
+        echo_info "Default model already present"
+    else
+        echo_info "✅ Default model downloaded successfully"
     fi
 }
 
@@ -301,6 +306,7 @@ main() {
     install_service
     install_desktop_entry
     create_config
+    download_default_model
     
     print_instructions
 }

@@ -223,6 +223,15 @@ export async function downloadModel(modelId: string): Promise<string> {
   return run(["models", "download", modelId])
 }
 
+export async function isModelDownloaded(modelId: string): Promise<boolean> {
+  try {
+    const output = await run(["models", "downloaded"])
+    return output.includes(modelId)
+  } catch {
+    return false
+  }
+}
+
 export async function removeModel(modelId: string): Promise<string> {
   return run(["models", "remove", modelId])
 }
