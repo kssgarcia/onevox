@@ -132,6 +132,29 @@ install_binary() {
     fi
 }
 
+# Install TUI resources
+install_tui() {
+    local extract_dir=$1
+    
+    echo_info "Installing TUI resources..."
+    
+    # Find TUI directory in extracted files
+    local tui_src=$(find "$extract_dir" -type d -name "tui" 2>/dev/null | head -n 1 || true)
+    
+    if [ -n "$tui_src" ] && [ -d "$tui_src" ]; then
+        local tui_dest="${HOME}/.local/share/onevox/tui"
+        mkdir -p "$(dirname "$tui_dest")"
+        
+        echo_info "Copying TUI to $tui_dest..."
+        rm -rf "$tui_dest"
+        cp -r "$tui_src" "$tui_dest"
+        
+        echo_info "✅ TUI resources installed"
+    else
+        echo_warn "TUI directory not found in package, TUI command may not work"
+    fi
+}
+
 # Install systemd service
 install_service() {
     echo_info "Installing systemd user service..."
@@ -242,6 +265,7 @@ print_instructions() {
     echo "  Binary:  $INSTALL_DIR/onevox"
     echo "  Service: $SERVICE_DIR/onevox.service"
     echo "  Config:  $CONFIG_DIR/config.toml"
+    echo "  TUI:     ${HOME}/.local/share/onevox/tui"
     echo ""
     echo "🚀 Quick start:"
     echo "  1. Start the service:"
@@ -297,10 +321,15 @@ main() {
     check_dependencies
     
     BINARY=$(download_onevox)
+    
+    # Get extract directory before cleaning up
+    EXTRACT_DIR=$(dirname "$BINARY")
+    
     install_binary "$BINARY"
+    install_tui "$EXTRACT_DIR"
     
     # Clean up temp directory
-    TMP_DIR=$(dirname "$(dirname "$BINARY")")
+    TMP_DIR=$(dirname "$EXTRACT_DIR")
     rm -rf "$TMP_DIR"
     
     install_service

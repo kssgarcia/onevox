@@ -106,6 +106,8 @@ jobs:
           cp scripts/uninstall_linux.sh "dist/onevox-linux-x86_64/"
           cp README.md "dist/onevox-linux-x86_64/"
           cp config.example.toml "dist/onevox-linux-x86_64/"
+          cp -r tui "dist/onevox-linux-x86_64/"
+          rm -rf "dist/onevox-linux-x86_64/tui/node_modules"
           cd dist
           tar -czf "release/onevox-linux-x86_64.tar.gz" "onevox-linux-x86_64"
 

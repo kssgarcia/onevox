@@ -63,8 +63,8 @@ fn find_tui_directory() -> Result<PathBuf> {
 
     let resolved_exe = std::fs::canonicalize(&current_exe).unwrap_or_else(|_| current_exe.clone());
 
-    // Installed app layout: Onevox.app/Contents/MacOS/onevox
-    // Bundled TUI path:      Onevox.app/Contents/Resources/tui
+    // macOS: Installed app layout: Onevox.app/Contents/MacOS/onevox
+    //        Bundled TUI path:      Onevox.app/Contents/Resources/tui
     if let Some(macos_dir) = resolved_exe.parent()
         && let Some(contents_dir) = macos_dir.parent()
     {
@@ -74,7 +74,31 @@ fn find_tui_directory() -> Result<PathBuf> {
         }
     }
 
-    // Try to find the project root by looking for Cargo.toml
+    // Linux: Installed binary layout: ~/.local/bin/onevox (or /usr/local/bin/onevox)
+    //        Bundled TUI path:        ~/.local/share/onevox/tui (or /usr/local/share/onevox/tui)
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(bin_dir) = resolved_exe.parent()
+            && bin_dir.ends_with("bin")
+            && let Some(prefix) = bin_dir.parent()
+        {
+            // Check for system-wide installation (/usr/local/bin -> /usr/local/share/onevox/tui)
+            let system_tui = prefix.join("share").join("onevox").join("tui");
+            if system_tui.exists() && system_tui.is_dir() {
+                return Ok(system_tui);
+            }
+        }
+
+        // Check user data directory (~/.local/share/onevox/tui)
+        if let Ok(data_dir) = crate::platform::paths::data_dir() {
+            let user_tui = data_dir.join("tui");
+            if user_tui.exists() && user_tui.is_dir() {
+                return Ok(user_tui);
+            }
+        }
+    }
+
+    // Try to find the project root by looking for Cargo.toml (development mode)
     let mut current = resolved_exe.clone();
     for _ in 0..10 {
         current.pop();

@@ -71,6 +71,19 @@ case "$PLATFORM" in
         cp README.md "dist/${RELEASE_DIR}/"
         cp config.example.toml "dist/${RELEASE_DIR}/"
         
+        echo ""
+        echo "📦 Bundling TUI resources..."
+        if [ -d "tui" ]; then
+            cp -r tui "dist/${RELEASE_DIR}/"
+            # Remove node_modules if it exists
+            rm -rf "dist/${RELEASE_DIR}/tui/node_modules"
+            # Remove .DS_Store files if they exist
+            find "dist/${RELEASE_DIR}/tui" -name ".DS_Store" -delete 2>/dev/null || true
+            echo "✅ TUI resources bundled"
+        else
+            echo "⚠️  Warning: tui directory not found, skipping"
+        fi
+        
         cd dist
         tar -czf "${RELEASE_DIR}.tar.gz" "${RELEASE_DIR}"
         cd ..
