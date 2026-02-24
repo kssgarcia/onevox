@@ -136,7 +136,7 @@ impl Default for Config {
 impl Default for VadConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             backend: "energy".to_string(),
             threshold: 0.02,
             pre_roll_ms: 300,

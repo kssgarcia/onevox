@@ -164,7 +164,7 @@ export const DEFAULT_CONFIG: VoxConfig = {
   },
   audio: { device: "default", sample_rate: 16000, chunk_duration_ms: 200 },
   vad: {
-    enabled: true,
+    enabled: false,
     backend: "energy",
     threshold: 0.02,
     pre_roll_ms: 300,

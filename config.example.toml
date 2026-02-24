@@ -54,7 +54,15 @@ buffer_duration_sec = 2
 recording_overlay = true
 
 [vad]
-# Enable Voice Activity Detection to filter silence
+# Voice Activity Detection - automatically detect speech and silence
+# 
+# enabled = false: Manual control (recommended for Wayland/manual commands)
+#   - Use start-dictation/stop-dictation commands to control recording
+#   - Recording continues until you explicitly stop it
+#
+# enabled = true: Automatic speech detection (for hotkey-based workflows)
+#   - Automatically stops recording after detecting silence
+#   - Good for push-to-talk with hotkeys on X11/macOS
 enabled = false
 
 # VAD backend: "silero" (accurate, ONNX-based) or "webrtc" (fast, CPU-only)
