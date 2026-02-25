@@ -24,7 +24,7 @@ import {
 
 import type { AppState } from "../app.js"
 import { saveConfig, type VoxConfig } from "../data/config.js"
-import { getModelRegistry, listDevicesWithError, reloadDaemonConfig } from "../data/cli.js"
+import { getModelRegistry, listDevicesWithError, reloadDaemonConfig, isModelDownloaded, downloadModel } from "../data/cli.js"
 import { createToggle, type ToggleInstance } from "../components/toggle.js"
 import { createKeyCapture, type KeyCaptureInstance } from "../components/key-capture.js"
 import { createStepper, type StepperInstance } from "../components/stepper.js"
@@ -212,16 +212,16 @@ export function createConfigPanel(
       const selectedModel = models[index]
       const modelId = selectedModel.id
       
-      config.model.model_path = `${modelId}.bin`
+      config.model.model_path = modelId
       markDirty()
       callbacks.onStatusMessage(`Model → ${selectedModel.name}`)
       
       // Auto-download if not present
-      const isDownloaded = await cli.isModelDownloaded(modelId)
+      const isDownloaded = await isModelDownloaded(modelId)
       if (!isDownloaded) {
         callbacks.onStatusMessage(`📥 Downloading ${selectedModel.name}...`)
         try {
-          await cli.downloadModel(modelId)
+          await downloadModel(modelId)
           callbacks.onStatusMessage(`✅ ${selectedModel.name} downloaded`)
           setTimeout(() => callbacks.onStatusMessage(""), 2000)
         } catch (err) {
