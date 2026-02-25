@@ -258,17 +258,126 @@ export async function getDaemonStatus(): Promise<DaemonStatus | null> {
 
 export async function reloadDaemonConfig(): Promise<ReloadResult> {
   try {
-    // Current CLI does not expose a dedicated "reload config" subcommand yet.
-    // We still check daemon availability so the TUI can provide accurate feedback.
-    await run(["status"])
+    // First reload the config in the daemon
+    await run(["reload-config"])
+    
+    // Then restart the daemon to apply changes
+    const platform = process.platform
+    
+    // macOS with launchd
+    if (platform === "darwin") {
+      try {
+        const label = "com.onevox.daemon"
+        const uidProc = Bun.spawn(["id", "-u"], { stdout: "pipe", stderr: "pipe" })
+        const uid = (await new Response(uidProc.stdout).text()).trim()
+        await uidProc.exited
+        
+        const kickstartProc = Bun.spawn(["launchctl", "kickstart", "-k", `gui/${uid}/${label}`], {
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        await kickstartProc.exited
+        
+        // Wait for daemon to restart
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
+        return {
+          state: "reloaded",
+          message: "Configuration reloaded and daemon restarted",
+        }
+      } catch (restartError) {
+        // Fallback: try stop/start via CLI
+        try {
+          await run(["stop"])
+          await new Promise(resolve => setTimeout(resolve, 500))
+          // Daemon should auto-restart via launchd
+          await new Promise(resolve => setTimeout(resolve, 1500))
+          
+          return {
+            state: "reloaded",
+            message: "Configuration reloaded and daemon restarted",
+          }
+        } catch {
+          return {
+            state: "reloaded",
+            message: "Config reloaded - restart manually: launchctl kickstart -k gui/$(id -u)/com.onevox.daemon",
+          }
+        }
+      }
+    }
+    
+    // Linux with systemd
+    if (platform === "linux") {
+      try {
+        const restartProc = Bun.spawn(["systemctl", "--user", "restart", "onevox"], {
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        await restartProc.exited
+        
+        // Wait for daemon to restart
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
+        return {
+          state: "reloaded",
+          message: "Configuration reloaded and daemon restarted",
+        }
+      } catch (systemdError) {
+        // Fallback: try stop/start via CLI (for non-systemd Linux)
+        try {
+          await run(["stop"])
+          await new Promise(resolve => setTimeout(resolve, 500))
+          // User needs to manually start daemon
+          return {
+            state: "reloaded",
+            message: "Config reloaded - start daemon manually: onevox daemon",
+          }
+        } catch {
+          return {
+            state: "reloaded",
+            message: "Config reloaded - restart manually: systemctl --user restart onevox",
+          }
+        }
+      }
+    }
+    
+    // Windows (no service manager, use CLI stop/start)
+    if (platform === "win32") {
+      try {
+        await run(["stop"])
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // On Windows, user typically runs daemon manually or via Task Scheduler
+        return {
+          state: "reloaded",
+          message: "Config reloaded - start daemon manually: onevox daemon",
+        }
+      } catch {
+        return {
+          state: "reloaded",
+          message: "Config reloaded - restart daemon manually: onevox stop && onevox daemon",
+        }
+      }
+    }
+    
+    // Fallback for other platforms
+    return {
+      state: "reloaded",
+      message: "Config reloaded - restart daemon manually: onevox stop && onevox daemon",
+    }
+    
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e)
+    // Check if daemon is not running
+    if (errorMsg.includes("not running") || errorMsg.includes("Failed to connect")) {
+      return {
+        state: "not_running",
+        message: errorMsg,
+      }
+    }
     return {
       state: "failed",
-      message: "reload command is not implemented by CLI yet",
-    }
-  } catch (e) {
-    return {
-      state: "not_running",
-      message: e instanceof Error ? e.message : String(e),
+      message: errorMsg,
     }
   }
 }

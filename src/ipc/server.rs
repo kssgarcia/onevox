@@ -240,8 +240,17 @@ impl IpcServer {
 
             Command::ReloadConfig => {
                 info!("Reload config command received");
-                // TODO: Implement config reloading
-                Response::Ok("Config reloaded (not yet implemented)".to_string())
+                let mut state = state.write().await;
+                match state.reload_config() {
+                    Ok(()) => {
+                        info!("Configuration reloaded successfully");
+                        Response::Success
+                    }
+                    Err(e) => {
+                        error!("Failed to reload config: {}", e);
+                        Response::Error(format!("Failed to reload config: {}", e))
+                    }
+                }
             }
 
             Command::GetConfig => {

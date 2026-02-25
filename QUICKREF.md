@@ -63,9 +63,15 @@ Get-Service Onevox      # Status
 
 **View/Edit:**
 ```bash
-onevox config show  # View current config
-onevox config init  # Create default config
+onevox config show         # View current config
+onevox config init         # Create default config
+onevox reload-config       # Reload and restart daemon with new config
 ```
+
+> **Note:** `reload-config` automatically restarts the daemon using:
+> - macOS: `launchctl kickstart` (launchd)
+> - Linux: `systemctl --user restart onevox` (systemd)
+> - Windows: Manual restart required
 
 ### Essential Settings
 

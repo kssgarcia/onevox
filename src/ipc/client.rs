@@ -161,4 +161,25 @@ impl IpcClient {
             _ => Err(anyhow::anyhow!("Unexpected response")),
         }
     }
+
+    /// Reload daemon configuration
+    pub async fn reload_config(&mut self) -> Result<()> {
+        match self.send_command(Command::ReloadConfig).await? {
+            Response::Success | Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
+
+    /// Restart daemon to apply configuration changes
+    pub async fn restart_daemon(&mut self) -> Result<()> {
+        // First, shutdown the daemon
+        self.shutdown().await?;
+
+        // Wait a moment for clean shutdown
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // The daemon should be restarted by the system service or user
+        Ok(())
+    }
 }

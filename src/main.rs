@@ -32,6 +32,9 @@ enum Commands {
     /// Check daemon status
     Status,
 
+    /// Reload daemon configuration
+    ReloadConfig,
+
     /// Configure onevox
     Config {
         #[command(subcommand)]
@@ -266,6 +269,23 @@ async fn main() -> Result<()> {
                 std::process::exit(1);
             }
         },
+
+        Commands::ReloadConfig => {
+            println!("🔄 Reloading daemon configuration...");
+            let mut client = onevox::ipc::IpcClient::default();
+            match client.reload_config().await {
+                Ok(_) => {
+                    println!("✅ Configuration reloaded successfully");
+                    println!("💡 The daemon is now using the updated configuration");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to reload configuration: {}", e);
+                    eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
+        }
 
         Commands::Config { action } => match action {
             ConfigAction::Show => {

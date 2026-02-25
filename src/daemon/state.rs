@@ -284,7 +284,7 @@ impl DaemonState {
     pub fn reload_config(&mut self) -> crate::Result<()> {
         let new_config = Config::load_default()?;
         self.config = new_config;
-        tracing::info!("Configuration reloaded");
+        tracing::info!("Configuration reloaded - daemon will be restarted to apply changes");
         Ok(())
     }
 
