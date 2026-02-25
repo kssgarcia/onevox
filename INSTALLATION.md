@@ -2,354 +2,287 @@
 
 ## macOS
 
-### Quick Install
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
 ```
 
-### Grant Permissions
+**Grant Permissions (Required):**
 
-macOS requires manual permission grants **in this order**:
+1. Input Monitoring: `open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"`
+2. Accessibility: `open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"`
+3. Restart daemon: `launchctl kickstart -k gui/$(id -u)/com.onevox.daemon`
+4. Microphone permission will prompt automatically on first use
 
-#### 1. Input Monitoring (for hotkey) - FIRST
+**Test:** Press `Cmd+Shift+0`, speak, release.
 
-```bash
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-```
-
-Add `Onevox.app` and toggle ON.
-
-#### 2. Accessibility (for text injection) - SECOND
-
-```bash
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-```
-
-Add `Onevox.app` and toggle ON.
-
-#### 3. Restart Daemon - REQUIRED
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
-```
-
-```bash
-tail -30 ~/Library/Logs/onevox/stdout.log
-```
-
-**Important**: You must restart the daemon after granting permissions!
-
-#### 4. Microphone (for audio) - APPEARS AUTOMATICALLY
-
-The microphone permission will appear automatically when you first press the hotkey (Cmd+Shift+0). macOS will prompt you to grant it.
-
-### Verify
-
-```bash
-onevox status
-```
-
-Test: Press **Cmd+Shift+0**, speak, release.
-
-### Paths
-
-- App: `~/Applications/Onevox.app`
-- CLI: `/usr/local/bin/onevox`
+**Paths:**
 - Config: `~/Library/Application Support/com.onevox.onevox/config.toml`
 - Models: `~/Library/Caches/com.onevox.onevox/models/`
-- Logs: `~/Library/Logs/onevox/`
-- LaunchAgent: `~/Library/LaunchAgents/com.onevox.daemon.plist`
+- Logs: `~/Library/Logs/onevox/stdout.log`
 
-### Uninstall
-
+**Service Management:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_macos.sh | sh
+# Start daemon
+launchctl start com.onevox.daemon
+
+# Stop daemon
+launchctl stop com.onevox.daemon
+
+# Restart daemon (use after permission changes)
+launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
+
+# Check if running
+launchctl list | grep onevox
+
+# Unload service
+launchctl unload ~/Library/LaunchAgents/com.onevox.daemon.plist
+
+# Load service
+launchctl load ~/Library/LaunchAgents/com.onevox.daemon.plist
+```
+
+**View Logs:**
+```bash
+# Tail logs (follow)
+tail -f ~/Library/Logs/onevox/stdout.log
+
+# View last 50 lines
+tail -50 ~/Library/Logs/onevox/stdout.log
+
+# View errors only
+grep -i error ~/Library/Logs/onevox/stdout.log
+```
+
+**Useful Commands:**
+```bash
+# Check status
+onevox status
+
+# List audio devices
+onevox devices list
+
+# Test audio capture
+onevox test-audio --duration 3
+
+# View configuration
+onevox config show
+
+# Download model
+onevox models download whisper-base.en
+
+# View history
+onevox history list
 ```
 
 ---
 
 ## Linux
 
-### Quick Install
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/install_linux.sh | bash
-```
 
-### Setup
+# Add user to required groups
+sudo usermod -aG audio,input $USER
+# Log out and back in
 
-#### 1. Add User to Groups
-
-```bash
-# For audio access
-sudo usermod -aG audio $USER
-
-# For hotkey access (optional but recommended)
-sudo usermod -aG input $USER
-
-# Log out and back in for changes to take effect
-```
-
-#### 2. Start Service
-
-```bash
-# Enable and start
+# Start service
 systemctl --user enable --now onevox
+```
+
+**Test:** Press `Ctrl+Shift+Space`, speak, release.
+
+**Paths:**
+- Config: `~/.config/onevox/config.toml`
+- Models: `~/.cache/onevox/models/`
+- Logs: `~/.local/share/onevox/logs/onevox.log`
+
+**Service Management:**
+```bash
+# Start daemon
+systemctl --user start onevox
+
+# Stop daemon
+systemctl --user stop onevox
+
+# Restart daemon
+systemctl --user restart onevox
+
+# Enable auto-start on boot
+systemctl --user enable onevox
+
+# Disable auto-start
+systemctl --user disable onevox
 
 # Check status
 systemctl --user status onevox
+
+# Reload service file (after editing)
+systemctl --user daemon-reload
+systemctl --user restart onevox
 ```
 
-### Verify
-
+**View Logs:**
 ```bash
-onevox status
-```
-
-Test: Press **Ctrl+Shift+Space**, speak, release.
-
-### Desktop Environment Notes
-
-**GNOME (Wayland):**
-```bash
-# May need extension for global hotkeys
-sudo apt install gnome-shell-extension-appindicator
-```
-
-**KDE Plasma:**
-Works out of the box on both X11 and Wayland.
-
-**XFCE:**
-Works on X11. Configure hotkeys in Settings → Keyboard if needed.
-
-**i3/Sway:**
-Add to your config:
-```
-exec --no-startup-id systemctl --user start onevox
-```
-
-### Paths
-
-- Binary: `~/.local/bin/onevox`
-- Config: `~/.config/onevox/config.toml`
-- Models: `~/.cache/onevox/models/`
-- Data: `~/.local/share/onevox/`
-- Service: `~/.config/systemd/user/onevox.service`
-- Desktop: `~/.local/share/applications/onevox.desktop`
-
-### Logs
-
-```bash
-# View logs
+# Follow logs in real-time
 journalctl --user -u onevox -f
 
-# Or
+# View last 50 lines
+journalctl --user -u onevox -n 50
+
+# View logs since boot
+journalctl --user -u onevox -b
+
+# View logs from today
+journalctl --user -u onevox --since today
+
+# View errors only
+journalctl --user -u onevox -p err
+
+# Alternative: direct log file
 tail -f ~/.local/share/onevox/logs/onevox.log
 ```
 
-### Uninstall
-
+**Useful Commands:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_linux.sh | bash
+# Check status
+onevox status
+
+# List audio devices
+onevox devices list
+
+# Test audio capture
+onevox test-audio --duration 3
+
+# View configuration
+onevox config show
+
+# Download model
+onevox models download whisper-base.en
+
+# View history
+onevox history list
+
+# Check group membership
+groups | grep -E 'audio|input'
+
+# Test PulseAudio
+pactl list sources short
+
+# Test ALSA
+arecord -l
 ```
+
+**Wayland:** See [WAYLAND.md](WAYLAND.md) for manual keybinding setup.
 
 ---
 
 ## Windows
 
-### Quick Install
+Download installer from [Releases](https://github.com/kssgarcia/onevox/releases) and run it.
 
-1. Download installer from [Releases](https://github.com/kssgarcia/onevox/releases)
-2. Run `onevox-windows-x86_64.msi`
-3. Follow installation wizard
+**Test:** Press `Ctrl+Shift+Space`, speak, release.
 
-### Manual Installation
-
-```powershell
-# Download and extract
-Invoke-WebRequest -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/onevox-windows-x86_64.zip" -OutFile "onevox.zip"
-Expand-Archive onevox.zip -DestinationPath "$env:ProgramFiles\Onevox"
-
-# Add to PATH
-[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:ProgramFiles\Onevox", "User")
-```
-
-### Setup
-
-#### 1. Grant Microphone Permission
-
-1. Open Settings → Privacy → Microphone
-2. Enable "Allow apps to access your microphone"
-3. Scroll down and enable for "Onevox"
-
-Or run:
-```powershell
-start ms-settings:privacy-microphone
-```
-
-#### 2. Start Service
-
-```powershell
-Start-Service Onevox
-```
-
-### Verify
-
-```powershell
-onevox status
-```
-
-Test: Press **Ctrl+Shift+Space**, speak, release.
-
-### Paths
-
-- Binary: `C:\Program Files\Onevox\onevox.exe`
+**Paths:**
 - Config: `%APPDATA%\onevox\onevox\config\config.toml`
 - Models: `%LOCALAPPDATA%\onevox\onevox\cache\models\`
-- Data: `%APPDATA%\onevox\onevox\data\`
-- Logs: `%APPDATA%\onevox\onevox\data\logs\`
+- Logs: `%APPDATA%\onevox\onevox\data\logs\onevox.log`
 
-### Logs
-
+**Service Management:**
 ```powershell
-Get-Content "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Wait
+# Start service
+Start-Service Onevox
+
+# Stop service
+Stop-Service Onevox
+
+# Restart service
+Restart-Service Onevox
+
+# Check status
+Get-Service Onevox
+
+# Set to start automatically
+Set-Service -Name Onevox -StartupType Automatic
+
+# Set to manual start
+Set-Service -Name Onevox -StartupType Manual
+
+# View service details
+Get-Service Onevox | Format-List *
 ```
 
-### Uninstall
+**View Logs:**
+```powershell
+# Follow logs in real-time
+Get-Content "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Wait
 
-Use "Add or Remove Programs" in Windows Settings.
+# View last 50 lines
+Get-Content "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Tail 50
+
+# Search for errors
+Select-String -Path "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Pattern "error" -CaseSensitive:$false
+
+# View event log
+Get-EventLog -LogName Application -Source Onevox -Newest 20
+```
+
+**Useful Commands:**
+```powershell
+# Check status
+onevox status
+
+# List audio devices
+onevox devices list
+
+# Test audio capture
+onevox test-audio --duration 3
+
+# View configuration
+onevox config show
+
+# Download model
+onevox models download whisper-base.en
+
+# View history
+onevox history list
+
+# Open microphone settings
+start ms-settings:privacy-microphone
+```
 
 ---
 
 ## Troubleshooting
 
-### macOS
-
 **Hotkey not working?**
-- Check Input Monitoring permission
-- Restart daemon: `launchctl kickstart -k gui/$(id -u)/com.onevox.daemon`
-- Check logs: `tail -f ~/Library/Logs/onevox/stdout.log`
+- macOS: Restart daemon after granting permissions
+- Linux: Ensure you're in `input` group and logged out/in
+- Windows: Check no other app uses the same hotkey
+
+**No audio?**
+- Run `onevox devices list` to verify microphone
+- Linux: Ensure you're in `audio` group
+- Test: `onevox test-audio --duration 3`
 
 **Text not appearing?**
-- Check Accessibility permission
-- Restart daemon
+- macOS: Grant Accessibility permission
+- Check logs for errors
 
-**No audio?**
-- Check Microphone permission
-- List devices: `onevox devices list`
-- Test: `onevox test-audio --duration 3`
-
-### Linux
-
-**Hotkey not working?**
-- Check if in input group: `groups | grep input`
-- Add to group: `sudo usermod -aG input $USER` (log out/in)
-- Check for conflicting hotkeys in your DE
-- Try: `sudo onevox daemon --foreground`
-
-**No audio?**
-- Check if in audio group: `groups | grep audio`
-- Add to group: `sudo usermod -aG audio $USER` (log out/in)
-- List devices: `onevox devices list`
-- Check PulseAudio: `pactl list sources short`
-- Check ALSA: `arecord -l`
-
-**Wayland issues?**
-- Some compositors have limited global hotkey support
-- Try X11 session as fallback
-- Check compositor-specific documentation
-
-**Service not starting?**
-```bash
-systemctl --user status onevox
-journalctl --user -u onevox -n 50
-```
-
-### Windows
-
-**Hotkey not working?**
-- Check Windows Defender isn't blocking
-- Ensure no other app uses the same hotkey
-- Try running as Administrator
-- Check for conflicting software
-
-**No audio?**
-- Check microphone permissions in Settings → Privacy
-- Ensure microphone is set as default device
-- Check Windows Sound settings
-- Test: `onevox test-audio --duration 3`
-
-**Service not starting?**
-```powershell
-Get-Service Onevox
-Get-EventLog -LogName Application -Source Onevox -Newest 10
-```
+**Check status:** `onevox status`
 
 ---
 
 ## Build from Source
 
-### All Platforms
-
 ```bash
-# Clone repository
 git clone https://github.com/kssgarcia/onevox.git
 cd onevox
-
-# Build release
 cargo build --release
-
-# Binary location
-./target/release/onevox
 ```
 
-### Platform-Specific Dependencies
+**Platform dependencies:**
+- macOS: Xcode Command Line Tools
+- Linux: `build-essential pkg-config libasound2-dev libpulse-dev`
+- Windows: Visual Studio Build Tools
 
-**macOS:**
-```bash
-# Xcode Command Line Tools
-xcode-select --install
-
-# Build with proper configuration
-CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
-  cargo build --release
-```
-
-**Troubleshooting macOS builds:** See DEVELOPMENT.md for detailed build instructions and troubleshooting.
-
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt install build-essential pkg-config libasound2-dev libpulse-dev
-```
-
-**Linux (Fedora):**
-```bash
-sudo dnf install gcc pkg-config alsa-lib-devel pulseaudio-libs-devel
-```
-
-**Linux (Arch):**
-```bash
-sudo pacman -S base-devel alsa-lib pulseaudio
-```
-
-**Windows:**
-- Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/)
-- Install [Rust](https://rustup.rs/)
-
-### Install Locally
-
-**macOS:**
-```bash
-./scripts/install_macos.sh
-```
-
-**Linux:**
-```bash
-./scripts/install_linux.sh
-```
-
-**Windows:**
-```powershell
-.\scripts\install_windows.ps1
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed build instructions.

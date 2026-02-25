@@ -1,47 +1,45 @@
-# Onevox
+<div align="center">
 
-Local speech-to-text daemon for **macOS**, **Linux**, and **Windows**. Press a hotkey, speak, and your words appear in any app.
+<img src="logo.svg" alt="OneVox Logo" width="200"/>
 
-## Quick Install
+# OneVox
 
-### Pre-built Releases
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.93%2B-orange.svg)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](https://github.com/kssgarcia/onevox)
+[![GitHub release](https://img.shields.io/github/v/release/kssgarcia/onevox)](https://github.com/kssgarcia/onevox/releases)
+[![GitHub stars](https://img.shields.io/github/stars/kssgarcia/onevox?style=social)](https://github.com/kssgarcia/onevox/stargazers)
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/kssgarcia/onevox/releases):
+**Privacy-first local speech-to-text for developers.**
 
-- **macOS ARM64** (Apple Silicon): `onevox-macos-arm64.tar.gz`
-- **macOS x86_64** (Intel): `onevox-macos-x86_64.tar.gz`
-- **Linux x86_64**: `onevox-v{version}-linux-x86_64.tar.gz`
+Press a hotkey, speak, and your words appear instantly in any application. All processing happens locally on your machine—no cloud, no data collection, no subscriptions.
 
-Or use the automated installers below:
+[Installation](#installation) • [Features](#features) • [Documentation](#documentation) • [Contributing](#contributing)
 
-### macOS
+</div>
+
+---
+
+## Features
+
+- **100% Local** - All processing on your machine, zero cloud dependencies
+- **Cross-Platform** - macOS, Linux, and Windows support
+- **Fast** - Native whisper.cpp integration, 50-200ms transcription latency
+- **System-Wide** - Works in any application
+- **Privacy-First** - Your voice data never leaves your device
+- **Open Source** - MIT licensed, fully auditable
+
+## Installation
+
+**macOS**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
 ```
 
-Then grant permissions (required by macOS):
-```bash
-# 1. Input Monitoring (for hotkey)
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-# Add Onevox.app and toggle ON
-
-# 2. Accessibility (for text injection)
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-# Add Onevox.app and toggle ON
-
-# 3. Restart daemon (REQUIRED!)
-launchctl kickstart -k gui/$(id -u)/com.onevox.daemon
-
-# 4. Microphone permission will prompt automatically when you press the hotkey
-```
-
-### Linux
+**Linux**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/install_linux.sh | bash
-```
 
-Then setup groups and start service:
-```bash
 # Add user to required groups
 sudo usermod -aG audio,input $USER
 # Log out and back in
@@ -51,251 +49,132 @@ systemctl --user start onevox
 systemctl --user enable onevox
 ```
 
-### Windows
-Download the installer from [Releases](https://github.com/kssgarcia/onevox/releases) and run it.
-Grant microphone permission when prompted.
+**Windows**
+```powershell
+# Download from releases
+# https://github.com/kssgarcia/onevox/releases
+```
+
+See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions and troubleshooting.
+
+## Quick Start
+
+1. Install OneVox using the command above
+2. Grant required permissions (installer will guide you)
+3. Press the hotkey: `Cmd+Shift+0` (macOS) or `Ctrl+Shift+Space` (Linux/Windows)
+4. Speak
+5. Release the hotkey
+6. Your text appears instantly
 
 ## Usage
 
-Press the hotkey, speak, release. Text appears.
-
-**Default Hotkeys:**
-- macOS: `Cmd+Shift+0`
-- Linux: `Ctrl+Shift+Space`
-- Windows: `Ctrl+Shift+Space`
-
-## Commands
-
 ```bash
-onevox daemon          # Start daemon
-onevox stop            # Stop daemon
-onevox status          # Check status
-onevox tui             # Open terminal UI
-onevox devices list    # List audio devices
-onevox models list     # List available models
-onevox models download <model-id>  # Download a model
-onevox history list    # View transcription history
-onevox config show     # Show configuration
+# Check status
+onevox status
 
-# Wayland/Manual Control (see WAYLAND.md)
-onevox start-dictation # Start recording (for Wayland keybindings)
-onevox stop-dictation  # Stop and transcribe (for Wayland keybindings)
+# Open terminal UI
+onevox tui
+
+# Manage models
+onevox models list
+onevox models download whisper-base.en
+
+# View history
+onevox history list
+
+# Configuration
+onevox config show
 ```
 
-### Platform-Specific Service Management
-
-**macOS:**
-```bash
-launchctl kickstart -k gui/$(id -u)/com.onevox.daemon  # Restart
-launchctl stop com.onevox.daemon                        # Stop
-```
-
-**Linux:**
-```bash
-systemctl --user start onevox    # Start
-systemctl --user stop onevox     # Stop
-systemctl --user status onevox   # Status
-journalctl --user -u onevox -f   # View logs
-```
-
-**Windows:**
-```powershell
-Start-Service Onevox    # Start
-Stop-Service Onevox     # Stop
-Get-Service Onevox      # Status
-```
+For service management and advanced usage, see [QUICKREF.md](QUICKREF.md).
 
 ## Configuration
 
-### Config File Locations
-
-- **macOS:** `~/Library/Application Support/com.onevox.onevox/config.toml`
-- **Linux:** `~/.config/onevox/config.toml`
-- **Windows:** `%APPDATA%\onevox\onevox\config\config.toml`
+OneVox is highly configurable. Edit your config file to customize:
 
 ```bash
-# View config
-onevox config show
-
-# Initialize default config
-onevox config init
+onevox config show  # View current configuration
 ```
 
-Key settings:
-- `hotkey.trigger` - Change hotkey (platform-specific defaults)
-- `hotkey.mode` - "push-to-talk" or "toggle"
-- `model.model_path` - Path to Whisper model
-- `audio.device` - Audio input device
+**Key settings:**
+- Hotkey combination and mode (push-to-talk vs toggle)
+- Audio device and quality
+- Model selection (tiny, base, small, medium, large)
+- Voice Activity Detection (VAD)
+- Text post-processing
+- GPU acceleration
 
-## Models
+**Config locations:**
+- macOS: `~/Library/Application Support/com.onevox.onevox/config.toml`
+- Linux: `~/.config/onevox/config.toml`
+- Windows: `%APPDATA%\onevox\onevox\config\config.toml`
 
-### Model Locations
+See [QUICKREF.md](QUICKREF.md#configuration) for all configuration options and examples, or check [config.example.toml](config.example.toml) for detailed comments.
 
-- **macOS:** `~/Library/Caches/com.onevox.onevox/models/`
-- **Linux:** `~/.cache/onevox/models/`
-- **Windows:** `%LOCALAPPDATA%\onevox\onevox\cache\models\`
+## Architecture
 
-```bash
-# List available models
-onevox models list
+OneVox uses native whisper.cpp bindings for maximum performance and reliability:
 
-# Download a model
-onevox models download whisper-base.en
-
-# Check downloaded models
-onevox models downloaded
-```
-
-Recommended: `whisper-base.en` (good balance of speed and accuracy)
-
-## Logs
-
-### Log Locations
-
-**macOS:**
-```bash
-tail -f ~/Library/Logs/onevox/stdout.log
-```
-
-**Linux:**
-```bash
-journalctl --user -u onevox -f
-# or
-tail -f ~/.local/share/onevox/logs/onevox.log
-```
-
-**Windows:**
-```powershell
-Get-Content "$env:APPDATA\onevox\onevox\data\logs\onevox.log" -Wait
-```
-
-## Build from Source
-
-```bash
-# Clone repo
-git clone https://github.com/kssgarcia/onevox.git
-cd onevox
-
-# Build with default features (native whisper.cpp)
-cargo build --release
-
-# Or with GPU acceleration
-cargo build --release --features metal      # macOS
-cargo build --release --features cuda       # Linux/Windows NVIDIA
-cargo build --release --features vulkan     # Cross-platform GPU
-cargo build --release --features openblas   # CPU optimization
-
-# Run
-./target/release/onevox daemon --foreground
-
-# Or install locally
-./scripts/install_macos.sh
-```
-
-### Backend Architecture
-
-OneVox uses **native whisper.cpp bindings** as the primary backend for maximum stability and performance:
-
-- ✅ No subprocess overhead
-- ✅ No Python or external runtime dependencies
-- ✅ Cross-platform stability (Linux, macOS, Windows)
-- ✅ GPU acceleration support (Metal, CUDA, Vulkan, OpenBLAS)
-- ✅ Deterministic performance
-- ✅ Easy distribution
+- Native Rust + whisper.cpp (no Python, no ONNX Runtime)
+- Single self-contained binary
+- GPU acceleration support (Metal, CUDA, Vulkan)
+- 50-200ms transcription latency
+- Cross-platform stability
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
 
-## Uninstall
+## Development
 
-**macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_macos.sh | sh
+git clone https://github.com/kssgarcia/onevox.git
+cd onevox
+cargo build --release
 ```
 
-**Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_linux.sh | bash
-```
-
-**Windows:**
-```
-Use "Add or Remove Programs" in Windows Settings
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions, testing, and contribution guidelines.
 
 ## Troubleshooting
 
-### macOS
-**Hotkey not working?**
-- Grant Input Monitoring permission
-- Restart: `launchctl kickstart -k gui/$(id -u)/com.onevox.daemon`
-
-**Text not appearing?**
-- Grant Accessibility permission
-- Restart daemon
-
-**No audio?**
-- Grant Microphone permission
-- Check device: `onevox devices list`
-
-### Linux
-**Hotkey not working?**
-- Add user to input group: `sudo usermod -aG input $USER`
-- Log out and back in
-- Check for conflicting hotkeys in your DE
-
-**No audio?**
-- Add user to audio group: `sudo usermod -aG audio $USER`
-- Check devices: `onevox devices list`
-- Verify PulseAudio/ALSA: `pactl list sources short`
-
-**Wayland issues?**
-- Wayland's security model prevents global hotkey detection
-- **Solution**: Use manual keybindings! See [WAYLAND.md](WAYLAND.md) for setup
-- Bind `onevox start-dictation` and `onevox stop-dictation` to your compositor keys
-- Works with Hyprland, Sway, and other Wayland compositors
-- Alternative: Use X11 session for automatic hotkey support
-
-### Windows
-**Hotkey not working?**
-- Check Windows Defender isn't blocking
-- Ensure no other app uses the same hotkey
-- Try running as Administrator
-
-**No audio?**
-- Check microphone permissions in Settings → Privacy
-- Ensure microphone is set as default device
-
-**Check status (all platforms):**
+**Check status:**
 ```bash
 onevox status
 ```
 
-## Requirements
+**Common issues:**
+- Hotkey not working → Check permissions (see [INSTALLATION.md](INSTALLATION.md))
+- No audio → Run `onevox devices list` to verify your microphone
+- Text not appearing → Verify accessibility permissions
 
-### macOS
-- macOS 13.0 or later
-- Apple Silicon or Intel
-- ~500MB disk space for models
+For detailed troubleshooting, see [INSTALLATION.md](INSTALLATION.md).
 
-### Linux
-- X11 or Wayland display server
-- PulseAudio or ALSA
-- systemd (optional, for service management)
-- ~500MB disk space for models
+## System Requirements
 
-### Windows
-- Windows 10 version 1809 or later
-- Windows 11 recommended
-- ~500MB disk space for models
-
-## License
-
-MIT
+- **macOS:** 13.0+ (Apple Silicon or Intel)
+- **Linux:** X11 or Wayland, PulseAudio/ALSA
+- **Windows:** 10 (1809+) or 11
+- **Disk:** ~500MB for models
+- **RAM:** ~200MB runtime
 
 ## Documentation
 
-- [QUICKREF.md](QUICKREF.md) - Quick reference card
-- [INSTALLATION.md](INSTALLATION.md) - Detailed installation and troubleshooting
-- [DEVELOPMENT.md](DEVELOPMENT.md) - Build, test, and development guide
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Model pipeline architecture and design decisions
-- [MIGRATION.md](MIGRATION.md) - Migration guide for backend refactoring
+- [INSTALLATION.md](INSTALLATION.md) - Detailed installation and platform-specific setup
+- [QUICKREF.md](QUICKREF.md) - Command reference and common tasks
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Building, testing, and contributing
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical design and architecture
+- [WAYLAND.md](WAYLAND.md) - Wayland-specific configuration
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Setting up your development environment
+- Code style and standards
+- Pull request process
+- Areas where we need help
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Acknowledgments
+
+Built with [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and powered by OpenAI's Whisper models.
