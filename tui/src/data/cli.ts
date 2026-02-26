@@ -197,6 +197,16 @@ export function getModelRegistry(): ModelInfo[] {
       description: "Higher accuracy, still suitable for dictation",
       downloaded: false,
     },
+    {
+      id: "parakeet-ctc-0.6b",
+      name: "Parakeet CTC 0.6B (ONNX)",
+      size: "~653 MB",
+      sizeBytes: 653_000_000,
+      speedFactor: 20,
+      memoryMb: 250,
+      description: "NVIDIA Parakeet - Fast multilingual ONNX model (requires --features onnx)",
+      downloaded: false,
+    },
   ]
 }
 

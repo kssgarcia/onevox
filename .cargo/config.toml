@@ -4,3 +4,6 @@ linker = "/usr/bin/clang"
 [env]
 CC = "/usr/bin/clang"
 CXX = "/usr/bin/clang++"
+# Disable BLAS in whisper.cpp to avoid symbol mismatch with macOS Accelerate framework
+# The Accelerate framework uses ILP64 symbol names which conflict with standard BLAS
+GGML_BLAS = "OFF"

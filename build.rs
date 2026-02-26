@@ -3,9 +3,7 @@ fn main() {
     #[cfg(target_os = "macos")]
     {
         // Link against Accelerate framework (includes BLAS/LAPACK)
+        // Note: whisper-rs-sys also links Accelerate, but we need it here for our direct usage
         println!("cargo:rustc-link-lib=framework=Accelerate");
-
-        // Add alias for ILP64 BLAS symbols to regular symbols
-        println!("cargo:rustc-link-arg=-Wl,-alias,_cblas_sgemm,_cblas_sgemm$NEWLAPACK$ILP64");
     }
 }

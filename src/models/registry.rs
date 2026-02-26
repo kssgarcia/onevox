@@ -165,84 +165,28 @@ impl ModelRegistry {
                 },
 
                 // ============================================================
-                // ONNX Models (Alternative backend)
+                // ONNX Models (NVIDIA Parakeet - Production Ready)
                 // ============================================================
 
-                // Tiny English-only (fastest, lowest quality)
+                // Parakeet CTC 0.6B - Multilingual (INT8 Quantized)
                 ModelMetadata {
-                    id: "whisper-tiny.en".to_string(),
-                    name: "Whisper Tiny English (ONNX)".to_string(),
-                    size: ModelSize::Tiny,
-                    variant: ModelVariant::EnglishOnly,
-                    format: ModelFormat::ONNX,
-                    size_bytes: 75 * 1024 * 1024, // ~75 MB
-                    hf_repo: "onnx-community/whisper-tiny.en".to_string(),
-                    files: vec![
-                        "onnx/decoder_model_merged.onnx".to_string(),
-                        "onnx/encoder_model.onnx".to_string(),
-                    ],
-                    file_sha256: HashMap::new(),
-                    speed_factor: 32.0, // 32x faster than real-time on CPU
-                    memory_mb: 200,
-                    description: "ONNX backend (experimental). Use GGML models instead."
-                        .to_string(),
-                },
-                // Base English-only (good balance)
-                ModelMetadata {
-                    id: "whisper-base.en".to_string(),
-                    name: "Whisper Base English (ONNX)".to_string(),
+                    id: "parakeet-ctc-0.6b".to_string(),
+                    name: "NVIDIA Parakeet CTC 0.6B (Multilingual)".to_string(),
                     size: ModelSize::Base,
-                    variant: ModelVariant::EnglishOnly,
+                    variant: ModelVariant::Multilingual,
                     format: ModelFormat::ONNX,
-                    size_bytes: 140 * 1024 * 1024, // ~140 MB
-                    hf_repo: "onnx-community/whisper-base.en".to_string(),
+                    size_bytes: 653 * 1024 * 1024, // ~653 MB (INT8 quantized)
+                    hf_repo: "istupakov/parakeet-ctc-0.6b-onnx".to_string(),
                     files: vec![
-                        "onnx/decoder_model_merged.onnx".to_string(),
-                        "onnx/encoder_model.onnx".to_string(),
+                        "model.int8.onnx".to_string(),
+                        "vocab.txt".to_string(),
+                        "config.json".to_string(),
                     ],
                     file_sha256: HashMap::new(),
-                    speed_factor: 16.0, // 16x faster than real-time
-                    memory_mb: 300,
-                    description: "ONNX backend (experimental). Use GGML models instead."
+                    speed_factor: 60.0, // 60x faster than real-time on CPU
+                    memory_mb: 400,
+                    description: "High-performance multilingual ASR (INT8 quantized). Supports 100+ languages with CTC architecture. Optimized for CPU inference."
                         .to_string(),
-                },
-                // Small English-only (better quality)
-                ModelMetadata {
-                    id: "whisper-small.en".to_string(),
-                    name: "Whisper Small English (ONNX)".to_string(),
-                    size: ModelSize::Small,
-                    variant: ModelVariant::EnglishOnly,
-                    format: ModelFormat::ONNX,
-                    size_bytes: 470 * 1024 * 1024, // ~470 MB
-                    hf_repo: "onnx-community/whisper-small.en".to_string(),
-                    files: vec![
-                        "onnx/decoder_model_merged.onnx".to_string(),
-                        "onnx/encoder_model.onnx".to_string(),
-                    ],
-                    file_sha256: HashMap::new(),
-                    speed_factor: 8.0, // 8x faster than real-time
-                    memory_mb: 600,
-                    description: "ONNX backend (experimental). Use GGML models instead."
-                        .to_string(),
-                },
-                // Medium English-only (high quality)
-                ModelMetadata {
-                    id: "whisper-medium.en".to_string(),
-                    name: "Whisper Medium English (ONNX)".to_string(),
-                    size: ModelSize::Medium,
-                    variant: ModelVariant::EnglishOnly,
-                    format: ModelFormat::ONNX,
-                    size_bytes: 1500 * 1024 * 1024, // ~1.5 GB
-                    hf_repo: "onnx-community/whisper-medium.en".to_string(),
-                    files: vec![
-                        "onnx/decoder_model_merged.onnx".to_string(),
-                        "onnx/encoder_model.onnx".to_string(),
-                    ],
-                    file_sha256: HashMap::new(),
-                    speed_factor: 4.0, // 4x faster than real-time
-                    memory_mb: 1200,
-                    description: "ONNX backend (experimental). Use GGML models instead."
-                            .to_string(),
                 },
             ],
         }
@@ -279,14 +223,15 @@ mod tests {
     fn test_registry() {
         let registry = ModelRegistry::new();
         assert!(!registry.list_models().is_empty());
-        assert!(registry.get_model("whisper-base.en").is_some());
+        assert!(registry.get_model("ggml-base.en").is_some());
+        assert!(registry.get_model("parakeet-ctc-0.6b").is_some());
         assert!(registry.get_model("nonexistent").is_none());
     }
 
     #[test]
     fn test_download_urls() {
         let registry = ModelRegistry::new();
-        let model = registry.get_model("whisper-tiny.en").unwrap();
+        let model = registry.get_model("ggml-tiny.en").unwrap();
         let urls = model.download_urls();
         assert!(!urls.is_empty());
         assert!(urls[0].1.contains("huggingface.co"));

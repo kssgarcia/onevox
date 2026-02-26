@@ -8,6 +8,9 @@ use crate::config::Config;
 use crate::history::{HistoryEntry, HistoryManager};
 use crate::indicator::RecordingIndicator;
 use crate::models::{ModelConfig, ModelRuntime, Transcription, WhisperCpp};
+
+#[cfg(feature = "onnx")]
+use crate::models::OnnxRuntime;
 use crate::platform::{
     HotkeyConfig as PlatformHotkeyConfig, HotkeyEvent, HotkeyManager, InjectorConfig, TextInjector,
 };
@@ -81,12 +84,38 @@ impl DictationEngine {
         // Create audio engine
         let audio_engine = AudioEngine::new();
 
-        // Create Whisper.cpp model (native bindings)
-        let mut model: Box<dyn ModelRuntime> = Box::new(WhisperCpp::new()?);
+        // Create model based on backend configuration
+        let backend = config.model.backend.as_str();
+        let mut model: Box<dyn ModelRuntime> = match backend {
+            "whisper_cpp" => {
+                info!("Using whisper.cpp backend");
+                Box::new(WhisperCpp::new()?)
+            }
+            #[cfg(feature = "onnx")]
+            "onnx_runtime" | "onnx" => {
+                info!("Using ONNX Runtime backend");
+                Box::new(OnnxRuntime::new()?)
+            }
+            #[cfg(not(feature = "onnx"))]
+            "onnx_runtime" | "onnx" => {
+                error!(
+                    "ONNX backend requested but feature not enabled. Rebuild with --features onnx"
+                );
+                return Err(crate::Error::Model(
+                    "ONNX feature not enabled. Rebuild with --features onnx".to_string(),
+                )
+                .into());
+            }
+            unknown => {
+                warn!("Unknown backend '{}', falling back to whisper.cpp", unknown);
+                Box::new(WhisperCpp::new()?)
+            }
+        };
+
         let model_config = ModelConfig {
             model_path: config.model.model_path.clone(),
             language: config.model.language.clone(),
-            use_gpu: config.model.device == "gpu",
+            use_gpu: config.model.device == "gpu" || config.model.device == "auto",
             ..Default::default()
         };
         model.load(model_config)?;

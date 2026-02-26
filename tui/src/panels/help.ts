@@ -91,6 +91,13 @@ export function createHelpOverlay(
         ["Enter", "Confirm / close"],
       ],
     },
+    {
+      title: "Model Backends",
+      keys: [
+        ["whisper_cpp", "OpenAI Whisper (default, CPU/GPU)"],
+        ["onnx", "ONNX Runtime - Parakeet (15-25x RT, CPU)"],
+      ],
+    },
   ]
 
   for (const section of sections) {

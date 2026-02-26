@@ -85,13 +85,26 @@ min_silence_chunks = 3
 adaptive = true
 
 [model]
-# Model backend: "whisper_cpp" (native, recommended), "candle" (experimental)
+# Model backend: "whisper_cpp" (default), "onnx" (requires --features onnx)
 backend = "whisper_cpp"
 
-# Model identifier (without .bin extension)
-# The model file should be in: ~/.cache/onevox/models/<model_id>/<model_id>.bin
-# Download models with: onevox models download ggml-base.en
-# Available models: ggml-tiny.en, ggml-base.en, ggml-small.en, ggml-medium.en, ggml-large-v3
+# Model identifier (without extension)
+# Models are stored in platform-appropriate cache directory:
+#   - macOS: ~/Library/Caches/com.onevox.onevox/models/<model_id>/
+#   - Linux: ~/.cache/onevox/models/<model_id>/
+#   - Windows: %LOCALAPPDATA%\onevox\onevox\cache\models\<model_id>\
+#
+# Download models with: onevox models download <model_id>
+#
+# Available GGML models (whisper_cpp backend):
+#   - ggml-tiny.en (fastest, lower accuracy)
+#   - ggml-base.en (recommended for most users)
+#   - ggml-small.en (better accuracy, slower)
+#   - ggml-medium.en (high accuracy, slow)
+#   - ggml-large-v3 (best accuracy, very slow)
+#
+# Available ONNX models (onnx backend, requires --features onnx):
+#   - parakeet-ctc-0.6b (multilingual, 100+ languages, 15-25x RT, INT8 quantized)
 model_path = "ggml-base.en"
 
 # Compute device: "auto", "cpu", "gpu"
@@ -100,6 +113,7 @@ device = "auto"
 
 # Language code (ISO 639-1): "en", "es", "fr", "de", etc.
 # Use "auto" for automatic detection (slower)
+# Parakeet supports: en, es, fr, de, it, pt, pl, nl, cs, ro, hu, sv, da, no, fi, bg, hr, sk, sl, et, lt, lv
 language = "en"
 
 # Task: "transcribe" or "translate" (translate to English)

@@ -3,10 +3,12 @@
 //! Unified interface for multiple transcription backends.
 //!
 //! Primary backend: whisper.cpp (native bindings)
+//! ONNX backend: ONNX Runtime (production-ready, supports Parakeet and other models)
 //! Optional backend: Candle (pure Rust, experimental)
 
 pub mod downloader;
 pub mod mock;
+pub mod onnx_runtime;
 pub mod registry;
 pub mod runtime;
 pub mod tokenizer;
@@ -18,6 +20,7 @@ pub mod whisper_candle;
 // Re-export commonly used types
 pub use downloader::ModelDownloader;
 pub use mock::MockModel;
+pub use onnx_runtime::OnnxRuntime;
 pub use registry::{ModelMetadata, ModelRegistry, ModelSize, ModelVariant};
 pub use runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
 pub use tokenizer::SimpleTokenizer;

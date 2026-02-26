@@ -44,7 +44,7 @@ use onevox::models::{WhisperCpp, ModelRuntime, ModelConfig};
 
 let mut model = WhisperCpp::new()?;
 let config = ModelConfig {
-    model_path: "ggml-base.en.bin".to_string(),
+    model_path: "ggml-base.en".to_string(),
     language: "en".to_string(),
     use_gpu: true,
     ..Default::default()
@@ -53,6 +53,50 @@ model.load(config)?;
 
 let transcription = model.transcribe(&audio_samples, 16000)?;
 ```
+
+## Backend: ONNX Runtime
+
+**Why ONNX Runtime?**
+- Cross-platform performance (15-25x real-time on CPU with Parakeet)
+- Multilingual support (25+ languages with models like Parakeet)
+- Production-ready inference engine with static linking
+- CTC-based models for fast streaming transcription
+- INT8 quantization support for reduced memory footprint (250MB for Parakeet 0.6B)
+- Automatic platform-specific binary downloads via ort-sys
+
+**Implementation:** `src/models/onnx_runtime.rs` (571 lines)
+
+**Key Features:**
+- Mel spectrogram feature extraction (128 mel bins, 25ms window, 10ms hop)
+- Greedy CTC decoding with blank token removal
+- SentencePiece tokenization (8193 token vocabulary)
+- Cross-platform model path resolution
+- Comprehensive error handling and logging
+
+```rust
+use onevox::models::{OnnxRuntime, ModelRuntime, ModelConfig};
+
+let mut model = OnnxRuntime::new()?;
+let config = ModelConfig {
+    model_path: "parakeet-ctc-0.6b".to_string(),
+    language: "en".to_string(),
+    use_gpu: false, // CPU-optimized with INT8
+    ..Default::default()
+};
+model.load(config)?;
+
+let transcription = model.transcribe(&audio_samples, 16000)?;
+```
+
+**Model Requirements:**
+- Input: Mel spectrogram features [batch=1, features=128, time_frames]
+- Output: CTC logits [batch=1, time_steps, vocab_size]
+- Sample rate: 16kHz
+- Model files: encoder-model.int8.onnx (621MB), vocab.txt (8KB)
+
+**Supported Models:**
+- NVIDIA Parakeet TDT 0.6B v3 (multilingual, INT8 quantized, 250MB runtime)
+- Any ONNX-exported CTC-based ASR model with compatible input/output shapes
 
 ## Model Runtime Trait
 
@@ -106,10 +150,19 @@ pub trait ModelRuntime: Send + Sync {
 
 ```toml
 [model]
-backend = "whisper_cpp"
-model_path = "ggml-base.en.bin"
+# Backend selection
+backend = "whisper_cpp"  # or "onnx_runtime" (requires --features onnx)
+
+# Model identifier (without extension)
+model_path = "ggml-base.en"  # or "parakeet-ctc-0.6b"
+
+# Device selection
 device = "auto"  # auto, cpu, gpu
+
+# Language (ISO 639-1 code)
 language = "en"
+
+# Preload model at daemon startup
 preload = true
 ```
 
@@ -121,6 +174,7 @@ default = ["whisper-cpp"]
 
 # Model backends
 whisper-cpp = ["whisper-rs"]
+onnx = ["ort", "ndarray"]
 candle = ["candle-core", "candle-nn", "candle-transformers"]
 
 # GPU acceleration
@@ -137,24 +191,26 @@ openblas = ["whisper-rs/openblas"]
 - Fast, low-latency transcription
 - Deterministic behavior
 - Easy distribution
-- Minimal dependencies
+- Minimal runtime dependencies
 - Long-term maintainability
+- Production-ready performance
 
 **What we avoid:**
-- General-purpose ML hosting
-- Dynamic plugin systems
-- Experimental backend explosion
-- Python or ONNX Runtime dependencies
+- Experimental or unstable backends
+- Complex dependency chains
+- Unpredictable behavior
+- Heavy runtime requirements
 
 ## Future Considerations
 
 **Potential additions:**
 - Candle backend (pure Rust)
 - Newer Whisper model variants
+- Additional ONNX-optimized models
 - Model quantization support
 - Preprocessing optimizations
 
 **Not planned:**
-- Multiple backend support
-- External runtime dependencies
-- Complex plugin architecture
+- Multiple simultaneous backends
+- Dynamic plugin architecture
+- Experimental ML frameworks

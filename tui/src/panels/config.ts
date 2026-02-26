@@ -236,21 +236,26 @@ export function createConfigPanel(
 
   modelContent.add(modelField.root)
 
-  const modelBackendIdx = ["whisper_cpp", "faster_whisper", "onnx", "candle"].indexOf(config.model.backend)
+  const modelBackendIdx = ["whisper_cpp", "onnx"].indexOf(config.model.backend)
   const modelBackendField = createSelectField(renderer, {
     id: "model-backend-select",
     label: "Backend:",
     options: [
-      { name: "whisper_cpp", description: "whisper.cpp CLI backend" },
-      { name: "faster_whisper", description: "CTranslate2 backend" },
-      { name: "onnx", description: "ONNX Runtime backend" },
-      { name: "candle", description: "Rust Candle backend" },
+      { name: "whisper_cpp", description: "whisper.cpp - OpenAI Whisper models (default)" },
+      { name: "onnx", description: "ONNX Runtime - Parakeet & other ONNX models (15-25x RT)" },
     ],
     selectedIndex: modelBackendIdx >= 0 ? modelBackendIdx : 0,
     theme,
     onChange: (index) => {
-      config.model.backend = ["whisper_cpp", "faster_whisper", "onnx", "candle"][index]
+      const backends = ["whisper_cpp", "onnx"]
+      config.model.backend = backends[index]
       markDirty()
+      
+      // Show helpful message for ONNX
+      if (backends[index] === "onnx") {
+        callbacks.onStatusMessage("ℹ ONNX requires --features onnx build flag")
+        setTimeout(() => callbacks.onStatusMessage(""), 3000)
+      }
     },
   })
 
