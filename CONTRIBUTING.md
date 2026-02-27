@@ -47,8 +47,8 @@ cargo test
 6. **Link issues** - Reference any related issues
 
 **For model backend changes:**
-- Test both `cargo build --release` and `cargo build --release --features onnx`
-- Verify existing tests pass with both backends
+- Add appropriate tests for both whisper.cpp and ONNX models
+- Verify existing tests pass with both backends (both included by default)
 - Update ARCHITECTURE.md if behavior changes
 
 ## Areas for Contribution
@@ -118,14 +118,13 @@ cargo test --features onnx
 When contributing changes that affect model backends:
 
 ```bash
-# Test default backend (whisper.cpp)
+# Test default build (includes both whisper.cpp and ONNX)
 cargo build --release
 cargo test
 ./target/release/onevox daemon --foreground
 
-# Test ONNX backend (if applicable)
-cargo build --release --features onnx
-cargo test --features onnx
+# Test ONNX models specifically
+cargo test --release
 # Edit config: model_path = "parakeet-ctc-0.6b"
 ./target/release/onevox daemon --foreground
 

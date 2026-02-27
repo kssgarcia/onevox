@@ -150,12 +150,32 @@ impl Lifecycle {
                             break;
                         }
                         Err(e) => {
+                            let error_msg = e.to_string();
+
+                            // Check if this is a model-related error (missing model file)
+                            let is_model_error = error_msg.contains("Model file not found")
+                                || error_msg.contains("Model not found")
+                                || error_msg.contains("Download GGML models")
+                                || error_msg.contains("Model download incomplete");
+
                             if retry_count == 0 {
                                 error!("Failed to create dictation engine: {}", e);
-                                error!("⚠️  This is usually a permission issue. Please grant:");
-                                error!("   1. Input Monitoring permission");
-                                error!("   2. Accessibility permission");
-                                error!("   Then restart: launchctl kickstart -k gui/$(id -u)/com.onevox.daemon");
+
+                                // Only show permission hints for non-model errors
+                                if !is_model_error {
+                                    error!("⚠️  This is usually a permission issue. Please grant:");
+                                    error!("   1. Input Monitoring permission");
+                                    error!("   2. Accessibility permission");
+                                    error!("   Then restart: launchctl kickstart -k gui/$(id -u)/com.onevox.daemon");
+                                }
+                            }
+
+                            // Don't retry for model errors - they won't fix themselves
+                            if is_model_error {
+                                error!("❌ Cannot start without a valid model");
+                                error!("   Daemon will continue running but dictation won't work");
+                                error!("   Download a model and restart the daemon");
+                                break;
                             }
 
                             retry_count += 1;

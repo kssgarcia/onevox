@@ -296,7 +296,7 @@ export function getModelRegistry(): ModelInfo[] {
       sizeBytes: 653_000_000,
       speedFactor: 20,
       memoryMb: 250,
-      description: "NVIDIA Parakeet - Fast multilingual ONNX model (requires --features onnx)",
+      description: "NVIDIA Parakeet - Fast multilingual ONNX model (included by default)",
       downloaded: false,
     },
   ]

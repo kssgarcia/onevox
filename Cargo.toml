@@ -89,7 +89,7 @@ enigo = "0.6"        # Keyboard/mouse simulation for text injection
 libc = "0.2"
 
 [features]
-default = ["whisper-cpp", "overlay-indicator"] # Native whisper.cpp is the primary backend
+default = ["whisper-cpp", "onnx", "overlay-indicator"] # Include both backends by default
 
 # Model backends
 whisper-cpp = ["whisper-rs"]

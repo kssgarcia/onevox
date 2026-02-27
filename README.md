@@ -76,11 +76,11 @@ cargo build --release
 - Alternative models (Parakeet CTC, etc.)
 - INT8 quantization for faster inference
 - ~250MB memory usage
-- Requires `--features onnx` flag
+- Included by default (no special flags needed)
 
 ```bash
-# Build with ONNX support
-cargo build --release --features onnx
+# Build (includes ONNX support by default)
+cargo build --release
 ```
 
 Backend selection is automatic based on model choice (see Configuration below).
@@ -159,7 +159,7 @@ OneVox uses a model-centric architecture where the backend is automatically sele
 - Alternative models with INT8 quantization
 - CPU-optimized inference
 - ~250MB memory usage
-- Requires `--features onnx` build flag
+- Included by default in all builds
 
 **Model Selection:**
 ```toml
@@ -168,7 +168,7 @@ OneVox uses a model-centric architecture where the backend is automatically sele
 # Backend is auto-detected from model_path
 model_path = "ggml-base.en"      # Uses whisper.cpp, English-only
 # model_path = "ggml-base"       # Uses whisper.cpp, multilingual (auto-detect language)
-# model_path = "parakeet-ctc-0.6b"  # Uses ONNX Runtime (requires --features onnx)
+# model_path = "parakeet-ctc-0.6b"  # Uses ONNX Runtime (included by default)
 device = "auto"                   # or "cpu", "gpu"
 preload = true
 ```

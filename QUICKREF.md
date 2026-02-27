@@ -100,7 +100,7 @@ sample_rate = 16000
 # Model identifier (backend auto-detected from path)
 model_path = "ggml-base.en"         # English-only, ~142MB
 # model_path = "ggml-base"          # Multilingual (99+ languages)
-# model_path = "parakeet-ctc-0.6b"  # ONNX (requires --features onnx)
+# model_path = "parakeet-ctc-0.6b"  # ONNX (included by default)
 
 device = "auto"  # auto, cpu, gpu
 preload = true   # Load model at startup
@@ -109,7 +109,7 @@ preload = true   # Load model at startup
 **Available Models:**
 - **English-only**: `ggml-tiny.en` (75MB), `ggml-base.en` (142MB), `ggml-small.en` (466MB), `ggml-medium.en` (1.5GB)
 - **Multilingual**: `ggml-tiny` (75MB), `ggml-base` (142MB), `ggml-small` (466MB), `ggml-medium` (1.5GB), `ggml-large-v2/v3` (2.9GB), `ggml-large-v3-turbo` (1.6GB)
-- **ONNX**: `parakeet-ctc-0.6b` (multilingual, INT8, requires `--features onnx` build)
+- **ONNX**: `parakeet-ctc-0.6b` (multilingual, INT8, included by default)
 
 Multilingual models automatically detect the spoken language. Backend is auto-selected based on model name.
 

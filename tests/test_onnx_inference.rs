@@ -1,4 +1,10 @@
 //! Integration test for ONNX Runtime inference
+//!
+//! These tests require the Parakeet model to be downloaded.
+//! Run: `cargo run --release -- models download parakeet-ctc-0.6b`
+//!
+//! To skip these tests if model is not available, they check for model
+//! presence and skip gracefully.
 
 #[cfg(feature = "onnx")]
 #[test]
@@ -16,7 +22,26 @@ fn test_onnx_transcription_silence() {
         beam_size: 1,
     };
 
-    model.load(config).expect("Failed to load model");
+    // Try to load model - skip test if model not downloaded
+    match model.load(config) {
+        Ok(_) => {
+            // Model loaded successfully, continue test
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("Model download incomplete")
+                || err_msg.contains("Missing files")
+                || err_msg.contains("Model directory not found")
+                || err_msg.contains("Download with:")
+            {
+                eprintln!("⚠️  Skipping test: Parakeet model not downloaded");
+                eprintln!("   Run: cargo run --release -- models download parakeet-ctc-0.6b");
+                return; // Skip test gracefully
+            } else {
+                panic!("Failed to load model: {:?}", e);
+            }
+        }
+    }
 
     // Create test audio: 1 second of silence at 16kHz
     let sample_rate: u32 = 16000;
@@ -61,7 +86,26 @@ fn test_onnx_transcription_synthetic_audio() {
         beam_size: 1,
     };
 
-    model.load(config).expect("Failed to load model");
+    // Try to load model - skip test if model not downloaded
+    match model.load(config) {
+        Ok(_) => {
+            // Model loaded successfully, continue test
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("Model download incomplete")
+                || err_msg.contains("Missing files")
+                || err_msg.contains("Model directory not found")
+                || err_msg.contains("Download with:")
+            {
+                eprintln!("⚠️  Skipping test: Parakeet model not downloaded");
+                eprintln!("   Run: cargo run --release -- models download parakeet-ctc-0.6b");
+                return; // Skip test gracefully
+            } else {
+                panic!("Failed to load model: {:?}", e);
+            }
+        }
+    }
 
     // Create synthetic speech-like audio: 2 seconds of varying frequencies
     // This simulates speech formants with modulated sine waves

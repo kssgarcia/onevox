@@ -10,15 +10,33 @@ cargo build --release
 
 ## Build
 
-### Default Backend (whisper.cpp)
-
-**First Build (macOS only):**
-
-macOS requires environment variables on first build:
-
 ```bash
-CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
-  cargo build --release
+# Debug build (includes ONNX by default)
+cargo build
+
+# Release build (includes ONNX by default)
+cargo build --release
+
+# Minimal build (whisper.cpp only, no ONNX)
+cargo build --release --no-default-features --features whisper-cpp
+```
+
+### ONNX Runtime Support
+
+ONNX support is **included by default** in all builds. This enables the Parakeet model and other ONNX models.
+
+**What's included:**
+- Downloads ONNX Runtime binaries automatically (~150MB) via `ort-sys`
+- Builds ONNX inference backend
+- Enables ONNX model support (Parakeet, etc.)
+- Increases binary size by ~30MB
+
+**Testing ONNX:**
+```bash
+# ONNX is available by default
+./target/release/onevox config init
+# Edit config.toml: model_path = "parakeet-ctc-0.6b"
+./target/release/onevox daemon --foreground
 ```
 
 **Why?** whisper.cpp compiles from source and needs proper SDK paths.
@@ -139,7 +157,7 @@ src/
 ├── vad/                 # Voice Activity Detection
 ├── models/              # Transcription models
 │   ├── whisper_cpp.rs   # whisper.cpp backend (default)
-│   ├── onnx_runtime.rs  # ONNX Runtime backend (--features onnx)
+│   ├── onnx_runtime.rs  # ONNX Runtime backend (default)
 │   ├── whisper_candle.rs # Pure Rust backend (experimental)
 │   └── runtime.rs       # ModelRuntime trait
 ├── platform/            # Platform-specific
@@ -160,7 +178,7 @@ scripts/                 # Installation and packaging scripts
 
 **Core:**
 - `whisper-rs` - Native whisper.cpp bindings (default backend)
-- `ort` + `ort-sys` - ONNX Runtime bindings (optional, `--features onnx`)
+- `ort` + `ort-sys` - ONNX Runtime bindings (default, included in all builds)
 - `handy-keys` - Global hotkey detection
 - `cpal` - Cross-platform audio
 - `enigo` - Text injection

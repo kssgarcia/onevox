@@ -49,7 +49,7 @@ OneVox is available in two build configurations:
 - **Latency**: Varies by model
 - **Models**: Parakeet, custom ONNX models
 
-**Installation**: Build from source with `--features onnx` flag (see [Build from Source](#build-from-source) below)
+**Installation**: Build from source (ONNX support included by default, see [Build from Source](#build-from-source) below)
 
 ---
 
@@ -408,7 +408,7 @@ After building, edit your config file to select a model:
 # Backend is auto-detected from model_path
 model_path = "ggml-base.en"         # English-only (whisper.cpp)
 # model_path = "ggml-base"          # Multilingual (whisper.cpp, 99+ languages)
-# model_path = "parakeet-ctc-0.6b"  # ONNX model (requires --features onnx build)
+# model_path = "parakeet-ctc-0.6b"  # ONNX model (included by default)
 
 device = "auto"  # auto, cpu, gpu
 preload = true

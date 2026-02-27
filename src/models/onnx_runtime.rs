@@ -6,7 +6,7 @@
 #[cfg(feature = "onnx")]
 use super::runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
 #[cfg(feature = "onnx")]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(feature = "onnx")]
 use tracing::{debug, info, warn};
 
@@ -118,7 +118,7 @@ impl OnnxRuntime {
     }
 
     /// Load vocabulary file
-    fn load_vocab(&self, model_dir: &PathBuf) -> crate::Result<Vec<String>> {
+    fn load_vocab(&self, model_dir: &Path) -> crate::Result<Vec<String>> {
         let vocab_path = model_dir.join("vocab.txt");
 
         if !vocab_path.exists() {
@@ -155,7 +155,7 @@ impl OnnxRuntime {
     }
 
     /// Load model configuration file
-    fn load_model_config(&self, model_dir: &PathBuf) -> crate::Result<usize> {
+    fn load_model_config(&self, model_dir: &Path) -> crate::Result<usize> {
         let config_path = model_dir.join("config.json");
 
         // If config.json doesn't exist, default to 80 mel bins (Parakeet CTC)
@@ -236,12 +236,12 @@ impl OnnxRuntime {
             kept_tokens += 1;
 
             // Handle SentencePiece subword tokens (▁ indicates word boundary)
-            if token.starts_with('▁') {
+            if let Some(stripped) = token.strip_prefix('▁') {
                 if !result.is_empty() {
                     result.push(' ');
                 }
                 // Remove the ▁ marker
-                result.push_str(&token[3..]); // ▁ is 3 bytes in UTF-8
+                result.push_str(stripped); // ▁ is 3 bytes in UTF-8
             } else {
                 result.push_str(token);
             }
@@ -337,10 +337,10 @@ impl OnnxRuntime {
                 .collect();
 
             // Apply mel filterbank
-            for mel_bin in 0..n_mel_bins {
+            for mel_filter in mel_filters.iter().take(n_mel_bins) {
                 let mut mel_energy = 0.0f32;
                 for (freq_bin, &power) in power_spectrum.iter().enumerate() {
-                    mel_energy += power * mel_filters[mel_bin][freq_bin];
+                    mel_energy += power * mel_filter[freq_bin];
                 }
 
                 // Apply log scale (add small epsilon to avoid log(0))
@@ -395,19 +395,23 @@ impl OnnxRuntime {
             let right = bin_points[mel_idx + 2] as usize;
 
             // Rising slope
-            for bin in left..center {
-                if bin < n_fft_bins {
-                    filterbank[mel_idx][bin] =
-                        (bin as f32 - left as f32) / (center as f32 - left as f32);
-                }
+            for (bin, value) in filterbank[mel_idx]
+                .iter_mut()
+                .enumerate()
+                .take(center)
+                .skip(left)
+            {
+                *value = (bin as f32 - left as f32) / (center as f32 - left as f32);
             }
 
             // Falling slope
-            for bin in center..right {
-                if bin < n_fft_bins {
-                    filterbank[mel_idx][bin] =
-                        (right as f32 - bin as f32) / (right as f32 - center as f32);
-                }
+            for (bin, value) in filterbank[mel_idx]
+                .iter_mut()
+                .enumerate()
+                .take(right.min(n_fft_bins))
+                .skip(center)
+            {
+                *value = (right as f32 - bin as f32) / (right as f32 - center as f32);
             }
         }
 
@@ -646,7 +650,7 @@ impl ModelRuntime for OnnxRuntime {
             // Extract logits output
             // Expected shape: [batch_size=1, time_steps, vocab_size]
             // Try common output names: "outputs", "logits", "output", "logprobs"
-            let output_names = vec!["outputs", "logits", "output", "logprobs"];
+            let output_names = ["outputs", "logits", "output", "logprobs"];
             let logits_value = output_names
                 .iter()
                 .find_map(|&name| outputs.get(name))
@@ -708,13 +712,9 @@ impl ModelRuntime for OnnxRuntime {
                 .collect();
             t0_values.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             eprintln!("🔍 Top 5 tokens at t=0:");
-            for i in 0..5.min(t0_values.len()) {
-                eprintln!(
-                    "  #{}: ID {}, value {:.4}",
-                    i + 1,
-                    t0_values[i].0,
-                    t0_values[i].1
-                );
+            for (i, &(token_id, value)) in t0_values.iter().enumerate().take(5.min(t0_values.len()))
+            {
+                eprintln!("  #{}: ID {}, value {:.4}", i + 1, token_id, value);
             }
 
             // Debug: check top 5 values at t=0
@@ -726,8 +726,8 @@ impl ModelRuntime for OnnxRuntime {
                 .collect();
             t0_values.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
             eprintln!("🔍 Top 5 tokens at t=0:");
-            for i in 0..5.min(t0_values.len()) {
-                eprintln!("  ID {}: {:.4}", t0_values[i].0, t0_values[i].1);
+            for &(token_id, value) in t0_values.iter().take(5.min(t0_values.len())) {
+                eprintln!("  ID {}: {:.4}", token_id, value);
             }
 
             // Debug: check if blank token (8192) has high probability at any timestep

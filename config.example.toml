@@ -109,7 +109,7 @@ adaptive = true
 #     - ggml-large-v3 (~2.9GB, 99+ languages)
 #     - ggml-large-v3-turbo (~1.6GB, 99+ languages, faster)
 #
-# Available ONNX models (requires --features onnx build):
+# Available ONNX models (included by default):
 #   - parakeet-ctc-0.6b (multilingual, 100+ languages, 15-25x RT, INT8 quantized)
 #
 # Backend auto-detection:

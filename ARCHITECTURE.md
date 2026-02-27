@@ -11,7 +11,7 @@ OneVox uses a model-centric architecture where the backend is automatically sele
 
 | Feature | whisper.cpp | ONNX Runtime |
 |---------|-------------|--------------|
-| **Build** | Default | `--features onnx` |
+| **Build** | Default | Default (included) |
 | **Selection** | Auto (GGML models) | Auto (ONNX/Parakeet models) |
 | **Stability** | Production-ready | Experimental |
 | **Speed** | 50-200ms | Varies by model |
@@ -104,7 +104,7 @@ let transcription = model.transcribe(&audio_samples, 16000)?;
 
 **Build:**
 ```bash
-cargo build --release --features onnx
+cargo build --release  # ONNX support included by default
 ```
 
 **Implementation:** `src/models/onnx_runtime.rs` (571 lines)
@@ -195,11 +195,11 @@ pub trait ModelRuntime: Send + Sync {
 [model]
 # Backend auto-detected from model_path
 # - GGML models (ggml-*) use whisper.cpp
-# - Parakeet/ONNX models use ONNX Runtime (requires --features onnx)
+# - Parakeet/ONNX models use ONNX Runtime (included by default)
 
 model_path = "ggml-base.en"      # English-only (whisper.cpp)
 # model_path = "ggml-base"       # Multilingual, 99+ languages (whisper.cpp)
-# model_path = "parakeet-ctc-0.6b"  # ONNX model (requires --features onnx)
+# model_path = "parakeet-ctc-0.6b"  # ONNX model (included by default)
 
 # Device selection
 device = "auto"  # auto, cpu, gpu
@@ -225,7 +225,7 @@ preload = true
 - `ggml-large-v3` (2.9GB)
 - `ggml-large-v3-turbo` (1.6GB)
 
-*ONNX (requires --features onnx):*
+*ONNX (included by default):*
 - `parakeet-ctc-0.6b` - Multilingual, INT8 quantized
 
 **Switching models:**
@@ -237,11 +237,11 @@ preload = true
 
 ```toml
 [features]
-default = ["whisper-cpp", "overlay-indicator"]
+default = ["whisper-cpp", "onnx", "overlay-indicator"]
 
-# Model backends (mutually exclusive in practice, but can coexist)
-whisper-cpp = ["whisper-rs"]                # Native whisper.cpp (recommended)
-onnx = ["ort", "ort-sys", "ndarray"]        # ONNX Runtime (multilingual)
+# Model backends
+whisper-cpp = ["whisper-rs"]                # Native whisper.cpp (default)
+onnx = ["ort", "ort-sys", "ndarray"]        # ONNX Runtime (default)
 candle = ["candle-core", "candle-nn", "candle-transformers"]  # Pure Rust (experimental)
 
 # GPU acceleration (whisper-cpp only)
@@ -257,20 +257,17 @@ overlay-indicator = ["eframe", "winit"]  # Visual recording indicator
 
 **Build examples:**
 ```bash
-# Default (whisper.cpp + overlay)
+# Default (includes both whisper.cpp and ONNX)
 cargo build --release
 
-# With ONNX support
-cargo build --release --features onnx
-
-# Both backends available (larger binary)
-cargo build --release --features "whisper-cpp,onnx"
+# Whisper.cpp only (minimal build)
+cargo build --release --no-default-features --features whisper-cpp
 
 # GPU-accelerated whisper.cpp (macOS)
 cargo build --release --features metal
 
-# ONNX + TUI
-cargo build --release --features "onnx,tui"
+# GPU-accelerated with ONNX
+cargo build --release --features "metal"
 ```
 
 ## Design Principles
