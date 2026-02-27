@@ -10,7 +10,7 @@ use onevox::{Config, Result};
 #[command(version)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -202,8 +202,9 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
+    let command = cli.command.unwrap_or(Commands::Tui);
 
-    match cli.command {
+    match command {
         Commands::Daemon { dev, foreground } => {
             tracing::info!("Starting onevox daemon...");
 

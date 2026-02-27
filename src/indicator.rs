@@ -1,5 +1,9 @@
 //! Desktop recording/processing overlay indicator.
 
+#[cfg(target_os = "macos")]
+use objc::{msg_send, sel, sel_impl};
+#[cfg(target_os = "macos")]
+use raw_window_handle::{HasWindowHandle as _, RawWindowHandle};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -195,9 +199,44 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
             positioned: bool,
             last_state_poll: Instant,
             frozen_phase: f32,
+            #[cfg(target_os = "macos")]
+            macos_window_level_set: bool,
         }
 
         impl OverlayApp {
+            #[cfg(target_os = "macos")]
+            #[allow(unexpected_cfgs)]
+            fn elevate_macos_window_level(frame: &eframe::Frame) {
+                let Ok(window_handle) = frame.window_handle() else {
+                    return;
+                };
+
+                let RawWindowHandle::AppKit(handle) = window_handle.as_raw() else {
+                    return;
+                };
+
+                let ns_view = handle.ns_view.as_ptr() as *mut objc::runtime::Object;
+                if ns_view.is_null() {
+                    return;
+                }
+
+                // Keep overlay above Dock and most system UI layers.
+                const NS_POPUP_MENU_WINDOW_LEVEL: i64 = 101;
+
+                unsafe {
+                    #[allow(unexpected_cfgs)]
+                    let ns_window: *mut objc::runtime::Object = msg_send![ns_view, window];
+                    if ns_window.is_null() {
+                        return;
+                    }
+                    #[allow(unexpected_cfgs)]
+                    let _: () = msg_send![ns_window, setLevel: NS_POPUP_MENU_WINDOW_LEVEL];
+                    // Ensure the overlay never captures pointer interactions on macOS.
+                    #[allow(unexpected_cfgs)]
+                    let _: () = msg_send![ns_window, setIgnoresMouseEvents: true];
+                }
+            }
+
             fn draw_waveform(&self, ui: &mut egui::Ui, t: f32) {
                 let desired = egui::vec2(ui.available_width(), ui.available_height());
                 let (rect, _) = ui.allocate_exact_size(desired, egui::Sense::hover());
@@ -235,7 +274,13 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
         }
 
         impl eframe::App for OverlayApp {
-            fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+            fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                #[cfg(target_os = "macos")]
+                if !self.macos_window_level_set {
+                    Self::elevate_macos_window_level(frame);
+                    self.macos_window_level_set = true;
+                }
+
                 if self.last_state_poll.elapsed() >= Duration::from_millis(60) {
                     self.last_state_poll = Instant::now();
                     if let Some(state) = read_indicator_state() {
@@ -337,6 +382,8 @@ pub fn run_indicator(mode: IndicatorMode) -> crate::Result<()> {
                     positioned: false,
                     last_state_poll: Instant::now(),
                     frozen_phase: 0.0,
+                    #[cfg(target_os = "macos")]
+                    macos_window_level_set: false,
                 }))
             }),
         )
