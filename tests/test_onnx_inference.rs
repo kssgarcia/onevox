@@ -11,11 +11,9 @@ fn test_onnx_transcription_silence() {
     // Load model
     let config = ModelConfig {
         model_path: "parakeet-ctc-0.6b".to_string(),
-        language: "en".to_string(),
         use_gpu: false,
         n_threads: 4,
         beam_size: 1,
-        translate: false,
     };
 
     model.load(config).expect("Failed to load model");
@@ -58,11 +56,9 @@ fn test_onnx_transcription_synthetic_audio() {
     // Load model
     let config = ModelConfig {
         model_path: "parakeet-ctc-0.6b".to_string(),
-        language: "en".to_string(),
         use_gpu: false,
         n_threads: 4,
         beam_size: 1,
-        translate: false,
     };
 
     model.load(config).expect("Failed to load model");

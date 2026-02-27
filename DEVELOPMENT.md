@@ -10,7 +10,9 @@ cargo build --release
 
 ## Build
 
-### First Build (macOS only)
+### Default Backend (whisper.cpp)
+
+**First Build (macOS only):**
 
 macOS requires environment variables on first build:
 
@@ -21,7 +23,7 @@ CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=1
 
 **Why?** whisper.cpp compiles from source and needs proper SDK paths.
 
-### Subsequent Builds
+**Subsequent Builds:**
 
 After first build, no env vars needed:
 
@@ -34,6 +36,33 @@ cargo build --release
 - When updating whisper-rs
 - On fresh machine/CI
 
+### ONNX Backend (Experimental)
+
+To build with ONNX Runtime support for multilingual models:
+
+```bash
+# macOS (first build)
+CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
+  cargo build --release --features onnx
+
+# Linux/Windows or subsequent builds
+cargo build --release --features onnx
+```
+
+**What happens:**
+- Downloads ONNX Runtime binaries (~150MB) automatically via `ort-sys`
+- Builds ONNX inference backend
+- Enables ONNX model support (Parakeet, etc.)
+- Increases binary size by ~30MB
+
+**Testing ONNX:**
+```bash
+# Run with ONNX model
+./target/release/onevox config init
+# Edit config.toml: model_path = "parakeet-ctc-0.6b"
+./target/release/onevox daemon --foreground
+```
+
 ### Build Script
 
 ```bash
@@ -43,22 +72,39 @@ cargo build --release
 
 ### GPU Acceleration
 
+OneVox supports GPU acceleration for whisper.cpp backend:
+
 ```bash
-cargo build --release --features metal      # macOS
-cargo build --release --features cuda       # NVIDIA
-cargo build --release --features vulkan     # Cross-platform
-cargo build --release --features openblas   # CPU optimization
+# macOS - Metal (default on Apple Silicon)
+cargo build --release
+
+# NVIDIA - CUDA
+cargo build --release --features cuda
+
+# Cross-platform - Vulkan
+cargo build --release --features vulkan
+
+# CPU optimization - OpenBLAS
+cargo build --release --features openblas
 ```
+
+**Note**: GPU features only apply to `whisper.cpp` backend. ONNX backend uses CPU-optimized INT8 models.
 
 ## Run
 
 ```bash
-# Foreground
+# Foreground (for development)
 ./target/release/onevox daemon --foreground
 
-# Install locally
-./scripts/install_macos.sh   # macOS
-./scripts/install_linux.sh   # Linux
+# With debug logging
+RUST_LOG=debug ./target/release/onevox daemon --foreground
+
+# Install locally for testing
+# macOS: builds and installs from source
+./install.sh
+
+# Linux: builds and installs from source  
+./scripts/install_linux.sh
 ```
 
 ## Test
@@ -91,10 +137,11 @@ src/
 │   └── state.rs         # Shared state
 ├── audio/               # Audio capture (cpal)
 ├── vad/                 # Voice Activity Detection
-├── models/              # Whisper models
-│   ├── whisper_cpp.rs   # Native whisper.cpp (PRIMARY)
-│   ├── whisper_candle.rs # Pure Rust (experimental)
-│   └── runtime.rs       # Model trait
+├── models/              # Transcription models
+│   ├── whisper_cpp.rs   # whisper.cpp backend (default)
+│   ├── onnx_runtime.rs  # ONNX Runtime backend (--features onnx)
+│   ├── whisper_candle.rs # Pure Rust backend (experimental)
+│   └── runtime.rs       # ModelRuntime trait
 ├── platform/            # Platform-specific
 │   ├── hotkey.rs        # Global hotkey
 │   ├── injector.rs      # Text injection
@@ -106,12 +153,14 @@ src/
 └── tui.rs               # Terminal UI
 
 tui/                     # TypeScript TUI (Bun)
+scripts/                 # Installation and packaging scripts
 ```
 
 ## Dependencies
 
 **Core:**
-- `whisper-rs` - Native whisper.cpp bindings
+- `whisper-rs` - Native whisper.cpp bindings (default backend)
+- `ort` + `ort-sys` - ONNX Runtime bindings (optional, `--features onnx`)
 - `handy-keys` - Global hotkey detection
 - `cpal` - Cross-platform audio
 - `enigo` - Text injection
@@ -120,6 +169,15 @@ tui/                     # TypeScript TUI (Bun)
 **Platform:**
 - macOS: `core-graphics`, `core-foundation`
 - Linux: `x11`, `evdev`
+
+**Build Features:**
+```toml
+default = ["whisper-cpp", "overlay-indicator"]
+whisper-cpp = ["whisper-rs"]        # Native whisper.cpp (recommended)
+onnx = ["ort", "ort-sys", "ndarray"] # ONNX Runtime (multilingual)
+candle = [...]                       # Pure Rust (experimental)
+tui = ["ratatui", "crossterm"]      # Terminal UI
+```
 
 ## Platform Setup
 
@@ -152,16 +210,27 @@ sudo pacman -S base-devel alsa-lib pulseaudio
 ### Build Release
 
 ```bash
-# macOS
+# macOS - Default (whisper.cpp)
 CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
   cargo build --release --locked
 
-# Linux
+# macOS - With ONNX
+CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
+  cargo build --release --locked --features onnx
+
+# Linux - Default
 cargo build --release --locked
 strip target/release/onevox
 
-# Windows
+# Linux - With ONNX
+cargo build --release --locked --features onnx
+strip target/release/onevox
+
+# Windows - Default
 cargo build --release --locked
+
+# Windows - With ONNX
+cargo build --release --locked --features onnx
 ```
 
 ### Package

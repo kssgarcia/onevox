@@ -97,11 +97,21 @@ sample_rate = 16000
 **Model:**
 ```toml
 [model]
-backend = "whisper_cpp"
-model_path = "ggml-base.en"  # tiny, base, small, medium, large-v3
+# Model identifier (backend auto-detected from path)
+model_path = "ggml-base.en"         # English-only, ~142MB
+# model_path = "ggml-base"          # Multilingual (99+ languages)
+# model_path = "parakeet-ctc-0.6b"  # ONNX (requires --features onnx)
+
 device = "auto"  # auto, cpu, gpu
-language = "en"  # or "auto" for detection
+preload = true   # Load model at startup
 ```
+
+**Available Models:**
+- **English-only**: `ggml-tiny.en` (75MB), `ggml-base.en` (142MB), `ggml-small.en` (466MB), `ggml-medium.en` (1.5GB)
+- **Multilingual**: `ggml-tiny` (75MB), `ggml-base` (142MB), `ggml-small` (466MB), `ggml-medium` (1.5GB), `ggml-large-v2/v3` (2.9GB), `ggml-large-v3-turbo` (1.6GB)
+- **ONNX**: `parakeet-ctc-0.6b` (multilingual, INT8, requires `--features onnx` build)
+
+Multilingual models automatically detect the spoken language. Backend is auto-selected based on model name.
 
 ### All Configuration Options
 
@@ -138,12 +148,9 @@ post_roll_ms = 500         # Continue after speech ends
 
 **[model]** - Transcription model
 ```toml
-backend = "whisper_cpp"     # whisper_cpp or candle
-model_path = "ggml-base.en" # Model to use
+model_path = "ggml-base.en" # Model identifier (backend auto-detected)
 device = "auto"             # auto, cpu, gpu
-language = "en"             # Language code or "auto"
-task = "transcribe"         # transcribe or translate
-preload = true              # Load at startup
+preload = true              # Load model at startup
 ```
 
 **[post_processing]** - Text processing

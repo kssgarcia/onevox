@@ -161,15 +161,16 @@ impl ModelRuntime for WhisperCpp {
 
         // Configure parameters from ModelConfig
         params.set_n_threads(config.n_threads as i32);
-        params.set_language(Some(&config.language));
-        params.set_translate(config.translate);
+        // Auto-detect language (None = auto-detection enabled)
+        params.set_language(None);
+        params.set_translate(false); // Always transcribe, never translate
         params.set_print_progress(false);
         params.set_print_special(false);
         params.set_print_realtime(false);
         params.set_print_timestamps(false);
         params.set_token_timestamps(false);
         params.set_suppress_blank(true);
-        params.set_suppress_nst(true); // Suppress non-speech tokens (renamed in newer API)
+        params.set_suppress_nst(true); // Suppress non-speech tokens
 
         // Create a state for this transcription (whisper-rs 0.14+ API)
         let mut state = ctx
@@ -199,9 +200,13 @@ impl ModelRuntime for WhisperCpp {
             processing_time.as_millis()
         );
 
+        // Detect language from the model (whisper models detect language automatically)
+        // Language will be auto-detected by the model when set_language(None) is used
+        let detected_language = None; // We could extract this from whisper state if needed
+
         Ok(Transcription {
             text: full_text.trim().to_string(),
-            language: Some(config.language.clone()),
+            language: detected_language,
             confidence: None, // whisper-rs doesn't expose confidence easily
             processing_time_ms: processing_time.as_millis() as u64,
             tokens: Some(num_segments),

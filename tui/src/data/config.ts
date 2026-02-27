@@ -118,11 +118,8 @@ export interface VadConfig {
 }
 
 export interface ModelConfig {
-  backend: string
   model_path: string
   device: string
-  language: string
-  task: string
   preload: boolean
 }
 
@@ -174,11 +171,8 @@ export const DEFAULT_CONFIG: VoxConfig = {
     adaptive: true,
   },
   model: {
-    backend: "whisper_cpp",
     model_path: "ggml-base.en.bin",
     device: "auto",
-    language: "en",
-    task: "transcribe",
     preload: true,
   },
   post_processing: {

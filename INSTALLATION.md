@@ -1,5 +1,58 @@
 # Installation
 
+## Quick Install
+
+### Universal Installer (Recommended)
+
+**macOS & Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
+```
+
+This single command detects your platform and installs the appropriate version.
+
+**Linux Post-Install:**
+```bash
+# Add user to required groups (required for audio and hotkeys)
+sudo usermod -aG audio,input $USER
+# Log out and back in for group changes to take effect
+
+# Start and enable service
+systemctl --user enable --now onevox
+```
+
+**Windows:**
+```powershell
+# Download installer from releases
+# https://github.com/kssgarcia/onevox/releases
+```
+
+---
+
+## Build Variants
+
+OneVox is available in two build configurations:
+
+### Default: whisper.cpp (Recommended)
+- **Best for**: Most users, production use
+- **Pros**: Fast, stable, single binary, GPU acceleration
+- **Memory**: ~100MB
+- **Latency**: 50-200ms
+- **Models**: Whisper GGML models (tiny, base, small, medium, large)
+
+**Installation**: Standard installer provides this by default
+
+### Experimental: ONNX Runtime
+- **Best for**: Multilingual use cases, research
+- **Pros**: 25+ languages, CTC models, INT8 quantization
+- **Memory**: ~250MB
+- **Latency**: Varies by model
+- **Models**: Parakeet, custom ONNX models
+
+**Installation**: Build from source with `--features onnx` flag (see [Build from Source](#build-from-source) below)
+
+---
+
 ## macOS
 
 ```bash
@@ -78,8 +131,9 @@ onevox history list
 
 ## Linux
 
+### Quick Install
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/install_linux.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
 
 # Add user to required groups
 sudo usermod -aG audio,input $USER
@@ -274,15 +328,90 @@ start ms-settings:privacy-microphone
 
 ## Build from Source
 
+### Prerequisites
+
+**All platforms:**
+- Rust 1.93+ ([rustup.rs](https://rustup.rs))
+- Git
+
+**macOS:**
+```bash
+xcode-select --install
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install build-essential pkg-config cmake libasound2-dev libpulse-dev
+```
+
+**Linux (Fedora):**
+```bash
+sudo dnf install gcc pkg-config cmake alsa-lib-devel pulseaudio-libs-devel
+```
+
+**Linux (Arch):**
+```bash
+sudo pacman -S base-devel cmake alsa-lib pulseaudio
+```
+
+**Windows:**
+- Visual Studio Build Tools with C++ support
+
+### Build Default (whisper.cpp)
+
 ```bash
 git clone https://github.com/kssgarcia/onevox.git
 cd onevox
+
+# macOS (first build requires environment variables)
+CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
+  cargo build --release
+
+# Linux/Windows
 cargo build --release
+
+# Install locally
+./target/release/onevox --version
 ```
 
-**Platform dependencies:**
-- macOS: Xcode Command Line Tools
-- Linux: `build-essential pkg-config libasound2-dev libpulse-dev`
-- Windows: Visual Studio Build Tools
+### Build with ONNX Support
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed build instructions.
+To build with ONNX Runtime support for multilingual models:
+
+```bash
+# Clone repository
+git clone https://github.com/kssgarcia/onevox.git
+cd onevox
+
+# macOS
+CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
+  cargo build --release --features onnx
+
+# Linux/Windows  
+cargo build --release --features onnx
+
+# Binary will be at: ./target/release/onevox
+```
+
+**Note**: Building with ONNX will:
+- Download ONNX Runtime binaries automatically (~150MB)
+- Increase build time (first build takes longer)
+- Increase binary size (~30MB larger)
+- Enable ONNX model support (Parakeet, etc.)
+
+### Configure Model
+
+After building, edit your config file to select a model:
+
+```toml
+[model]
+# Backend is auto-detected from model_path
+model_path = "ggml-base.en"         # English-only (whisper.cpp)
+# model_path = "ggml-base"          # Multilingual (whisper.cpp, 99+ languages)
+# model_path = "parakeet-ctc-0.6b"  # ONNX model (requires --features onnx build)
+
+device = "auto"  # auto, cpu, gpu
+preload = true
+```
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed build instructions and troubleshooting.

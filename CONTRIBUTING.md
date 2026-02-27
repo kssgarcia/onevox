@@ -42,24 +42,39 @@ cargo test
 1. **Update documentation** - If you change functionality, update relevant .md files
 2. **Add tests** - New features should include tests
 3. **Run checks** - Ensure `cargo test`, `cargo fmt`, and `cargo clippy` pass
-4. **Describe changes** - Write a clear PR description explaining what and why
-5. **Link issues** - Reference any related issues
+4. **Test build variants** - If touching model code, test both whisper.cpp and ONNX builds
+5. **Describe changes** - Write a clear PR description explaining what and why
+6. **Link issues** - Reference any related issues
+
+**For model backend changes:**
+- Test both `cargo build --release` and `cargo build --release --features onnx`
+- Verify existing tests pass with both backends
+- Update ARCHITECTURE.md if behavior changes
 
 ## Areas for Contribution
 
 ### High Priority
 - Windows installer and service management
 - Additional Whisper model support
+- ONNX backend improvements and testing
 - Performance optimizations
-- Cross-platform testing
+- Cross-platform testing (especially with ONNX backend)
 - Documentation improvements
 
 ### Feature Ideas
+- Additional ONNX-optimized multilingual models
 - Custom vocabulary/word lists
 - Multiple language support improvements
 - Alternative VAD implementations
 - Plugin system for post-processing
 - Cloud sync for history (optional, privacy-preserving)
+
+### Backend Development
+- Testing and stabilizing ONNX backend
+- Adding support for new model formats
+- Implementing Candle backend (pure Rust)
+- GPU optimization for ONNX models
+- Model quantization improvements
 
 ### Bug Fixes
 - Check [Issues](https://github.com/kssgarcia/onevox/issues) for open bugs
@@ -89,10 +104,35 @@ cargo test --test '*'
 # Benchmarks
 cargo bench
 
+# Test with different backends
+cargo test --features onnx
+
 # Platform-specific tests
 ./target/release/onevox test-hotkey
 ./target/release/onevox test-audio --duration 3
 ./target/release/onevox test-vad --duration 10
+```
+
+**Testing Build Variants:**
+
+When contributing changes that affect model backends:
+
+```bash
+# Test default backend (whisper.cpp)
+cargo build --release
+cargo test
+./target/release/onevox daemon --foreground
+
+# Test ONNX backend (if applicable)
+cargo build --release --features onnx
+cargo test --features onnx
+# Edit config: model_path = "parakeet-ctc-0.6b"
+./target/release/onevox daemon --foreground
+
+# Test with GPU features (if available)
+cargo build --release --features metal  # macOS
+cargo build --release --features cuda   # NVIDIA
+cargo test --features metal
 ```
 
 ## Documentation

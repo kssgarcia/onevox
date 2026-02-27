@@ -2,14 +2,33 @@
 
 ## Overview
 
-OneVox uses native whisper.cpp bindings for maximum stability and performance.
+OneVox uses a model-centric architecture where the backend is automatically selected based on your model choice:
 
-**Key Benefits:**
+1. **whisper.cpp** (Default, Recommended) - Native C++ bindings for GGML models
+2. **ONNX Runtime** (Experimental) - Alternative runtime for ONNX models
+
+**Comparison:**
+
+| Feature | whisper.cpp | ONNX Runtime |
+|---------|-------------|--------------|
+| **Build** | Default | `--features onnx` |
+| **Selection** | Auto (GGML models) | Auto (ONNX/Parakeet models) |
+| **Stability** | Production-ready | Experimental |
+| **Speed** | 50-200ms | Varies by model |
+| **Memory** | ~100MB | ~250MB |
+| **Languages** | English-only or multilingual (99+) | Model-dependent |
+| **Models** | Whisper GGML (tiny to large-v3) | Parakeet, custom ONNX |
+| **GPU** | Metal, CUDA, Vulkan | CPU-optimized INT8 |
+| **Binary Size** | ~20MB | ~50MB |
+
+**Key Benefits of whisper.cpp:**
 - 2-4x faster transcription (50-200ms vs 150-400ms)
 - 30-50% less memory usage
 - Single self-contained binary
 - No subprocess or IPC overhead
-- No Python or ONNX Runtime dependencies
+- No Python or external runtime dependencies
+- Cross-platform GPU acceleration
+- Automatic language detection for multilingual models
 
 ## Pipeline
 
@@ -27,7 +46,14 @@ Transcription (whisper.cpp)
 Text Injection
 ```
 
-## Backend: whisper.cpp
+## Backend: whisper.cpp (Default)
+
+**When to use:**
+- Production deployments
+- English or multilingual transcription
+- Need for GPU acceleration
+- Minimum resource usage
+- Maximum stability
 
 **Why whisper.cpp?**
 - Proven cross-platform stability
@@ -36,6 +62,12 @@ Text Injection
 - Optimized for speech transcription
 - Deterministic performance
 - GPU acceleration (Metal, CUDA, Vulkan, OpenBLAS)
+- Supports both English-only and multilingual models (99+ languages)
+
+**Build:**
+```bash
+cargo build --release  # Default, no flags needed
+```
 
 **Implementation:** `src/models/whisper_cpp.rs`
 
@@ -44,17 +76,23 @@ use onevox::models::{WhisperCpp, ModelRuntime, ModelConfig};
 
 let mut model = WhisperCpp::new()?;
 let config = ModelConfig {
-    model_path: "ggml-base.en".to_string(),
-    language: "en".to_string(),
+    model_path: "ggml-base.en".to_string(),  // or "ggml-base" for multilingual
     use_gpu: true,
     ..Default::default()
 };
 model.load(config)?;
 
 let transcription = model.transcribe(&audio_samples, 16000)?;
+// Language auto-detected for multilingual models
 ```
 
-## Backend: ONNX Runtime
+## Backend: ONNX Runtime (Experimental)
+
+**When to use:**
+- Multilingual transcription (25+ languages)
+- Research and experimentation
+- Need for CTC-based models
+- CPU-only deployments with INT8 optimization
 
 **Why ONNX Runtime?**
 - Cross-platform performance (15-25x real-time on CPU with Parakeet)
@@ -63,6 +101,11 @@ let transcription = model.transcribe(&audio_samples, 16000)?;
 - CTC-based models for fast streaming transcription
 - INT8 quantization support for reduced memory footprint (250MB for Parakeet 0.6B)
 - Automatic platform-specific binary downloads via ort-sys
+
+**Build:**
+```bash
+cargo build --release --features onnx
+```
 
 **Implementation:** `src/models/onnx_runtime.rs` (571 lines)
 
@@ -150,38 +193,84 @@ pub trait ModelRuntime: Send + Sync {
 
 ```toml
 [model]
-# Backend selection
-backend = "whisper_cpp"  # or "onnx_runtime" (requires --features onnx)
+# Backend auto-detected from model_path
+# - GGML models (ggml-*) use whisper.cpp
+# - Parakeet/ONNX models use ONNX Runtime (requires --features onnx)
 
-# Model identifier (without extension)
-model_path = "ggml-base.en"  # or "parakeet-ctc-0.6b"
+model_path = "ggml-base.en"      # English-only (whisper.cpp)
+# model_path = "ggml-base"       # Multilingual, 99+ languages (whisper.cpp)
+# model_path = "parakeet-ctc-0.6b"  # ONNX model (requires --features onnx)
 
 # Device selection
 device = "auto"  # auto, cpu, gpu
 
-# Language (ISO 639-1 code)
-language = "en"
-
-# Preload model at daemon startup
+# Preload model at daemon startup (recommended)
 preload = true
 ```
+
+**Available Models:**
+
+*English-only (whisper.cpp):*
+- `ggml-tiny.en` (75MB) - Fastest
+- `ggml-base.en` (142MB) - Recommended
+- `ggml-small.en` (466MB) - Better accuracy
+- `ggml-medium.en` (1.5GB) - High accuracy
+
+*Multilingual (whisper.cpp, 99+ languages):*
+- `ggml-tiny` (75MB)
+- `ggml-base` (142MB)
+- `ggml-small` (466MB)
+- `ggml-medium` (1.5GB)
+- `ggml-large-v2` (2.9GB)
+- `ggml-large-v3` (2.9GB)
+- `ggml-large-v3-turbo` (1.6GB)
+
+*ONNX (requires --features onnx):*
+- `parakeet-ctc-0.6b` - Multilingual, INT8 quantized
+
+**Switching models:**
+1. Download model: `onevox models download <model_id>`
+2. Update config: `model_path = "<model_id>"`
+3. Restart daemon: `onevox daemon restart` or `systemctl --user restart onevox`
 
 ## Build Features
 
 ```toml
 [features]
-default = ["whisper-cpp"]
+default = ["whisper-cpp", "overlay-indicator"]
 
-# Model backends
-whisper-cpp = ["whisper-rs"]
-onnx = ["ort", "ndarray"]
-candle = ["candle-core", "candle-nn", "candle-transformers"]
+# Model backends (mutually exclusive in practice, but can coexist)
+whisper-cpp = ["whisper-rs"]                # Native whisper.cpp (recommended)
+onnx = ["ort", "ort-sys", "ndarray"]        # ONNX Runtime (multilingual)
+candle = ["candle-core", "candle-nn", "candle-transformers"]  # Pure Rust (experimental)
 
-# GPU acceleration
-metal = ["whisper-rs/metal"]
-cuda = ["whisper-rs/cuda"]
-vulkan = ["whisper-rs/vulkan"]
-openblas = ["whisper-rs/openblas"]
+# GPU acceleration (whisper-cpp only)
+metal = ["whisper-rs/metal"]       # macOS GPU acceleration
+cuda = ["whisper-rs/cuda"]         # NVIDIA GPU acceleration
+vulkan = ["whisper-rs/vulkan"]     # Cross-platform GPU
+openblas = ["whisper-rs/openblas"] # CPU optimization
+
+# Additional features
+tui = ["ratatui", "crossterm"]           # Terminal UI
+overlay-indicator = ["eframe", "winit"]  # Visual recording indicator
+```
+
+**Build examples:**
+```bash
+# Default (whisper.cpp + overlay)
+cargo build --release
+
+# With ONNX support
+cargo build --release --features onnx
+
+# Both backends available (larger binary)
+cargo build --release --features "whisper-cpp,onnx"
+
+# GPU-accelerated whisper.cpp (macOS)
+cargo build --release --features metal
+
+# ONNX + TUI
+cargo build --release --features "onnx,tui"
 ```
 
 ## Design Principles

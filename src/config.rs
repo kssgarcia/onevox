@@ -64,11 +64,8 @@ pub struct VadConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
-    pub backend: String,
     pub model_path: String,
     pub device: String,
-    pub language: String,
-    pub task: String,
     pub preload: bool,
 }
 
@@ -159,11 +156,8 @@ impl Default for UiConfig {
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
-            backend: "whisper_cpp".to_string(),
             model_path: "ggml-base.en".to_string(), // Model ID, not full filename
             device: "auto".to_string(),
-            language: "en".to_string(),
-            task: "transcribe".to_string(),
             preload: true,
         }
     }

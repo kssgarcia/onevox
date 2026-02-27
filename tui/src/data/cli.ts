@@ -167,36 +167,128 @@ export async function listDevices(): Promise<AudioDevice[]> {
 /** Hardcoded model registry (mirrors src/models/registry.rs) */
 export function getModelRegistry(): ModelInfo[] {
   return [
+    // ============================================================
+    // GGML Models (whisper.cpp) - RECOMMENDED
+    // ============================================================
+
+    // Multilingual models (99+ languages with auto-detection)
     {
-      id: "ggml-tiny.en",
-      name: "Whisper Tiny English (GGML)",
+      id: "ggml-tiny",
+      name: "Whisper Tiny Multilingual (GGML)",
       size: "~75 MB",
       sizeBytes: 75_000_000,
       speedFactor: 32,
       memoryMb: 200,
-      description: "Fastest model using whisper.cpp",
+      description: "Fastest multilingual model. Supports 99 languages. Good for real-time dictation.",
+      downloaded: false,
+    },
+    {
+      id: "ggml-base",
+      name: "Whisper Base Multilingual (GGML)",
+      size: "~142 MB",
+      sizeBytes: 142_000_000,
+      speedFactor: 16,
+      memoryMb: 300,
+      description: "Recommended multilingual model. Best balance of speed and accuracy for 99 languages.",
+      downloaded: false,
+    },
+    {
+      id: "ggml-small",
+      name: "Whisper Small Multilingual (GGML)",
+      size: "~466 MB",
+      sizeBytes: 466_000_000,
+      speedFactor: 8,
+      memoryMb: 600,
+      description: "Higher accuracy multilingual model. Supports 99 languages.",
+      downloaded: false,
+    },
+    {
+      id: "ggml-medium",
+      name: "Whisper Medium Multilingual (GGML)",
+      size: "~1.5 GB",
+      sizeBytes: 1_500_000_000,
+      speedFactor: 4,
+      memoryMb: 800,
+      description: "High accuracy multilingual model. Supports 99 languages. Slower inference.",
+      downloaded: false,
+    },
+    {
+      id: "ggml-large-v2",
+      name: "Whisper Large v2 (GGML)",
+      size: "~2.9 GB",
+      sizeBytes: 2_900_000_000,
+      speedFactor: 2,
+      memoryMb: 1000,
+      description: "Best accuracy multilingual model. Supports 99 languages. Very slow, recommended for offline processing.",
+      downloaded: false,
+    },
+    {
+      id: "ggml-large-v3",
+      name: "Whisper Large v3 (GGML)",
+      size: "~2.9 GB",
+      sizeBytes: 2_900_000_000,
+      speedFactor: 2,
+      memoryMb: 1000,
+      description: "Latest large model with improved accuracy. Supports 99 languages.",
+      downloaded: false,
+    },
+    {
+      id: "ggml-large-v3-turbo",
+      name: "Whisper Large v3 Turbo (GGML)",
+      size: "~1.6 GB",
+      sizeBytes: 1_600_000_000,
+      speedFactor: 4,
+      memoryMb: 800,
+      description: "Optimized large model with faster inference. Supports 99 languages.",
+      downloaded: false,
+    },
+
+    // English-only models (optimized for English)
+    {
+      id: "ggml-tiny.en",
+      name: "Whisper Tiny English-only (GGML)",
+      size: "~75 MB",
+      sizeBytes: 75_000_000,
+      speedFactor: 32,
+      memoryMb: 200,
+      description: "Fastest English-only model using whisper.cpp",
       downloaded: false,
     },
     {
       id: "ggml-base.en",
-      name: "Whisper Base English (GGML)",
-      size: "~140 MB",
-      sizeBytes: 140_000_000,
+      name: "Whisper Base English-only (GGML)",
+      size: "~142 MB",
+      sizeBytes: 142_000_000,
       speedFactor: 16,
       memoryMb: 300,
-      description: "Best balance of speed and accuracy",
+      description: "Recommended English-only model. Best balance of speed and accuracy.",
       downloaded: false,
     },
     {
       id: "ggml-small.en",
-      name: "Whisper Small English (GGML)",
-      size: "~470 MB",
-      sizeBytes: 470_000_000,
+      name: "Whisper Small English-only (GGML)",
+      size: "~466 MB",
+      sizeBytes: 466_000_000,
       speedFactor: 8,
       memoryMb: 600,
-      description: "Higher accuracy, still suitable for dictation",
+      description: "Higher accuracy English-only model, still suitable for dictation",
       downloaded: false,
     },
+    {
+      id: "ggml-medium.en",
+      name: "Whisper Medium English-only (GGML)",
+      size: "~1.5 GB",
+      sizeBytes: 1_500_000_000,
+      speedFactor: 4,
+      memoryMb: 800,
+      description: "High accuracy English-only model. Slower inference.",
+      downloaded: false,
+    },
+
+    // ============================================================
+    // ONNX Models (requires --features onnx)
+    // ============================================================
+
     {
       id: "parakeet-ctc-0.6b",
       name: "Parakeet CTC 0.6B (ONNX)",
@@ -217,9 +309,16 @@ export async function listModelsWithStatus(): Promise<ModelInfo[]> {
     const downloadedIds = out
       .split("\n")
       .map((l) => l.trim())
-      .filter((l) => l.length > 0)
+      .filter((l) => l.startsWith("✅")) // Only lines with checkmark
+      .map((l) => {
+        // Extract model ID from lines like "✅ ggml-base.en (141.1 MB)"
+        const match = l.match(/✅\s+([^\s(]+)/)
+        return match ? match[1] : ""
+      })
+      .filter((id) => id.length > 0) // Remove empty strings
     for (const m of models) {
-      if (downloadedIds.some((d) => d.includes(m.id))) {
+      // Exact match to avoid "ggml-base" matching "ggml-base.en"
+      if (downloadedIds.some((d) => d === m.id)) {
         m.downloaded = true
       }
     }
@@ -236,7 +335,17 @@ export async function downloadModel(modelId: string): Promise<string> {
 export async function isModelDownloaded(modelId: string): Promise<boolean> {
   try {
     const output = await run(["models", "downloaded"])
-    return output.includes(modelId)
+    // Extract model IDs and do exact match to avoid "ggml-base" matching "ggml-base.en"
+    const downloadedIds = output
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("✅")) // Only lines with checkmark
+      .map((l) => {
+        const match = l.match(/✅\s+([^\s(]+)/)
+        return match ? match[1] : ""
+      })
+      .filter((id) => id.length > 0) // Remove empty strings
+    return downloadedIds.some((id) => id === modelId)
   } catch {
     return false
   }

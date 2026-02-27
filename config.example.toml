@@ -85,10 +85,7 @@ min_silence_chunks = 3
 adaptive = true
 
 [model]
-# Model backend: "whisper_cpp" (default), "onnx" (requires --features onnx)
-backend = "whisper_cpp"
-
-# Model identifier (without extension)
+# Model identifier - determines which model and backend to use
 # Models are stored in platform-appropriate cache directory:
 #   - macOS: ~/Library/Caches/com.onevox.onevox/models/<model_id>/
 #   - Linux: ~/.cache/onevox/models/<model_id>/
@@ -96,28 +93,38 @@ backend = "whisper_cpp"
 #
 # Download models with: onevox models download <model_id>
 #
-# Available GGML models (whisper_cpp backend):
-#   - ggml-tiny.en (fastest, lower accuracy)
-#   - ggml-base.en (recommended for most users)
-#   - ggml-small.en (better accuracy, slower)
-#   - ggml-medium.en (high accuracy, slow)
-#   - ggml-large-v3 (best accuracy, very slow)
+# Available Whisper GGML models (whisper.cpp backend, auto-selected):
+#   English-only variants:
+#     - ggml-tiny.en (fastest, ~75MB)
+#     - ggml-base.en (recommended, ~142MB)
+#     - ggml-small.en (~466MB)
+#     - ggml-medium.en (~1.5GB)
+#   
+#   Multilingual variants (auto-detect language):
+#     - ggml-tiny (~75MB, 99+ languages)
+#     - ggml-base (~142MB, 99+ languages)
+#     - ggml-small (~466MB, 99+ languages)
+#     - ggml-medium (~1.5GB, 99+ languages)
+#     - ggml-large-v2 (~2.9GB, 99+ languages)
+#     - ggml-large-v3 (~2.9GB, 99+ languages)
+#     - ggml-large-v3-turbo (~1.6GB, 99+ languages, faster)
 #
-# Available ONNX models (onnx backend, requires --features onnx):
+# Available ONNX models (requires --features onnx build):
 #   - parakeet-ctc-0.6b (multilingual, 100+ languages, 15-25x RT, INT8 quantized)
+#
+# Backend auto-detection:
+#   - Models containing "parakeet" or "onnx" use ONNX Runtime backend
+#   - All other models use whisper.cpp backend
+#
+# Language detection:
+#   - English-only models (.en suffix) only transcribe English
+#   - Multilingual models auto-detect language from audio
+#   - All models transcribe only (no translation to English)
 model_path = "ggml-base.en"
 
 # Compute device: "auto", "cpu", "gpu"
 # "auto" will select GPU if available, otherwise CPU
 device = "auto"
-
-# Language code (ISO 639-1): "en", "es", "fr", "de", etc.
-# Use "auto" for automatic detection (slower)
-# Parakeet supports: en, es, fr, de, it, pt, pl, nl, cs, ro, hu, sv, da, no, fi, bg, hr, sk, sl, et, lt, lv
-language = "en"
-
-# Task: "transcribe" or "translate" (translate to English)
-task = "transcribe"
 
 # Load model at daemon startup (reduces first-transcription latency)
 preload = true

@@ -821,11 +821,6 @@ impl ModelRuntime for OnnxRuntime {
         let processing_time = start_time.elapsed();
         let processing_ms = processing_time.as_millis() as u64;
 
-        let config = self
-            .config
-            .as_ref()
-            .ok_or_else(|| crate::Error::Model("Config not set".to_string()))?;
-
         info!(
             "✅ Transcription complete: \"{}\" ({} ms, {:.1}x real-time)",
             text,
@@ -833,9 +828,11 @@ impl ModelRuntime for OnnxRuntime {
             audio_duration * 1000.0 / processing_ms as f32
         );
 
+        // ONNX models (like Parakeet) support multilingual transcription
+        // Language is auto-detected by the model
         Ok(Transcription {
             text,
-            language: Some(config.language.clone()),
+            language: None,   // Auto-detected by model
             confidence: None, // CTC models don't easily provide confidence scores
             processing_time_ms: processing_ms,
             tokens: Some(token_ids.len()),

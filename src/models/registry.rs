@@ -116,6 +116,22 @@ impl ModelRegistry {
                 // GGML Models (whisper.cpp) - RECOMMENDED
                 // ============================================================
 
+                // Tiny Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-tiny".to_string(),
+                    name: "Whisper Tiny Multilingual (GGML)".to_string(),
+                    size: ModelSize::Tiny,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 75 * 1024 * 1024, // ~75 MB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-tiny.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 32.0,
+                    memory_mb: 200,
+                    description: "Fastest multilingual model. Supports 99 languages. Good for real-time dictation.".to_string(),
+                },
+
                 // Tiny English-only GGML
                 ModelMetadata {
                     id: "ggml-tiny.en".to_string(),
@@ -129,7 +145,23 @@ impl ModelRegistry {
                     file_sha256: HashMap::new(),
                     speed_factor: 32.0,
                     memory_mb: 200,
-                    description: "Fastest model using whisper.cpp. English only. Recommended for real-time dictation.".to_string(),
+                    description: "Fastest English-only model. Optimized for English transcription.".to_string(),
+                },
+
+                // Base Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-base".to_string(),
+                    name: "Whisper Base Multilingual (GGML)".to_string(),
+                    size: ModelSize::Base,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 142 * 1024 * 1024, // ~142 MB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-base.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 16.0,
+                    memory_mb: 300,
+                    description: "Best balance of speed and accuracy for multiple languages. Supports 99 languages.".to_string(),
                 },
 
                 // Base English-only GGML
@@ -139,13 +171,29 @@ impl ModelRegistry {
                     size: ModelSize::Base,
                     variant: ModelVariant::EnglishOnly,
                     format: ModelFormat::GGML,
-                    size_bytes: 140 * 1024 * 1024, // ~140 MB
+                    size_bytes: 142 * 1024 * 1024, // ~142 MB
                     hf_repo: "ggerganov/whisper.cpp".to_string(),
                     files: vec!["ggml-base.en.bin".to_string()],
                     file_sha256: HashMap::new(),
                     speed_factor: 16.0,
                     memory_mb: 300,
-                    description: "Best balance of speed and accuracy. Recommended for most users.".to_string(),
+                    description: "Best balance of speed and accuracy. Recommended for English users.".to_string(),
+                },
+
+                // Small Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-small".to_string(),
+                    name: "Whisper Small Multilingual (GGML)".to_string(),
+                    size: ModelSize::Small,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 466 * 1024 * 1024, // ~466 MB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-small.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 8.0,
+                    memory_mb: 600,
+                    description: "Higher accuracy for multiple languages. Still fast enough for real-time use.".to_string(),
                 },
 
                 // Small English-only GGML
@@ -155,13 +203,93 @@ impl ModelRegistry {
                     size: ModelSize::Small,
                     variant: ModelVariant::EnglishOnly,
                     format: ModelFormat::GGML,
-                    size_bytes: 470 * 1024 * 1024, // ~470 MB
+                    size_bytes: 466 * 1024 * 1024, // ~466 MB
                     hf_repo: "ggerganov/whisper.cpp".to_string(),
                     files: vec!["ggml-small.en.bin".to_string()],
                     file_sha256: HashMap::new(),
                     speed_factor: 8.0,
                     memory_mb: 600,
-                    description: "Higher accuracy, still fast enough for real-time use.".to_string(),
+                    description: "Higher accuracy for English. Still fast enough for real-time use.".to_string(),
+                },
+
+                // Medium Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-medium".to_string(),
+                    name: "Whisper Medium Multilingual (GGML)".to_string(),
+                    size: ModelSize::Medium,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 1500 * 1024 * 1024, // ~1.5 GB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-medium.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 4.0,
+                    memory_mb: 1200,
+                    description: "High accuracy for multiple languages. Slower but more accurate.".to_string(),
+                },
+
+                // Medium English-only GGML
+                ModelMetadata {
+                    id: "ggml-medium.en".to_string(),
+                    name: "Whisper Medium English (GGML)".to_string(),
+                    size: ModelSize::Medium,
+                    variant: ModelVariant::EnglishOnly,
+                    format: ModelFormat::GGML,
+                    size_bytes: 1500 * 1024 * 1024, // ~1.5 GB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-medium.en.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 4.0,
+                    memory_mb: 1200,
+                    description: "High accuracy for English. Slower but more accurate.".to_string(),
+                },
+
+                // Large-v2 Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-large-v2".to_string(),
+                    name: "Whisper Large v2 Multilingual (GGML)".to_string(),
+                    size: ModelSize::Large,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 2900 * 1024 * 1024, // ~2.9 GB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-large-v2.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 2.0,
+                    memory_mb: 2500,
+                    description: "Best accuracy for multiple languages. Requires significant resources.".to_string(),
+                },
+
+                // Large-v3 Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-large-v3".to_string(),
+                    name: "Whisper Large v3 Multilingual (GGML)".to_string(),
+                    size: ModelSize::Large,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 2900 * 1024 * 1024, // ~2.9 GB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-large-v3.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 2.0,
+                    memory_mb: 2500,
+                    description: "Latest large model with improved accuracy. Best for demanding use cases.".to_string(),
+                },
+
+                // Large-v3 Turbo Multilingual GGML
+                ModelMetadata {
+                    id: "ggml-large-v3-turbo".to_string(),
+                    name: "Whisper Large v3 Turbo Multilingual (GGML)".to_string(),
+                    size: ModelSize::Large,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGML,
+                    size_bytes: 1500 * 1024 * 1024, // ~1.5 GB
+                    hf_repo: "ggerganov/whisper.cpp".to_string(),
+                    files: vec!["ggml-large-v3-turbo.bin".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 3.5,
+                    memory_mb: 1500,
+                    description: "Faster variant of large-v3 with comparable accuracy. Best large model for real-time use.".to_string(),
                 },
 
                 // ============================================================

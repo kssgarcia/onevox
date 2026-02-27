@@ -236,29 +236,6 @@ export function createConfigPanel(
 
   modelContent.add(modelField.root)
 
-  const modelBackendIdx = ["whisper_cpp", "onnx"].indexOf(config.model.backend)
-  const modelBackendField = createSelectField(renderer, {
-    id: "model-backend-select",
-    label: "Backend:",
-    options: [
-      { name: "whisper_cpp", description: "whisper.cpp - OpenAI Whisper models (default)" },
-      { name: "onnx", description: "ONNX Runtime - Parakeet & other ONNX models (15-25x RT)" },
-    ],
-    selectedIndex: modelBackendIdx >= 0 ? modelBackendIdx : 0,
-    theme,
-    onChange: (index) => {
-      const backends = ["whisper_cpp", "onnx"]
-      config.model.backend = backends[index]
-      markDirty()
-      
-      // Show helpful message for ONNX
-      if (backends[index] === "onnx") {
-        callbacks.onStatusMessage("ℹ ONNX requires --features onnx build flag")
-        setTimeout(() => callbacks.onStatusMessage(""), 3000)
-      }
-    },
-  })
-
   const modelDeviceIdx = ["auto", "cpu", "gpu"].indexOf(config.model.device)
   const modelDeviceField = createSelectField(renderer, {
     id: "model-device-select",
@@ -276,38 +253,6 @@ export function createConfigPanel(
     },
   })
 
-  const modelLanguageIdx = ["en", "auto"].indexOf(config.model.language)
-  const modelLanguageField = createSelectField(renderer, {
-    id: "model-language-select",
-    label: "Language:",
-    options: [
-      { name: "en", description: "English" },
-      { name: "auto", description: "Auto-detect language" },
-    ],
-    selectedIndex: modelLanguageIdx >= 0 ? modelLanguageIdx : 0,
-    theme,
-    onChange: (index) => {
-      config.model.language = ["en", "auto"][index]
-      markDirty()
-    },
-  })
-
-  const modelTaskIdx = ["transcribe", "translate"].indexOf(config.model.task)
-  const modelTaskField = createSelectField(renderer, {
-    id: "model-task-select",
-    label: "Task:",
-    options: [
-      { name: "transcribe", description: "Speech to source language text" },
-      { name: "translate", description: "Speech translated to English" },
-    ],
-    selectedIndex: modelTaskIdx >= 0 ? modelTaskIdx : 0,
-    theme,
-    onChange: (index) => {
-      config.model.task = ["transcribe", "translate"][index]
-      markDirty()
-    },
-  })
-
   const modelPreload = createToggle(renderer, {
     id: "model-preload",
     label: "Preload model at startup",
@@ -316,10 +261,7 @@ export function createConfigPanel(
     onChange: (v) => { config.model.preload = v; markDirty() },
   })
 
-  modelContent.add(modelBackendField.root)
   modelContent.add(modelDeviceField.root)
-  modelContent.add(modelLanguageField.root)
-  modelContent.add(modelTaskField.root)
   modelContent.add(modelPreload.root)
 
   // ── 3. Key Bindings ────────────────────────────────────────────────
@@ -410,8 +352,8 @@ export function createConfigPanel(
     deviceFieldRef = deviceField
 
     deviceContent.add(deviceField.root)
-    // Register in keyboard focus navigation (inserted before srStepper at index 10)
-    focusables.splice(10, 0, { type: "selectfield", instance: deviceField, scrollHint: 22 })
+    // Register in keyboard focus navigation (inserted after modeField, before srStepper)
+    focusables.splice(7, 0, { type: "selectfield", instance: deviceField, scrollHint: 18 })
     bindMouseFocusHandlers()
   })
 
@@ -639,34 +581,31 @@ export function createConfigPanel(
   // Populated after all widget declarations; deviceSelect spliced in async
   // scrollHints are approximate terminal-row offsets for each widget
   let focusables: FocusItem[] = [
-    { type: "toggle",     instance: daemonAutoStart,      scrollHint: 0 },
-    { type: "selectfield", instance: daemonLogLevelField,  scrollHint: 2 },
-    { type: "selectfield", instance: modelField,           scrollHint: 6 },
-    { type: "selectfield", instance: modelBackendField,    scrollHint: 8 },
-    { type: "selectfield", instance: modelDeviceField,     scrollHint: 9 },
-    { type: "selectfield", instance: modelLanguageField,   scrollHint: 10 },
-    { type: "selectfield", instance: modelTaskField,       scrollHint: 11 },
-    { type: "toggle",     instance: modelPreload,          scrollHint: 12 },
-    { type: "keycapture", instance: triggerCapture,        scrollHint: 16 },
-    { type: "selectfield", instance: modeField,            scrollHint: 17 },
-    // index 10 reserved for deviceSelect (inserted asynchronously → scrollHint 22)
-    { type: "stepper",    instance: srStepper,             scrollHint: 26 },
-    { type: "stepper",    instance: chunkStepper,          scrollHint: 27 },
-    { type: "toggle",     instance: vadEnabled,            scrollHint: 32 },
-    { type: "selectfield", instance: vadBackendField,      scrollHint: 33 },
-    { type: "stepper",    instance: vadThresholdStepper,   scrollHint: 34 },
-    { type: "toggle",     instance: vadAdaptive,           scrollHint: 35 },
-    { type: "stepper",    instance: vadPreRollStepper,     scrollHint: 36 },
-    { type: "stepper",    instance: vadPostRollStepper,    scrollHint: 37 },
-    { type: "stepper",    instance: vadMinSpeechStepper,   scrollHint: 38 },
-    { type: "stepper",    instance: vadMinSilenceStepper,  scrollHint: 39 },
-    { type: "toggle",     instance: ppPunctuation,         scrollHint: 44 },
-    { type: "toggle",     instance: ppCapitalize,          scrollHint: 45 },
-    { type: "toggle",     instance: ppFiller,              scrollHint: 46 },
-    { type: "selectfield", instance: injMethodField,       scrollHint: 51 },
-    { type: "stepper",    instance: injDelayStepper,       scrollHint: 52 },
-    { type: "stepper",    instance: injFocusSettleStepper, scrollHint: 53 },
-    { type: "toggle",     instance: uiOverlayToggle,       scrollHint: 58 },
+    { type: "toggle",      instance: daemonAutoStart,         scrollHint: 0 },
+    { type: "selectfield", instance: daemonLogLevelField,     scrollHint: 2 },
+    { type: "selectfield", instance: modelField,              scrollHint: 6 },
+    { type: "selectfield", instance: modelDeviceField,        scrollHint: 7 },
+    { type: "toggle",      instance: modelPreload,            scrollHint: 8 },
+    { type: "keycapture",  instance: triggerCapture,          scrollHint: 12 },
+    { type: "selectfield", instance: modeField,               scrollHint: 13 },
+    // deviceSelect inserted here at index 7 asynchronously → scrollHint 18
+    { type: "stepper",     instance: srStepper,               scrollHint: 22 },
+    { type: "stepper",     instance: chunkStepper,            scrollHint: 23 },
+    { type: "toggle",      instance: vadEnabled,              scrollHint: 28 },
+    { type: "selectfield", instance: vadBackendField,         scrollHint: 29 },
+    { type: "stepper",     instance: vadThresholdStepper,     scrollHint: 30 },
+    { type: "toggle",      instance: vadAdaptive,             scrollHint: 31 },
+    { type: "stepper",     instance: vadPreRollStepper,       scrollHint: 32 },
+    { type: "stepper",     instance: vadPostRollStepper,      scrollHint: 33 },
+    { type: "stepper",     instance: vadMinSpeechStepper,     scrollHint: 34 },
+    { type: "stepper",     instance: vadMinSilenceStepper,    scrollHint: 35 },
+    { type: "toggle",      instance: ppPunctuation,           scrollHint: 40 },
+    { type: "toggle",      instance: ppCapitalize,            scrollHint: 41 },
+    { type: "toggle",      instance: ppFiller,                scrollHint: 42 },
+    { type: "selectfield", instance: injMethodField,          scrollHint: 47 },
+    { type: "stepper",     instance: injDelayStepper,         scrollHint: 48 },
+    { type: "stepper",     instance: injFocusSettleStepper,   scrollHint: 49 },
+    { type: "toggle",      instance: uiOverlayToggle,         scrollHint: 54 },
   ]
 
   let focusedIdx = -1
@@ -837,10 +776,7 @@ export function createConfigPanel(
     renderer.removeInputHandler(configInputHandler)
     daemonLogLevelField.destroy()
     modelField.destroy()
-    modelBackendField.destroy()
     modelDeviceField.destroy()
-    modelLanguageField.destroy()
-    modelTaskField.destroy()
     modeField.destroy()
     vadBackendField.destroy()
     injMethodField.destroy()

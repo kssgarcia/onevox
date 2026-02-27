@@ -289,9 +289,9 @@ impl IpcServer {
                 Response::List(vec![])
             }
 
-            Command::LoadModel { backend, path } => {
-                info!("Load model command: {} at {}", backend, path);
-                // TODO: Implement model loading
+            Command::LoadModel { path } => {
+                info!("Load model command: {}", path);
+                // TODO: Implement model loading (backend auto-detected from path)
                 Response::Ok(format!("Model loaded (not yet implemented): {}", path))
             }
 

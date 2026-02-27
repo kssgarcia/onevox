@@ -59,11 +59,9 @@ fn main() -> Result<()> {
 
     let config = ModelConfig {
         model_path: "ggml-base.en".to_string(), // Model ID for whisper.cpp
-        language: "en".to_string(),
         use_gpu: false,
         n_threads: 4,
         beam_size: 1,
-        translate: false,
     };
 
     model.load(config)?;

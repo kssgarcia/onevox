@@ -31,31 +31,61 @@ Press a hotkey, speak, and your words appear instantly in any application. All p
 
 ## Installation
 
-**macOS**
+### Quick Install
+
+**macOS & Linux**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
 ```
 
-**Linux**
+**Linux Post-Install**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/install_linux.sh | bash
-
-# Add user to required groups
+# Add user to required groups (run once, then log out and back in)
 sudo usermod -aG audio,input $USER
-# Log out and back in
 
 # Start service
-systemctl --user start onevox
-systemctl --user enable onevox
+systemctl --user enable --now onevox
 ```
 
 **Windows**
 ```powershell
-# Download from releases
+# Download installer from releases
 # https://github.com/kssgarcia/onevox/releases
 ```
 
-See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions and troubleshooting.
+See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions, troubleshooting, and service management.
+
+### Build Variants
+
+OneVox supports multiple model backends with automatic detection:
+
+**Default (Recommended): whisper.cpp**
+- Fast, stable, production-ready
+- Native C++ integration
+- Multilingual support (99+ languages) or English-only models
+- GPU acceleration: Metal (macOS), CUDA, Vulkan
+- ~100MB memory usage
+- 50-200ms latency
+
+```bash
+# Build default
+cargo build --release
+```
+
+**Experimental: ONNX Runtime**
+- Alternative models (Parakeet CTC, etc.)
+- INT8 quantization for faster inference
+- ~250MB memory usage
+- Requires `--features onnx` flag
+
+```bash
+# Build with ONNX support
+cargo build --release --features onnx
+```
+
+Backend selection is automatic based on model choice (see Configuration below).
+
+For pre-built binaries with ONNX support, see the [Releases](https://github.com/kssgarcia/onevox/releases) page.
 
 ## Quick Start
 
@@ -99,7 +129,7 @@ onevox config show  # View current configuration
 **Key settings:**
 - Hotkey combination and mode (push-to-talk vs toggle)
 - Audio device and quality
-- Model selection (tiny, base, small, medium, large)
+- Model selection (auto-detects backend and language)
 - Voice Activity Detection (VAD)
 - Text post-processing
 - GPU acceleration
@@ -113,15 +143,47 @@ See [QUICKREF.md](QUICKREF.md#configuration) for all configuration options and e
 
 ## Architecture
 
-OneVox uses native whisper.cpp bindings for maximum performance and reliability:
+OneVox uses a model-centric architecture where the backend is automatically selected based on your model choice:
 
-- Native Rust + whisper.cpp (no Python, no ONNX Runtime)
+### Whisper.cpp Backend (Default)
+- Automatic selection for GGML models (ggml-tiny, ggml-base, ggml-small, etc.)
+- Native C++ bindings for maximum performance
 - Single self-contained binary
-- GPU acceleration support (Metal, CUDA, Vulkan)
+- GPU acceleration (Metal, CUDA, Vulkan)
 - 50-200ms transcription latency
-- Cross-platform stability
+- ~100MB memory usage
+- Supports both English-only (.en models) and multilingual models (99+ languages)
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
+### ONNX Runtime Backend (Experimental)
+- Automatic selection for ONNX models (parakeet, *.onnx files)
+- Alternative models with INT8 quantization
+- CPU-optimized inference
+- ~250MB memory usage
+- Requires `--features onnx` build flag
+
+**Model Selection:**
+```toml
+# config.toml
+[model]
+# Backend is auto-detected from model_path
+model_path = "ggml-base.en"      # Uses whisper.cpp, English-only
+# model_path = "ggml-base"       # Uses whisper.cpp, multilingual (auto-detect language)
+# model_path = "parakeet-ctc-0.6b"  # Uses ONNX Runtime (requires --features onnx)
+device = "auto"                   # or "cpu", "gpu"
+preload = true
+```
+
+**Available Models:**
+- `ggml-tiny.en`, `ggml-tiny` - Fastest, ~75MB
+- `ggml-base.en`, `ggml-base` - Recommended, ~142MB
+- `ggml-small.en`, `ggml-small` - Better accuracy, ~466MB
+- `ggml-medium.en`, `ggml-medium` - High accuracy, ~1.5GB
+- `ggml-large-v2`, `ggml-large-v3`, `ggml-large-v3-turbo` - Best accuracy, ~1.6-2.9GB
+- `parakeet-ctc-0.6b` - ONNX, multilingual, 100+ languages
+
+Models with `.en` suffix are English-only. Multilingual models auto-detect the spoken language.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical information.
 
 ## Development
 

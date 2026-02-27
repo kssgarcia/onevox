@@ -55,8 +55,8 @@ pub enum Command {
     /// List available models
     ListModels,
 
-    /// Load a model
-    LoadModel { backend: String, path: String },
+    /// Load a model (backend auto-detected from path)
+    LoadModel { path: String },
 
     /// Unload current model
     UnloadModel,

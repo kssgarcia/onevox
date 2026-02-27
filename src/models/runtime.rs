@@ -43,27 +43,21 @@ impl Transcription {
 pub struct ModelConfig {
     /// Path to model file
     pub model_path: String,
-    /// Language (e.g., "en", "auto" for auto-detect)
-    pub language: String,
     /// Use GPU acceleration if available
     pub use_gpu: bool,
     /// Number of threads for CPU inference
     pub n_threads: u32,
     /// Beam size for decoding (higher = better quality, slower)
     pub beam_size: u32,
-    /// Enable translate mode (translate to English)
-    pub translate: bool,
 }
 
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             model_path: "models/ggml-base.en.bin".to_string(),
-            language: "en".to_string(),
             use_gpu: true,
             n_threads: default_thread_count(),
             beam_size: 5,
-            translate: false,
         }
     }
 }

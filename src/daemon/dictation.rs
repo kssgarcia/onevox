@@ -84,37 +84,40 @@ impl DictationEngine {
         // Create audio engine
         let audio_engine = AudioEngine::new();
 
-        // Create model based on backend configuration
-        let backend = config.model.backend.as_str();
-        let mut model: Box<dyn ModelRuntime> = match backend {
-            "whisper_cpp" => {
-                info!("Using whisper.cpp backend");
-                Box::new(WhisperCpp::new()?)
-            }
+        // Auto-detect backend from model path
+        let model_path = &config.model.model_path;
+        let is_onnx_model = model_path.contains("parakeet")
+            || model_path.ends_with(".onnx")
+            || model_path.contains("onnx");
+
+        let mut model: Box<dyn ModelRuntime> = if is_onnx_model {
             #[cfg(feature = "onnx")]
-            "onnx_runtime" | "onnx" => {
+            {
+                info!("Auto-detected ONNX model from path: {}", model_path);
                 info!("Using ONNX Runtime backend");
                 Box::new(OnnxRuntime::new()?)
             }
             #[cfg(not(feature = "onnx"))]
-            "onnx_runtime" | "onnx" => {
+            {
                 error!(
-                    "ONNX backend requested but feature not enabled. Rebuild with --features onnx"
+                    "ONNX model detected ('{}') but feature not enabled. Rebuild with --features onnx",
+                    model_path
                 );
-                return Err(crate::Error::Model(
-                    "ONNX feature not enabled. Rebuild with --features onnx".to_string(),
-                )
+                return Err(crate::Error::Model(format!(
+                    "ONNX model requires --features onnx build. Model: {}",
+                    model_path
+                ))
                 .into());
             }
-            unknown => {
-                warn!("Unknown backend '{}', falling back to whisper.cpp", unknown);
-                Box::new(WhisperCpp::new()?)
-            }
+        } else {
+            // Default to whisper.cpp for GGML models
+            info!("Auto-detected GGML model from path: {}", model_path);
+            info!("Using whisper.cpp backend");
+            Box::new(WhisperCpp::new()?)
         };
 
         let model_config = ModelConfig {
             model_path: config.model.model_path.clone(),
-            language: config.model.language.clone(),
             use_gpu: config.model.device == "gpu" || config.model.device == "auto",
             ..Default::default()
         };

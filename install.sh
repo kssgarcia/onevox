@@ -6,16 +6,17 @@ SYSTEM_INSTALL=0
 REPO="${ONEVOX_REPO:-kssgarcia/onevox}"
 VERSION="${ONEVOX_VERSION:-latest}"
 ASSET="${ONEVOX_RELEASE_ASSET:-}"
+OS="$(uname -s)"
 
 usage() {
   cat <<EOF
-Onevox curl installer (macOS)
+Onevox Universal Installer
 
 Usage:
-  sh install.sh [--system] [--repo owner/name] [--version latest|vX.Y.Z] [--asset file.tar.gz]
+  sh install.sh [OPTIONS]
 
 Options:
-  --system         Install app to /Applications (uses sudo when needed)
+  --system         Install to system location (macOS: /Applications, requires sudo)
   --repo           GitHub repo slug (default: $REPO)
   --version        Release tag or "latest" (default: $VERSION)
   --asset          Override release asset filename
@@ -23,6 +24,15 @@ Options:
 
 Environment overrides:
   ONEVOX_REPO, ONEVOX_VERSION, ONEVOX_RELEASE_ASSET
+
+Supported platforms:
+  - macOS (Darwin)
+  - Linux (Ubuntu, Debian, Fedora, Arch)
+
+Examples:
+  curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
+  sh install.sh --system         # macOS: Install to /Applications
+  sh install.sh --version v0.1.1 # Install specific version
 EOF
 }
 
@@ -56,19 +66,84 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [ "$(uname -s)" != "Darwin" ]; then
-  echo "This installer currently supports macOS only." >&2
-  exit 1
-fi
+# Detect platform and delegate to appropriate installer
+case "$OS" in
+  Darwin)
+    # If run from a local checkout, use build-from-source installer
+    if [ -f "./Cargo.toml" ] && [ -f "./build.sh" ]; then
+      echo "Detected local checkout; building from source..."
+      
+      # Check for Rust
+      if ! command -v cargo >/dev/null 2>&1; then
+        echo "Error: Rust toolchain not found" >&2
+        echo "Install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh" >&2
+        exit 1
+      fi
+      
+      # Build and package
+      echo "Building Onevox..."
+      ./build.sh release
+      
+      echo "Packaging app bundle..."
+      ./scripts/package_macos_app.sh
+      
+      # Install the built app
+      APP_INSTALL_DIR="${HOME}/Applications"
+      if [ "$SYSTEM_INSTALL" -eq 1 ]; then
+        APP_INSTALL_DIR="/Applications"
+      fi
+      
+      APP_PATH="$APP_INSTALL_DIR/Onevox.app"
+      echo "Installing to $APP_PATH..."
+      
+      if [ -w "$APP_INSTALL_DIR" ]; then
+        rm -rf "$APP_PATH"
+        cp -R "./dist/Onevox.app" "$APP_PATH"
+      else
+        sudo rm -rf "$APP_PATH"
+        sudo cp -R "./dist/Onevox.app" "$APP_PATH"
+      fi
+      
+      echo "✅ Local build installed successfully"
+      echo "App: $APP_PATH"
+      echo ""
+      echo "Next: Grant permissions and start daemon"
+      echo "See: https://github.com/$REPO#installation"
+      exit 0
+    fi
+    
+    # Otherwise, download from GitHub releases
+    ;;
+    
+  Linux)
+    # Delegate to Linux installer script
+    if [ -f "./scripts/install_linux.sh" ]; then
+      # Local checkout
+      exec sh ./scripts/install_linux.sh
+    else
+      # Download and execute Linux installer
+      echo "Downloading Linux installer..."
+      curl -fsSL "https://raw.githubusercontent.com/$REPO/main/scripts/install_linux.sh" | bash
+      exit $?
+    fi
+    ;;
+    
+  *)
+    echo "Error: Unsupported operating system: $OS" >&2
+    echo "" >&2
+    echo "Supported platforms:" >&2
+    echo "  - macOS (Darwin)" >&2
+    echo "  - Linux" >&2
+    echo "" >&2
+    echo "For Windows, download from:" >&2
+    echo "  https://github.com/$REPO/releases" >&2
+    exit 1
+    ;;
+esac
 
-# If run from a local checkout, delegate to the repo installer.
-if [ -f "./scripts/install_macos.sh" ] && [ -f "./Cargo.toml" ]; then
-  echo "Detected local checkout; delegating to ./scripts/install_macos.sh"
-  if [ "$SYSTEM_INSTALL" -eq 1 ]; then
-    exec ./scripts/install_macos.sh --system
-  fi
-  exec ./scripts/install_macos.sh
-fi
+# ============================================================================
+# macOS installation from GitHub releases
+# ============================================================================
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "curl is required but not installed." >&2
