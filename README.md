@@ -68,7 +68,7 @@ OneVox supports multiple model backends with automatic detection:
 - 50-200ms latency
 
 ```bash
-# Build default
+# Build default (whisper.cpp only on x86_64 macOS, includes ONNX on ARM64 macOS/Linux)
 cargo build --release
 ```
 
@@ -76,16 +76,20 @@ cargo build --release
 - Alternative models (Parakeet CTC, etc.)
 - INT8 quantization for faster inference
 - ~250MB memory usage
-- Included by default (no special flags needed)
+- Included by default on ARM64 macOS, Linux, Windows
+- **Note**: Not available on x86_64 (Intel) macOS due to ONNX Runtime limitations
 
 ```bash
-# Build (includes ONNX support by default)
+# Build with ONNX (ARM64 macOS, Linux, Windows)
 cargo build --release
+
+# Build without ONNX (x86_64 macOS or if you prefer whisper.cpp only)
+cargo build --release --no-default-features --features whisper-cpp,overlay-indicator
 ```
 
 Backend selection is automatic based on model choice (see Configuration below).
 
-For pre-built binaries with ONNX support, see the [Releases](https://github.com/kssgarcia/onevox/releases) page.
+For pre-built binaries, see the [Releases](https://github.com/kssgarcia/onevox/releases) page.
 
 ## Quick Start
 

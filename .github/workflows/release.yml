@@ -38,10 +38,18 @@ jobs:
 
       - name: Build release binary
         run: |
+          # ONNX Runtime doesn't provide prebuilt binaries for x86_64 macOS
+          # Build without ONNX feature for x86_64, with default features (includes ONNX) for ARM64
+          if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+            FEATURES="--no-default-features --features whisper-cpp,overlay-indicator"
+          else
+            FEATURES=""
+          fi
+          
           CC=clang CXX=clang++ \
           SDKROOT=$(xcrun --show-sdk-path) \
           MACOSX_DEPLOYMENT_TARGET=13.0 \
-          cargo build --release --locked --target ${{ matrix.target }}
+          cargo build --release --locked --target ${{ matrix.target }} $FEATURES
 
       - name: Create app bundle
         run: |

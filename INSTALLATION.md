@@ -48,8 +48,9 @@ OneVox is available in two build configurations:
 - **Memory**: ~250MB
 - **Latency**: Varies by model
 - **Models**: Parakeet, custom ONNX models
+- **Platform Support**: ARM64 macOS, Linux (x86_64 macOS not supported by ONNX Runtime)
 
-**Installation**: Build from source (ONNX support included by default, see [Build from Source](#build-from-source) below)
+**Installation**: Build from source with ONNX feature (see [Build from Source](#build-from-source) below)
 
 ---
 
@@ -357,47 +358,40 @@ sudo pacman -S base-devel cmake alsa-lib pulseaudio
 **Windows:**
 - Visual Studio Build Tools with C++ support
 
-### Build Default (whisper.cpp)
+### Build Default (whisper.cpp + ONNX)
 
 ```bash
 git clone https://github.com/kssgarcia/onevox.git
 cd onevox
 
-# macOS (first build requires environment variables)
+# macOS ARM64 (M1/M2/M3) - includes ONNX by default
 CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
   cargo build --release
 
-# Linux/Windows
+# macOS x86_64 (Intel) - ONNX not available, use whisper.cpp only
+CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
+  cargo build --release --no-default-features --features whisper-cpp,overlay-indicator
+
+# Linux - includes ONNX by default
+cargo build --release
+
+# Windows - includes ONNX by default
 cargo build --release
 
 # Install locally
 ./target/release/onevox --version
 ```
 
-### Build with ONNX Support
+**Note**: ONNX Runtime does not provide prebuilt binaries for x86_64 (Intel) macOS. Use whisper.cpp models on Intel Macs.
 
-To build with ONNX Runtime support for multilingual models:
+### Build with Only whisper.cpp
+
+If you want to disable ONNX and use only whisper.cpp:
 
 ```bash
-# Clone repository
-git clone https://github.com/kssgarcia/onevox.git
-cd onevox
-
-# macOS
-CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=13.0 \
-  cargo build --release --features onnx
-
-# Linux/Windows  
-cargo build --release --features onnx
-
-# Binary will be at: ./target/release/onevox
+# All platforms
+cargo build --release --no-default-features --features whisper-cpp,overlay-indicator
 ```
-
-**Note**: Building with ONNX will:
-- Download ONNX Runtime binaries automatically (~150MB)
-- Increase build time (first build takes longer)
-- Increase binary size (~30MB larger)
-- Enable ONNX model support (Parakeet, etc.)
 
 ### Configure Model
 
