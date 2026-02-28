@@ -5,8 +5,11 @@
 use super::protocol::{Command, Message, Payload, Response};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+#[cfg(unix)]
 use tokio::net::UnixStream;
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::ClientOptions;
 
 /// IPC client
 pub struct IpcClient {
@@ -31,20 +34,44 @@ impl IpcClient {
 
     /// Get default socket path
     pub fn default_socket_path() -> PathBuf {
-        // Use platform-appropriate runtime directory
-        crate::platform::paths::runtime_dir()
-            .or_else(|_| crate::platform::paths::cache_dir())
-            .unwrap_or_else(|_| PathBuf::from("/tmp").join("onevox"))
-            .join("onevox.sock")
+        crate::platform::paths::ipc_socket_path().unwrap_or_else(|_| {
+            crate::platform::paths::runtime_dir()
+                .or_else(|_| crate::platform::paths::cache_dir())
+                .unwrap_or_else(|_| PathBuf::from("/tmp").join("onevox"))
+                .join("onevox.sock")
+        })
     }
 
     /// Send a command and wait for response
     pub async fn send_command(&mut self, command: Command) -> Result<Response> {
-        // Connect to socket
-        let mut stream = UnixStream::connect(&self.socket_path)
-            .await
-            .context("Failed to connect to daemon. Is it running?")?;
+        #[cfg(unix)]
+        {
+            let stream = UnixStream::connect(&self.socket_path)
+                .await
+                .context("Failed to connect to daemon. Is it running?")?;
+            return self.send_with_stream(stream, command).await;
+        }
 
+        #[cfg(windows)]
+        {
+            let pipe_name = self
+                .socket_path
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("Invalid Windows pipe path"))?;
+            let stream = ClientOptions::new()
+                .open(pipe_name)
+                .context("Failed to connect to daemon. Is it running?")?;
+            return self.send_with_stream(stream, command).await;
+        }
+
+        #[allow(unreachable_code)]
+        Err(anyhow::anyhow!("Unsupported platform for IPC"))
+    }
+
+    async fn send_with_stream<S>(&mut self, mut stream: S, command: Command) -> Result<Response>
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
         // Create message
         let id = self.next_id;
         self.next_id += 1;

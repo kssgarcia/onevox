@@ -196,23 +196,44 @@ impl HealthChecker {
     async fn check_ipc(&self) -> ComponentCheck {
         let start = Instant::now();
 
-        match crate::platform::ipc_socket_path() {
-            Ok(socket_path) => {
-                if socket_path.exists() {
-                    ComponentCheck::healthy("ipc", start.elapsed().as_millis() as u64)
-                } else {
-                    ComponentCheck::unhealthy(
-                        "ipc",
-                        "IPC socket not found",
-                        start.elapsed().as_millis() as u64,
-                    )
+        #[cfg(windows)]
+        {
+            let mut client = crate::ipc::IpcClient::default();
+            return match client.ping().await {
+                Ok(true) => ComponentCheck::healthy("ipc", start.elapsed().as_millis() as u64),
+                Ok(false) => ComponentCheck::unhealthy(
+                    "ipc",
+                    "IPC endpoint is not responding",
+                    start.elapsed().as_millis() as u64,
+                ),
+                Err(e) => ComponentCheck::unhealthy(
+                    "ipc",
+                    format!("Failed to connect to IPC endpoint: {}", e),
+                    start.elapsed().as_millis() as u64,
+                ),
+            };
+        }
+
+        #[cfg(not(windows))]
+        {
+            match crate::platform::ipc_socket_path() {
+                Ok(socket_path) => {
+                    if socket_path.exists() {
+                        ComponentCheck::healthy("ipc", start.elapsed().as_millis() as u64)
+                    } else {
+                        ComponentCheck::unhealthy(
+                            "ipc",
+                            "IPC socket not found",
+                            start.elapsed().as_millis() as u64,
+                        )
+                    }
                 }
+                Err(e) => ComponentCheck::unhealthy(
+                    "ipc",
+                    format!("Failed to get IPC socket path: {}", e),
+                    start.elapsed().as_millis() as u64,
+                ),
             }
-            Err(e) => ComponentCheck::unhealthy(
-                "ipc",
-                format!("Failed to get IPC socket path: {}", e),
-                start.elapsed().as_millis() as u64,
-            ),
         }
     }
 

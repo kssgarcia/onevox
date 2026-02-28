@@ -242,29 +242,23 @@ Download installer from [Releases](https://github.com/kssgarcia/onevox/releases)
 - Models: `%LOCALAPPDATA%\onevox\onevox\cache\models\`
 - Logs: `%APPDATA%\onevox\onevox\data\logs\onevox.log`
 
-**Service Management:**
+**Daemon Management (Windows 11):**
 ```powershell
-# Start service
-Start-Service Onevox
+# Start daemon (foreground)
+onevox daemon --foreground
 
-# Stop service
-Stop-Service Onevox
+# Start daemon in background shell/session
+onevox daemon
 
-# Restart service
-Restart-Service Onevox
+# Stop daemon
+onevox stop
 
-# Check status
-Get-Service Onevox
-
-# Set to start automatically
-Set-Service -Name Onevox -StartupType Automatic
-
-# Set to manual start
-Set-Service -Name Onevox -StartupType Manual
-
-# View service details
-Get-Service Onevox | Format-List *
+# Check daemon status
+onevox status
 ```
+
+**Auto-start on login (recommended):** Use Windows Task Scheduler to run
+`onevox daemon` at user logon.
 
 **View Logs:**
 ```powershell

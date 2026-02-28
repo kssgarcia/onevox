@@ -26,8 +26,8 @@ pub struct DictationEngine {
     /// Configuration
     config: Config,
 
-    /// Hotkey manager
-    hotkey_manager: HotkeyManager,
+    /// Hotkey manager (optional when global hotkeys are unavailable, e.g. some Wayland setups)
+    hotkey_manager: Option<HotkeyManager>,
 
     /// Text injector
     text_injector: TextInjector,
@@ -71,8 +71,18 @@ impl DictationEngine {
     pub fn with_history(config: Config, history_manager: Arc<HistoryManager>) -> Result<Self> {
         info!("Initializing dictation engine");
 
-        // Create hotkey manager
-        let hotkey_manager = HotkeyManager::new()?;
+        // Create hotkey manager. If this fails (common on some Wayland setups),
+        // keep the engine available for manual IPC start/stop dictation commands.
+        let hotkey_manager = match HotkeyManager::new() {
+            Ok(manager) => Some(manager),
+            Err(e) => {
+                warn!(
+                    "Global hotkeys unavailable ({}). Manual IPC commands will still work.",
+                    e
+                );
+                None
+            }
+        };
 
         // Create text injector
         let injector_config = InjectorConfig {
@@ -146,13 +156,18 @@ impl DictationEngine {
         // List available audio devices for debugging
         self.list_audio_devices();
 
+        let hotkey_manager = self.hotkey_manager.as_mut().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Global hotkey backend unavailable on this system. Use 'onevox start-dictation' and 'onevox stop-dictation' (recommended for some Wayland environments)."
+            )
+        })?;
+
         // Register global hotkey
         let hotkey_str = self.config.hotkey.trigger.clone();
         let hotkey_config = PlatformHotkeyConfig::from_string(&hotkey_str)
             .context("Failed to parse hotkey configuration")?;
 
-        let event_rx = self
-            .hotkey_manager
+        let event_rx = hotkey_manager
             .register(hotkey_config)
             .context("Failed to register hotkey")?;
 
@@ -160,10 +175,10 @@ impl DictationEngine {
 
         // Take ownership of hotkey_manager to start the listener
         // (it consumes self and moves into the listener thread)
-        let hotkey_manager = std::mem::replace(
-            &mut self.hotkey_manager,
-            HotkeyManager::new().unwrap(), // Temporary placeholder
-        );
+        let hotkey_manager = self
+            .hotkey_manager
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Hotkey manager missing after registration"))?;
 
         hotkey_manager
             .start_listener()
@@ -572,7 +587,9 @@ impl DictationEngine {
         }
         self.indicator.hide();
 
-        if let Err(e) = self.hotkey_manager.unregister() {
+        if let Some(hotkey_manager) = self.hotkey_manager.as_mut()
+            && let Err(e) = hotkey_manager.unregister()
+        {
             error!("Failed to unregister hotkeys: {}", e);
         }
 

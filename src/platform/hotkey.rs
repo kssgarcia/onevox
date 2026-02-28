@@ -40,10 +40,10 @@ impl Default for HotkeyConfig {
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         let default_hotkey = "Ctrl+Shift+Space";
 
-        Self {
-            modifiers: vec!["Cmd".to_string(), "Shift".to_string()],
+        Self::from_string(default_hotkey).unwrap_or_else(|_| Self {
+            modifiers: vec!["Ctrl".to_string(), "Shift".to_string()],
             key: "Space".to_string(),
-        }
+        })
     }
 }
 

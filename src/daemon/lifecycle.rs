@@ -166,7 +166,12 @@ impl Lifecycle {
                                     error!("⚠️  This is usually a permission issue. Please grant:");
                                     error!("   1. Input Monitoring permission");
                                     error!("   2. Accessibility permission");
+                                    #[cfg(target_os = "macos")]
                                     error!("   Then restart: launchctl kickstart -k gui/$(id -u)/com.onevox.daemon");
+                                    #[cfg(target_os = "linux")]
+                                    error!("   Then restart: systemctl --user restart onevox");
+                                    #[cfg(target_os = "windows")]
+                                    error!("   Then restart: onevox stop && onevox daemon --foreground");
                                 }
                             }
 
@@ -305,10 +310,24 @@ impl Lifecycle {
 
 /// Get the PID file path
 pub fn pid_file_path() -> PathBuf {
-    IpcClient::default_socket_path()
-        .parent()
-        .map(|p| p.join("onevox.pid"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/onevox.pid"))
+    let base = crate::platform::paths::runtime_dir()
+        .or_else(|_| crate::platform::paths::cache_dir())
+        .unwrap_or_else(|_| {
+            #[cfg(unix)]
+            {
+                PathBuf::from("/tmp").join("onevox")
+            }
+            #[cfg(windows)]
+            {
+                std::env::temp_dir().join("onevox")
+            }
+            #[cfg(not(any(unix, windows)))]
+            {
+                PathBuf::from("/tmp").join("onevox")
+            }
+        });
+
+    base.join("onevox.pid")
 }
 
 /// Write PID file

@@ -98,6 +98,27 @@ fn find_tui_directory() -> Result<PathBuf> {
         }
     }
 
+    // Windows: Installed binary layout:
+    //          C:\Program Files\Onevox\onevox.exe
+    //          Bundled TUI path:
+    //          C:\Program Files\Onevox\tui
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(bin_dir) = resolved_exe.parent() {
+            let bundled_tui = bin_dir.join("tui");
+            if bundled_tui.exists() && bundled_tui.is_dir() {
+                return Ok(bundled_tui);
+            }
+        }
+
+        if let Ok(data_dir) = crate::platform::paths::data_dir() {
+            let user_tui = data_dir.join("tui");
+            if user_tui.exists() && user_tui.is_dir() {
+                return Ok(user_tui);
+            }
+        }
+    }
+
     // Try to find the project root by looking for Cargo.toml (development mode)
     let mut current = resolved_exe.clone();
     for _ in 0..10 {

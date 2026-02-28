@@ -3,8 +3,14 @@
 //! High-performance local speech recognition using whisper.cpp native bindings.
 //! This is the primary production backend for cross-platform stability.
 
+#[cfg(feature = "whisper-cpp")]
 use super::runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
+#[cfg(not(feature = "whisper-cpp"))]
+use super::runtime::{ModelConfig, ModelInfo, ModelRuntime, Transcription};
+
+#[cfg(feature = "whisper-cpp")]
 use std::path::PathBuf;
+#[cfg(feature = "whisper-cpp")]
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "whisper-cpp")]
@@ -253,8 +259,43 @@ pub struct WhisperCpp;
 impl WhisperCpp {
     pub fn new() -> crate::Result<Self> {
         Err(crate::Error::Model(
-            "whisper-cpp feature not enabled.".to_string(),
+            "whisper-cpp feature not enabled".to_string(),
         ))
+    }
+}
+
+#[cfg(not(feature = "whisper-cpp"))]
+impl ModelRuntime for WhisperCpp {
+    fn load(&mut self, _config: ModelConfig) -> crate::Result<()> {
+        Err(crate::Error::Model(
+            "whisper-cpp feature not enabled".to_string(),
+        ))
+    }
+
+    fn is_loaded(&self) -> bool {
+        false
+    }
+
+    fn transcribe(&mut self, _samples: &[f32], _sample_rate: u32) -> crate::Result<Transcription> {
+        Err(crate::Error::Model(
+            "whisper-cpp feature not enabled".to_string(),
+        ))
+    }
+
+    fn unload(&mut self) {}
+
+    fn name(&self) -> &str {
+        "whisper-cpp-disabled"
+    }
+
+    fn info(&self) -> ModelInfo {
+        ModelInfo {
+            name: "whisper-cpp".to_string(),
+            size_bytes: 0,
+            model_type: "disabled".to_string(),
+            backend: "whisper.cpp".to_string(),
+            gpu_enabled: false,
+        }
     }
 }
 

@@ -116,6 +116,14 @@ x11 = "2.21"
 x11-clipboard = "0.8"
 evdev = "0.12"
 
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+  "Win32_System_Pipes",
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Threading",
+] }
+
 # Optional dependencies (enabled by features)
 [dependencies.whisper-rs]
 version = "0.15"

@@ -1,9 +1,15 @@
 [target.aarch64-apple-darwin]
 linker = "/usr/bin/clang"
 
+[target.x86_64-apple-darwin]
+linker = "/usr/bin/clang"
+
+# Target-specific compiler settings (work for both Rust and build scripts like CMake)
+# Format: CC_<target> and CXX_<target> are recognized by both cargo and cc/cmake crates
 [env]
-CC = "/usr/bin/clang"
-CXX = "/usr/bin/clang++"
+CC_aarch64_apple_darwin = "/usr/bin/clang"
+CXX_aarch64_apple_darwin = "/usr/bin/clang++"
+CC_x86_64_apple_darwin = "/usr/bin/clang"
+CXX_x86_64_apple_darwin = "/usr/bin/clang++"
 # Disable BLAS in whisper.cpp to avoid symbol mismatch with macOS Accelerate framework
-# The Accelerate framework uses ILP64 symbol names which conflict with standard BLAS
 GGML_BLAS = "OFF"

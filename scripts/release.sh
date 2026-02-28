@@ -117,6 +117,11 @@ case "$PLATFORM" in
         cp target/release/onevox.exe "dist/${RELEASE_DIR}/"
         cp README.md "dist/${RELEASE_DIR}/"
         cp config.example.toml "dist/${RELEASE_DIR}/"
+        if [ -d "tui" ]; then
+            cp -r tui "dist/${RELEASE_DIR}/"
+            rm -rf "dist/${RELEASE_DIR}/tui/node_modules"
+            find "dist/${RELEASE_DIR}/tui" -name ".DS_Store" -delete 2>/dev/null || true
+        fi
         
         cd dist
         if command -v zip &> /dev/null; then

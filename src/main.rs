@@ -311,7 +311,7 @@ async fn main() -> Result<()> {
                 default_config.save_default()?;
 
                 println!("✅ Created default config at: {:?}", config_path);
-                println!("\n📝 Default hotkey: Cmd+Shift+0");
+                println!("\n📝 Default hotkey: {}", default_config.hotkey.trigger);
                 println!("Edit the file to customize settings.");
                 Ok(())
             }

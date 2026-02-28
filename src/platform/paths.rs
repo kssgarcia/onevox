@@ -5,7 +5,7 @@
 
 use crate::Result;
 use directories::ProjectDirs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Get ProjectDirs instance for onevox
 fn project_dirs() -> Result<ProjectDirs> {
@@ -196,7 +196,7 @@ pub fn ipc_socket_path() -> Result<PathBuf> {
 /// On Unix: Sets to 0o700 (owner read/write/execute only) for security
 /// On Windows: No-op (Windows uses ACLs)
 #[allow(unused_variables)]
-fn set_dir_permissions(dir: &PathBuf) -> Result<()> {
+fn set_dir_permissions(dir: &Path) -> Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

@@ -244,7 +244,7 @@ pub fn open_accessibility_settings() -> crate::Result<()> {
     info!("Opening Windows settings");
 
     Command::new("cmd")
-        .args(&["/C", "start", "ms-settings:privacy-microphone"])
+        .args(["/C", "start", "ms-settings:privacy-microphone"])
         .spawn()
         .map_err(|e| crate::Error::Platform(format!("Failed to open settings: {}", e)))?;
 

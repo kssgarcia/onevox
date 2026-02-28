@@ -156,7 +156,7 @@ export interface VoxConfig {
 export const DEFAULT_CONFIG: VoxConfig = {
   daemon: { auto_start: true, log_level: "info" },
   hotkey: {
-    trigger: "Cmd+Shift+0",
+    trigger: process.platform === "darwin" ? "Cmd+Shift+0" : "Ctrl+Shift+Space",
     mode: "push-to-talk",
   },
   audio: { device: "default", sample_rate: 16000, chunk_duration_ms: 200 },

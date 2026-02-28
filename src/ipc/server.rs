@@ -1,6 +1,6 @@
 //! IPC Server Implementation
 //!
-//! Unix socket server for handling daemon commands.
+//! Platform-specific IPC server for handling daemon commands.
 
 use super::protocol::{Command, Message, Payload, Response};
 use crate::daemon::state::DaemonState as DaemonStateManager;
@@ -9,14 +9,20 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
+#[cfg(unix)]
 use tokio::net::{UnixListener, UnixStream};
+#[cfg(windows)]
+use tokio::sync::Semaphore;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// IPC server
 pub struct IpcServer {
     socket_path: PathBuf,
+    #[cfg(unix)]
     listener: Option<UnixListener>,
     state: Arc<RwLock<DaemonStateManager>>,
     request_limiter: Arc<Mutex<HashMap<u32, Instant>>>,
@@ -28,6 +34,7 @@ impl IpcServer {
     pub fn new(socket_path: PathBuf, state: Arc<RwLock<DaemonStateManager>>) -> Self {
         Self {
             socket_path,
+            #[cfg(unix)]
             listener: None,
             state,
             request_limiter: Arc::new(Mutex::new(HashMap::new())),
@@ -37,34 +44,55 @@ impl IpcServer {
 
     /// Start the IPC server
     pub async fn start(&mut self) -> Result<()> {
-        // Remove existing socket file if it exists
-        if self.socket_path.exists() {
-            std::fs::remove_file(&self.socket_path)?;
-        }
-
-        // Create parent directory if needed
-        if let Some(parent) = self.socket_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        // Bind to socket
-        let listener = UnixListener::bind(&self.socket_path)?;
-        info!("IPC server listening on {:?}", self.socket_path);
-
-        // Set socket permissions (owner only)
         #[cfg(unix)]
         {
+            // Remove existing socket file if it exists
+            if self.socket_path.exists() {
+                std::fs::remove_file(&self.socket_path)?;
+            }
+
+            // Create parent directory if needed
+            if let Some(parent) = self.socket_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            // Bind to socket
+            let listener = UnixListener::bind(&self.socket_path)?;
+            info!("IPC server listening on {:?}", self.socket_path);
+
+            // Set socket permissions (owner only)
             use std::os::unix::fs::PermissionsExt;
             let perms = std::fs::Permissions::from_mode(0o600);
             std::fs::set_permissions(&self.socket_path, perms)?;
+            self.listener = Some(listener);
         }
 
-        self.listener = Some(listener);
+        #[cfg(windows)]
+        {
+            // Named pipes don't require an up-front bind step.
+            info!("IPC server listening on named pipe {:?}", self.socket_path);
+        }
         Ok(())
     }
 
     /// Run the server loop
     pub async fn run(&mut self) -> Result<()> {
+        #[cfg(unix)]
+        {
+            return self.run_unix().await;
+        }
+
+        #[cfg(windows)]
+        {
+            return self.run_windows().await;
+        }
+
+        #[allow(unreachable_code)]
+        Err(anyhow::anyhow!("Unsupported platform for IPC"))
+    }
+
+    #[cfg(unix)]
+    async fn run_unix(&mut self) -> Result<()> {
         let listener = self
             .listener
             .as_ref()
@@ -79,7 +107,7 @@ impl IpcServer {
                     let request_limiter = Arc::clone(&self.request_limiter);
                     let min_request_interval = self.min_request_interval;
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_client(
+                        if let Err(e) = Self::handle_unix_client(
                             stream,
                             state,
                             request_limiter,
@@ -95,6 +123,71 @@ impl IpcServer {
                     error!("Error accepting connection: {}", e);
                 }
             }
+        }
+    }
+
+    #[cfg(windows)]
+    async fn run_windows(&mut self) -> Result<()> {
+        let pipe_name = self
+            .socket_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid Windows named pipe path"))?
+            .to_string();
+
+        info!("IPC server accepting named pipe connections");
+
+        // Limit concurrent connections to prevent resource exhaustion
+        let semaphore = Arc::new(Semaphore::new(10));
+
+        loop {
+            // Acquire permit for new connection
+            let permit = match semaphore.clone().acquire_owned().await {
+                Ok(p) => p,
+                Err(e) => {
+                    error!("Failed to acquire connection permit: {}", e);
+                    continue;
+                }
+            };
+
+            // Create new pipe instance
+            let server = match ServerOptions::new()
+                .first_pipe_instance(false) // Allow multiple instances
+                .reject_remote_clients(true) // Security: local connections only
+                .create(&pipe_name)
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("Failed to create named pipe instance: {}", e);
+                    drop(permit);
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+            };
+
+            // Wait for client connection
+            if let Err(e) = server.connect().await {
+                error!("Error accepting named pipe connection: {}", e);
+                drop(permit);
+                continue;
+            }
+
+            let state = Arc::clone(&self.state);
+            let request_limiter = Arc::clone(&self.request_limiter);
+            let min_request_interval = self.min_request_interval;
+
+            tokio::spawn(async move {
+                let _permit = permit; // Hold permit until handler completes
+                if let Err(e) = Self::handle_windows_client(
+                    server,
+                    state,
+                    request_limiter,
+                    min_request_interval,
+                )
+                .await
+                {
+                    error!("Error handling client: {}", e);
+                }
+            });
         }
     }
 
@@ -123,12 +216,27 @@ impl IpcServer {
         Ok(ucred.uid())
     }
 
-    /// Verify client credentials (Windows - placeholder)
-    #[cfg(not(unix))]
-    fn verify_client_credentials(_stream: &UnixStream) -> Result<u32> {
-        // TODO: Implement Windows credential verification
-        warn!("Client credential verification not implemented on Windows");
-        Ok(0)
+    /// Verify client identity (Windows)
+    #[cfg(windows)]
+    fn verify_client_identity(stream: &NamedPipeServer) -> Result<u32> {
+        use std::os::windows::io::AsRawHandle;
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::Pipes::GetNamedPipeClientProcessId;
+
+        let mut client_pid: u32 = 0;
+
+        unsafe {
+            let handle = HANDLE(stream.as_raw_handle());
+            GetNamedPipeClientProcessId(handle, &mut client_pid)
+                .map_err(|e| anyhow::anyhow!("Failed to get client process ID: {}", e))?;
+        }
+
+        if client_pid == 0 {
+            return Err(anyhow::anyhow!("Invalid client process ID"));
+        }
+
+        debug!("Windows client process ID verified: {}", client_pid);
+        Ok(client_pid)
     }
 
     async fn check_rate_limit(
@@ -156,17 +264,56 @@ impl IpcServer {
         Ok(())
     }
 
-    /// Handle a client connection
-    async fn handle_client(
-        mut stream: UnixStream,
+    /// Handle a Unix client connection
+    #[cfg(unix)]
+    async fn handle_unix_client(
+        stream: UnixStream,
         state: Arc<RwLock<DaemonStateManager>>,
         request_limiter: Arc<Mutex<HashMap<u32, Instant>>>,
         min_request_interval: Duration,
     ) -> Result<()> {
-        debug!("New IPC client connected");
-
         // SECURITY: Verify client credentials first
         let client_uid = Self::verify_client_credentials(&stream)?;
+        Self::handle_client(
+            stream,
+            state,
+            request_limiter,
+            min_request_interval,
+            client_uid,
+        )
+        .await
+    }
+
+    /// Handle a Windows named-pipe client connection
+    #[cfg(windows)]
+    async fn handle_windows_client(
+        stream: NamedPipeServer,
+        state: Arc<RwLock<DaemonStateManager>>,
+        request_limiter: Arc<Mutex<HashMap<u32, Instant>>>,
+        min_request_interval: Duration,
+    ) -> Result<()> {
+        let client_uid = Self::verify_client_identity(&stream)?;
+        Self::handle_client(
+            stream,
+            state,
+            request_limiter,
+            min_request_interval,
+            client_uid,
+        )
+        .await
+    }
+
+    async fn handle_client<S>(
+        mut stream: S,
+        state: Arc<RwLock<DaemonStateManager>>,
+        request_limiter: Arc<Mutex<HashMap<u32, Instant>>>,
+        min_request_interval: Duration,
+        client_uid: u32,
+    ) -> Result<()>
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
+        debug!("New IPC client connected");
 
         // Read message length (4 bytes)
         let mut len_bytes = [0u8; 4];
@@ -333,9 +480,12 @@ impl IpcServer {
 
     /// Stop the server and clean up
     pub fn stop(&mut self) -> Result<()> {
-        if self.socket_path.exists() {
-            std::fs::remove_file(&self.socket_path)?;
-            info!("IPC socket removed");
+        #[cfg(unix)]
+        {
+            if self.socket_path.exists() {
+                std::fs::remove_file(&self.socket_path)?;
+                info!("IPC socket removed");
+            }
         }
         Ok(())
     }
