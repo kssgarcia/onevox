@@ -96,6 +96,37 @@ Backend selection is automatic based on model choice (see Configuration below).
 
 For pre-built binaries, see the [Releases](https://github.com/kssgarcia/onevox/releases) page.
 
+### Uninstall
+
+**macOS**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_macos.sh | bash
+```
+
+**Linux**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_linux.sh | bash
+```
+
+**Windows**
+```powershell
+# Download and run the uninstall script
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_windows.ps1" -OutFile uninstall_windows.ps1
+.\uninstall_windows.ps1
+
+# To keep your config file
+.\uninstall_windows.ps1 -KeepConfig
+
+# To skip confirmation prompt
+.\uninstall_windows.ps1 -Force
+```
+
+The uninstaller removes:
+- All binaries and executables
+- Service/daemon registrations
+- Application data and cache
+- Configuration files (unless `-KeepConfig` is used on Windows)
+
 ## Quick Start
 
 1. Install OneVox using the command above

@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-target-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -58,6 +58,10 @@ jobs:
             libxfixes-dev \
             libxi-dev \
             libxtst-dev
+          # Use bundled whisper-rs-sys bindings on Linux
+          echo "WHISPER_DONT_GENERATE_BINDINGS=1" >> $GITHUB_ENV
+          # Clean whisper-rs-sys to ensure it rebuilds with correct env
+          cargo clean -p whisper-rs-sys || true
 
       - name: Set whisper.cpp build flags for macOS
         if: runner.os == 'macOS'
@@ -65,6 +69,10 @@ jobs:
           # Use generic ARM64 target instead of native to avoid i8mm issues on CI
           echo "CFLAGS=-march=armv8-a" >> $GITHUB_ENV
           echo "CXXFLAGS=-march=armv8-a" >> $GITHUB_ENV
+          # Use bundled whisper-rs-sys bindings on macOS
+          echo "WHISPER_DONT_GENERATE_BINDINGS=1" >> $GITHUB_ENV
+          # Clean whisper-rs-sys to ensure it rebuilds with correct env
+          cargo clean -p whisper-rs-sys || true
 
       - name: Check formatting
         run: cargo fmt --all -- --check

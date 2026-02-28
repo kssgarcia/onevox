@@ -49,6 +49,7 @@ jobs:
           CC=clang CXX=clang++ \
           SDKROOT=$(xcrun --show-sdk-path) \
           MACOSX_DEPLOYMENT_TARGET=13.0 \
+          WHISPER_DONT_GENERATE_BINDINGS=1 \
           cargo build --release --locked --target ${{ matrix.target }} $FEATURES
 
       - name: Create app bundle
@@ -100,6 +101,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build release binary
+        env:
+          WHISPER_DONT_GENERATE_BINDINGS: "1"
         run: cargo build --release --locked
 
       - name: Strip binary

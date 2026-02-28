@@ -409,3 +409,131 @@ preload = true
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed build instructions and troubleshooting.
+
+---
+
+## Uninstall
+
+### macOS
+
+**Quick Uninstall:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_macos.sh | bash
+```
+
+**Manual Uninstall:**
+```bash
+# Stop launchd service
+launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.onevox.daemon.plist
+
+# Remove service file
+rm -f ~/Library/LaunchAgents/com.onevox.daemon.plist
+
+# Remove application
+rm -rf ~/Applications/Onevox.app
+rm -rf /Applications/Onevox.app  # If installed system-wide
+
+# Remove CLI symlinks
+rm -f /usr/local/bin/onevox
+rm -f /opt/homebrew/bin/onevox
+rm -f ~/.local/bin/onevox
+
+# Remove config and data
+rm -rf ~/Library/Application\ Support/com.onevox.onevox
+rm -rf ~/Library/Caches/com.onevox.onevox
+rm -rf ~/Library/Logs/onevox
+```
+
+---
+
+### Linux
+
+**Quick Uninstall:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_linux.sh | bash
+```
+
+**Manual Uninstall:**
+```bash
+# Stop and disable service
+systemctl --user stop onevox.service
+systemctl --user disable onevox.service
+
+# Remove service file
+rm -f ~/.config/systemd/user/onevox.service
+systemctl --user daemon-reload
+
+# Remove binary
+rm -f ~/.local/bin/onevox
+
+# Remove desktop entry
+rm -f ~/.local/share/applications/onevox.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+
+# Remove config and data
+rm -rf ~/.config/onevox
+rm -rf ~/.local/share/onevox
+rm -rf ~/.cache/onevox
+```
+
+---
+
+### Windows
+
+**Quick Uninstall:**
+```powershell
+# Download and run uninstall script
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/kssgarcia/onevox/main/scripts/uninstall_windows.ps1" -OutFile uninstall_windows.ps1
+.\uninstall_windows.ps1
+```
+
+**Options:**
+```powershell
+# Keep configuration files
+.\uninstall_windows.ps1 -KeepConfig
+
+# Skip confirmation prompt
+.\uninstall_windows.ps1 -Force
+
+# Both options
+.\uninstall_windows.ps1 -KeepConfig -Force
+```
+
+**Manual Uninstall:**
+```powershell
+# Stop and remove service (run as Administrator)
+sc.exe stop Onevox
+sc.exe delete Onevox
+
+# Remove from PATH (requires reopening PowerShell after)
+$userPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
+$newPath = ($userPath -split ';' | Where-Object { $_ -ne "$env:LOCALAPPDATA\onevox" }) -join ';'
+[Environment]::SetEnvironmentVariable("Path", $newPath, [EnvironmentVariableTarget]::User)
+
+# Remove files and directories
+Remove-Item -Path "$env:LOCALAPPDATA\onevox" -Recurse -Force
+Remove-Item -Path "$env:APPDATA\onevox" -Recurse -Force
+```
+
+---
+
+## What Gets Removed
+
+The uninstaller removes the following on all platforms:
+
+**Binaries:**
+- Application executable
+- CLI tools and symlinks
+
+**Services:**
+- System service/daemon registration
+- LaunchAgent (macOS) / systemd service (Linux) / Windows Service
+
+**Data:**
+- Configuration files
+- Downloaded models (can be large, ~100MB-3GB)
+- Transcription history
+- Application logs
+- Cache files
+
+**Note:** On Windows, use the `-KeepConfig` flag to preserve your configuration and downloaded models if you plan to reinstall later.

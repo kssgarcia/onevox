@@ -171,7 +171,7 @@ export const DEFAULT_CONFIG: VoxConfig = {
     adaptive: true,
   },
   model: {
-    model_path: "ggml-base.en.bin",
+    model_path: "ggml-base.en",
     device: "auto",
     preload: true,
   },
