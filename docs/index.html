@@ -374,8 +374,10 @@
                             >
                                 COPY
                             </button>
-                            <pre><span class="highlight">Invoke-WebRequest</span> -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/onevox-windows-x86_64.zip" -OutFile onevox-windows-x86_64.zip
-<span class="highlight">Expand-Archive</span> -Path onevox-windows-x86_64.zip -DestinationPath "$env:LOCALAPPDATA\onevox" -Force</pre>
+                            <pre>$onevoxDir = "$env:LOCALAPPDATA\onevox"
+<span class="highlight">Invoke-WebRequest</span> -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/onevox-windows-x86_64.zip" -OutFile onevox-windows-x86_64.zip
+<span class="highlight">Expand-Archive</span> -Path onevox-windows-x86_64.zip -DestinationPath $onevoxDir -Force
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$onevoxDir", [EnvironmentVariableTarget]::User)</pre>
                         </div>
                         <p style="font-size: 12px; margin-top: 20px">
                             HOTKEY:

@@ -23,10 +23,13 @@ systemctl --user enable --now onevox
 
 **Windows:**
 ```powershell
+$onevoxDir = "$env:LOCALAPPDATA\onevox"
 $asset = "onevox-windows-x86_64.zip"
 Invoke-WebRequest -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/$asset" -OutFile $asset
-Expand-Archive -Path $asset -DestinationPath "$env:LOCALAPPDATA\onevox" -Force
-& "$env:LOCALAPPDATA\onevox\onevox.exe" --version
+Expand-Archive -Path $asset -DestinationPath $onevoxDir -Force
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$onevoxDir", [EnvironmentVariableTarget]::User)
+$env:Path += ";$onevoxDir"
+& "$onevoxDir\onevox.exe" --version
 ```
 
 ---
@@ -244,23 +247,24 @@ Download installer from [Releases](https://github.com/kssgarcia/onevox/releases)
 - Models: `%LOCALAPPDATA%\onevox\onevox\cache\models\`
 - Logs: `%APPDATA%\onevox\onevox\data\logs\onevox.log`
 
-**Daemon Management (Windows 11):**
+**Service Management with SCM (run PowerShell as Administrator):**
 ```powershell
-# Start daemon (foreground)
-onevox daemon --foreground
+# Register service (one-time)
+sc.exe create Onevox binPath= "\"$env:LOCALAPPDATA\onevox\onevox.exe\" daemon --foreground" start= auto
 
-# Start daemon in background shell/session
-onevox daemon
+# Start / Stop / Restart
+sc.exe start Onevox
+sc.exe stop Onevox
+sc.exe stop Onevox; sc.exe start Onevox
 
-# Stop daemon
-onevox stop
+# Status
+sc.exe query Onevox
 
-# Check daemon status
-onevox status
+# Remove service
+sc.exe delete Onevox
 ```
 
-**Auto-start on login (recommended):** Use Windows Task Scheduler to run
-`onevox daemon` at user logon.
+**Auto-start:** The `start= auto` flag above configures startup with SCM.
 
 **View Logs:**
 ```powershell

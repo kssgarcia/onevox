@@ -32,9 +32,13 @@ systemctl --user status onevox   # Status
 
 **Windows:**
 ```powershell
-Start-Service Onevox    # Start
-Stop-Service Onevox     # Stop
-Get-Service Onevox      # Status
+# Register (one-time, run as Administrator)
+sc.exe create Onevox binPath= "\"$env:LOCALAPPDATA\onevox\onevox.exe\" daemon --foreground" start= auto
+
+sc.exe start Onevox     # Start
+sc.exe stop Onevox      # Stop
+sc.exe query Onevox     # Status
+sc.exe stop Onevox; sc.exe start Onevox   # Restart
 ```
 
 ## Paths

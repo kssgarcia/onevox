@@ -49,10 +49,13 @@ systemctl --user enable --now onevox
 
 **Windows**
 ```powershell
+$onevoxDir = "$env:LOCALAPPDATA\onevox"
 $asset = "onevox-windows-x86_64.zip"
 Invoke-WebRequest -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/$asset" -OutFile $asset
-Expand-Archive -Path $asset -DestinationPath "$env:LOCALAPPDATA\onevox" -Force
-& "$env:LOCALAPPDATA\onevox\onevox.exe" --version
+Expand-Archive -Path $asset -DestinationPath $onevoxDir -Force
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$onevoxDir", [EnvironmentVariableTarget]::User)
+$env:Path += ";$onevoxDir"
+& "$onevoxDir\onevox.exe" --version
 ```
 
 See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions, troubleshooting, and service management.
