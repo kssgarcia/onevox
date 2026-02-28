@@ -88,6 +88,14 @@ cargo build --release --features onnx
 ./build.sh release  # Release
 ```
 
+`build.sh` is a build wrapper for consistent local/release builds across platforms.
+
+- It configures platform-specific build environment before calling Cargo.
+- On Linux, it auto-patches the ELF interpreter when binaries are linked against a Nix loader path, preventing runtime failures like missing `libxcb.so.1` on non-Nix userland.
+- It is recommended for developer and release candidate builds, especially on mixed Nix/system environments.
+
+For production releases, keep using CI per target OS and artifact verification/signing in addition to `build.sh`.
+
 ### GPU Acceleration
 
 OneVox supports GPU acceleration for whisper.cpp backend:
@@ -237,11 +245,13 @@ CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=1
   cargo build --release --locked --features onnx
 
 # Linux - Default
-cargo build --release --locked
+./build.sh release
 strip target/release/onevox
 
 # Linux - With ONNX
 cargo build --release --locked --features onnx
+# If built from a Nix shell and run on system userland, patch interpreter:
+# patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 target/release/onevox
 strip target/release/onevox
 
 # Windows - Default

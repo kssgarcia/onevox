@@ -13,7 +13,6 @@ StandardError=journal
 
 # Resource limits (optional, can be adjusted per system)
 MemoryMax=2G
-CPUQuota=80%
 
 [Install]
 WantedBy=default.target
