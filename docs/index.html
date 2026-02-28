@@ -232,22 +232,6 @@
                 color: var(--muted);
             }
 
-            /* Windows Coming Soon Overlay */
-            .coming-soon {
-                filter: grayscale(1);
-                opacity: 0.5;
-                pointer-events: none;
-            }
-
-            .badge-coming {
-                display: inline-block;
-                border: 1px solid var(--text);
-                padding: 2px 8px;
-                font-size: 10px;
-                margin-bottom: 10px;
-                color: var(--text);
-            }
-
             footer {
                 padding: 40px;
                 display: flex;
@@ -372,8 +356,7 @@
                             <pre><span class="highlight">sudo</span> usermod -aG audio,input $USER && <span class="highlight">systemctl</span> --user enable --now onevox</pre>
                         </div>
                     </div>
-                    <div class="install-box coming-soon">
-                        <div class="badge-coming mono">COMING_SOON</div>
+                    <div class="install-box">
                         <h3 class="mono">Windows</h3>
                         <p
                             style="
@@ -382,14 +365,20 @@
                                 margin-bottom: 15px;
                             "
                         >
-                            MSI Installer / PowerShell
+                            ZIP Release / PowerShell
                         </p>
-                        <pre>
-# Windows support is currently in development.
-# Check back for the v0.3.0 release.</pre
-                        >
+                        <div class="code-wrapper">
+                            <button
+                                class="copy-btn mono"
+                                onclick="copyCode(this)"
+                            >
+                                COPY
+                            </button>
+                            <pre><span class="highlight">Invoke-WebRequest</span> -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/onevox-windows-x86_64.zip" -OutFile onevox-windows-x86_64.zip
+<span class="highlight">Expand-Archive</span> -Path onevox-windows-x86_64.zip -DestinationPath "$env:LOCALAPPDATA\onevox" -Force</pre>
+                        </div>
                         <p style="font-size: 12px; margin-top: 20px">
-                            EXPECTED HOTKEY:
+                            HOTKEY:
                         </p>
                         <p style="font-size: 14px" class="mono">
                             CTRL + SHIFT + SPACE

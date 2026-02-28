@@ -23,8 +23,10 @@ systemctl --user enable --now onevox
 
 **Windows:**
 ```powershell
-# Download installer from releases
-# https://github.com/kssgarcia/onevox/releases
+$asset = "onevox-windows-x86_64.zip"
+Invoke-WebRequest -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/$asset" -OutFile $asset
+Expand-Archive -Path $asset -DestinationPath "$env:LOCALAPPDATA\onevox" -Force
+& "$env:LOCALAPPDATA\onevox\onevox.exe" --version
 ```
 
 ---

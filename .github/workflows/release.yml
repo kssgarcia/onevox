@@ -123,3 +123,33 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/release/*.tar.gz
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Create zip archive
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/release -Force | Out-Null
+          New-Item -ItemType Directory -Path dist/onevox-windows-x86_64 -Force | Out-Null
+          Copy-Item target/release/onevox.exe dist/onevox-windows-x86_64/
+          Copy-Item README.md dist/onevox-windows-x86_64/
+          Copy-Item config.example.toml dist/onevox-windows-x86_64/
+          Copy-Item tui dist/onevox-windows-x86_64/tui -Recurse
+          Remove-Item dist/onevox-windows-x86_64/tui/node_modules -Recurse -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist/onevox-windows-x86_64/* -DestinationPath dist/release/onevox-windows-x86_64.zip -Force
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release/onevox-windows-x86_64.zip
