@@ -13,3 +13,6 @@ CC_x86_64_apple_darwin = "/usr/bin/clang"
 CXX_x86_64_apple_darwin = "/usr/bin/clang++"
 # Disable BLAS in whisper.cpp to avoid symbol mismatch with macOS Accelerate framework
 GGML_BLAS = "OFF"
+# Use bundled whisper-rs-sys bindings to avoid runtime libclang/libLLVM coupling.
+# This keeps builds stable across Linux/macOS (including mixed Nix/system shells).
+WHISPER_DONT_GENERATE_BINDINGS = "1"

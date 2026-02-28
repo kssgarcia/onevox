@@ -10,6 +10,39 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+patch_linux_interpreter() {
+    local binary_path="$1"
+
+    # Only relevant on Linux for ELF binaries.
+    if [ "$(uname -s)" != "Linux" ] || [ ! -f "$binary_path" ]; then
+        return
+    fi
+
+    if ! command -v readelf >/dev/null 2>&1 || ! command -v patchelf >/dev/null 2>&1; then
+        return
+    fi
+
+    local current_interp=""
+    current_interp="$(readelf -l "$binary_path" 2>/dev/null | sed -n 's/.*Requesting program interpreter: \(.*\)]/\1/p' | head -n1)"
+
+    # Nix-linked binaries can fail to resolve transitive system libs outside nix env.
+    if [[ "$current_interp" == /nix/store/* ]]; then
+        local system_interp=""
+        if [ -x /lib64/ld-linux-x86-64.so.2 ]; then
+            system_interp="/lib64/ld-linux-x86-64.so.2"
+        elif [ -x /usr/lib64/ld-linux-x86-64.so.2 ]; then
+            system_interp="/usr/lib64/ld-linux-x86-64.so.2"
+        fi
+
+        if [ -n "$system_interp" ]; then
+            echo -e "${YELLOW}Patching Linux ELF interpreter:${NC} $current_interp -> $system_interp"
+            patchelf --set-interpreter "$system_interp" "$binary_path"
+        else
+            echo -e "${YELLOW}Warning:${NC} binary uses Nix interpreter ($current_interp), but no system ld-linux was found to patch."
+        fi
+    fi
+}
+
 # Detect platform
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -107,6 +140,8 @@ if [ $BUILD_STATUS -eq 0 ]; then
     fi
     
     if [ -f "$BINARY_PATH" ]; then
+        patch_linux_interpreter "$BINARY_PATH"
+
         BINARY_SIZE=$(du -h "$BINARY_PATH" | cut -f1)
         echo "Binary: $BINARY_PATH ($BINARY_SIZE)"
         echo ""

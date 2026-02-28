@@ -78,12 +78,24 @@ impl ModelDownloader {
         let urls = metadata.download_urls();
         for (file, url) in urls {
             let file_path = model_dir.join(&file);
+            let temp_path = Self::temp_path(&file_path);
 
             // Create parent directory if it doesn't exist
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)
                     .await
                     .context("Failed to create file parent directory")?;
+            }
+
+            // Clean stale temporary artifact before proceeding.
+            if temp_path.exists()
+                && let Err(e) = fs::remove_file(&temp_path).await
+            {
+                warn!(
+                    "Could not remove stale temporary model file {}: {}",
+                    temp_path.display(),
+                    e
+                );
             }
 
             // Skip if already exists
@@ -106,7 +118,11 @@ impl ModelDownloader {
 
             // Verify downloaded artifact when checksum is available.
             if let Some(expected_sha) = metadata.file_sha256.get(&file) {
-                self.verify_checksum(&file_path, expected_sha).await?;
+                if let Err(e) = self.verify_checksum(&file_path, expected_sha).await {
+                    // Remove corrupted final artifact so future runs can re-download cleanly.
+                    let _ = fs::remove_file(&file_path).await;
+                    return Err(e);
+                }
                 info!("Checksum verified: {}", file);
             }
         }
@@ -121,12 +137,14 @@ impl ModelDownloader {
         const INITIAL_BACKOFF: u64 = 1000; // 1 second
 
         let mut last_error = None;
+        let temp_path = Self::temp_path(dest);
 
         for attempt in 1..=MAX_RETRIES {
             match self.download_file_attempt(url, dest).await {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     last_error = Some(e);
+                    Self::cleanup_temp_file(&temp_path).await;
 
                     if attempt < MAX_RETRIES {
                         let backoff_ms = INITIAL_BACKOFF * 2u64.pow(attempt - 1);
@@ -139,6 +157,8 @@ impl ModelDownloader {
                 }
             }
         }
+
+        Self::cleanup_temp_file(&temp_path).await;
 
         Err(last_error
             .unwrap_or_else(|| anyhow::anyhow!("Download failed after {} retries", MAX_RETRIES)))
@@ -176,8 +196,13 @@ impl ModelDownloader {
                 .unwrap_or_else(|| "model".to_string())
         ));
 
-        // Create temporary file
-        let temp_path = dest.with_extension("tmp");
+        // Create temporary file in the same directory for atomic finalize.
+        let temp_path = Self::temp_path(dest);
+        if temp_path.exists() {
+            fs::remove_file(&temp_path)
+                .await
+                .context("Failed to remove stale temporary file")?;
+        }
         let mut file = fs::File::create(&temp_path)
             .await
             .context("Failed to create temporary file")?;
@@ -194,6 +219,13 @@ impl ModelDownloader {
             downloaded += chunk.len() as u64;
             pb.set_position(downloaded);
         }
+        file.flush()
+            .await
+            .context("Failed to flush temporary file")?;
+        file.sync_all()
+            .await
+            .context("Failed to sync temporary file")?;
+        drop(file);
 
         pb.finish_with_message(format!(
             "Downloaded {}",
@@ -202,12 +234,41 @@ impl ModelDownloader {
                 .unwrap_or_else(|| "model".to_string())
         ));
 
-        // Move temp file to final location
-        fs::rename(&temp_path, dest)
-            .await
-            .context("Failed to move downloaded file")?;
+        // Move temp file to final location. Fall back to copy+remove when rename
+        // is not possible due filesystem/runtime edge cases.
+        if let Err(rename_err) = fs::rename(&temp_path, dest).await {
+            warn!(
+                "Atomic rename failed for {:?} -> {:?}: {}. Falling back to copy+remove.",
+                temp_path, dest, rename_err
+            );
+            if dest.exists() {
+                fs::remove_file(dest)
+                    .await
+                    .context("Failed to remove existing destination file")?;
+            }
+            fs::copy(&temp_path, dest)
+                .await
+                .context("Failed to copy temporary download to destination")?;
+            fs::remove_file(&temp_path)
+                .await
+                .context("Failed to remove temporary file after copy")?;
+        }
 
         Ok(())
+    }
+
+    fn temp_path(dest: &Path) -> PathBuf {
+        dest.with_extension("tmp")
+    }
+
+    async fn cleanup_temp_file(path: &Path) {
+        if !path.exists() {
+            return;
+        }
+        match fs::remove_file(path).await {
+            Ok(()) => info!("Removed temporary file: {}", path.display()),
+            Err(e) => warn!("Failed to remove temporary file {}: {}", path.display(), e),
+        }
     }
 
     async fn verify_checksum(&self, path: &Path, expected_sha256: &str) -> Result<()> {
@@ -281,6 +342,7 @@ impl ModelDownloader {
             return Ok(vec![]);
         }
 
+        let registry = crate::models::ModelRegistry::new();
         let mut models = vec![];
         let mut entries = fs::read_dir(&self.cache_dir)
             .await
@@ -289,6 +351,8 @@ impl ModelDownloader {
         while let Some(entry) = entries.next_entry().await? {
             if entry.file_type().await?.is_dir()
                 && let Some(name) = entry.file_name().to_str()
+                && let Some(metadata) = registry.get_model(name)
+                && self.is_downloaded(metadata).await
             {
                 models.push(name.to_string());
             }
