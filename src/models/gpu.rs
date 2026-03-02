@@ -118,7 +118,8 @@ impl GpuCapabilities {
         // This is a basic check - whisper.cpp will do more thorough validation
         #[cfg(target_os = "linux")]
         {
-            std::path::Path::new("/usr/local/cuda/lib64/libcudart.so").exists()
+            std::path::Path::new("/opt/cuda/lib64/libcudart.so").exists()
+                || std::path::Path::new("/usr/local/cuda/lib64/libcudart.so").exists()
                 || std::path::Path::new("/usr/lib/x86_64-linux-gnu/libcudart.so").exists()
         }
         #[cfg(target_os = "windows")]

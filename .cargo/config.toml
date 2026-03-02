@@ -22,6 +22,15 @@ GGML_BLAS = "OFF"
 # Windows generates bindings at build time, so don't set this there.
 [target.x86_64-unknown-linux-gnu.env]
 WHISPER_DONT_GENERATE_BINDINGS = "1"
+# CUDA 13 + glibc 2.42+ compatibility (Linux only)
+CC_x86_64_unknown_linux_gnu = "clang"
+CXX_x86_64_unknown_linux_gnu = "clang++"
+CMAKE_CUDA_HOST_COMPILER = "clang++"
+# Set C++ standard to 17 for CUDA compatibility
+CMAKE_CUDA_STANDARD = "17"
+CMAKE_CUDA_ARCHITECTURES = "native"
+# Suppress glibc 2.42+ exception specification errors with CUDA 13+
+CMAKE_CUDA_FLAGS = "-Xcompiler=-Wno-error=mismatched-exception-spec,-Wno-mismatched-exception-spec"
 
 [target.aarch64-unknown-linux-gnu.env]
 WHISPER_DONT_GENERATE_BINDINGS = "1"
