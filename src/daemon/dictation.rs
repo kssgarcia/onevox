@@ -69,7 +69,7 @@ impl DictationEngine {
 
     /// Create a new dictation engine with an existing history manager
     pub fn with_history(config: Config, history_manager: Arc<HistoryManager>) -> Result<Self> {
-        info!("Initializing dictation engine");
+        // Note: logging is done in new(), not here to avoid duplicate messages
 
         // Create hotkey manager. If this fails (common on some Wayland setups),
         // keep the engine available for manual IPC start/stop dictation commands.
@@ -131,6 +131,10 @@ impl DictationEngine {
             use_gpu: config.model.device == "gpu" || config.model.device == "auto",
             ..Default::default()
         };
+
+        // Report GPU status at startup
+        Self::report_gpu_status(&model_config);
+
         model.load(model_config)?;
 
         info!("✅ Dictation engine initialized");
@@ -325,7 +329,25 @@ impl DictationEngine {
                             // Process through VAD
                             match vad_processor.process(chunk) {
                                 Ok(Some(segment)) => {
-                                    info!("🎯 Speech segment detected ({} chunks)", segment.len());
+                                    // Skip segments that are too short (likely noise or button clicks)
+                                    const MIN_AUDIO_DURATION_MS: u64 = 300;
+                                    if segment.duration_ms < MIN_AUDIO_DURATION_MS {
+                                        debug!(
+                                            "⏭️  Skipping short segment ({}ms < {}ms threshold)",
+                                            segment.duration_ms, MIN_AUDIO_DURATION_MS
+                                        );
+                                        // Return to recording state without transcribing
+                                        if is_dictating.load(Ordering::SeqCst) {
+                                            indicator.recording();
+                                        }
+                                        continue;
+                                    }
+
+                                    info!(
+                                        "🎯 Speech segment detected ({} chunks, {}ms)",
+                                        segment.len(),
+                                        segment.duration_ms
+                                    );
                                     indicator.processing();
 
                                     // Transcribe
@@ -435,14 +457,26 @@ impl DictationEngine {
 
                 // Hotkey released - transcribe all collected audio
                 if !collected_chunks.is_empty() {
-                    info!(
-                        "🎤 Hotkey released - transcribing {} chunks",
-                        collected_chunks.len()
-                    );
-                    indicator.processing();
-
                     // Create a speech segment from all collected chunks
                     let mut segment = crate::vad::SpeechSegment::new(collected_chunks);
+
+                    // Skip segments that are too short (likely accidental key presses)
+                    const MIN_AUDIO_DURATION_MS: u64 = 300;
+                    if segment.duration_ms < MIN_AUDIO_DURATION_MS {
+                        info!(
+                            "⏭️  Skipping short recording ({}ms < {}ms threshold)",
+                            segment.duration_ms, MIN_AUDIO_DURATION_MS
+                        );
+                        indicator.hide();
+                        return;
+                    }
+
+                    info!(
+                        "🎤 Hotkey released - transcribing {} chunks ({}ms)",
+                        segment.len(),
+                        segment.duration_ms
+                    );
+                    indicator.processing();
 
                     // DEBUG: Analyze captured audio
                     let sample_rate = segment.sample_rate();
@@ -542,17 +576,33 @@ impl DictationEngine {
         model: Arc<Mutex<Box<dyn ModelRuntime>>>,
         mut segment: crate::vad::SpeechSegment,
     ) -> std::result::Result<Transcription, String> {
-        match tokio::task::spawn_blocking(move || {
+        let total_start = std::time::Instant::now();
+        let audio_duration_ms = segment.duration_ms;
+
+        let lock_start = std::time::Instant::now();
+        let result = tokio::task::spawn_blocking(move || {
             let mut guard = model
                 .lock()
                 .map_err(|_| "Model mutex poisoned".to_string())?;
+
+            let lock_time = lock_start.elapsed();
+            if lock_time.as_millis() > 50 {
+                warn!(
+                    "⚠️  Model lock took {}ms (potential contention)",
+                    lock_time.as_millis()
+                );
+            }
+
             guard
                 .transcribe_segment(&mut segment)
                 .map_err(|e| e.to_string())
         })
-        .await
-        {
-            Ok(result) => result,
+        .await;
+
+        let total_time = total_start.elapsed();
+
+        match result {
+            Ok(r) => r,
             Err(e) => Err(format!("Transcription task failed: {}", e)),
         }
     }
@@ -572,6 +622,44 @@ impl DictationEngine {
             Err(e) => {
                 warn!("Failed to list audio devices: {}", e);
             }
+        }
+    }
+
+    /// Report GPU acceleration status at startup
+    fn report_gpu_status(config: &ModelConfig) {
+        if config.use_gpu {
+            #[cfg(all(feature = "metal", target_os = "macos"))]
+            {
+                info!("🎮 GPU Acceleration: ENABLED (Metal)");
+            }
+
+            #[cfg(all(feature = "cuda", not(target_os = "macos")))]
+            {
+                info!("🎮 GPU Acceleration: ENABLED (CUDA)");
+            }
+
+            #[cfg(all(feature = "vulkan", not(feature = "cuda"), not(feature = "metal")))]
+            {
+                info!("🎮 GPU Acceleration: ENABLED (Vulkan)");
+            }
+
+            #[cfg(not(any(feature = "metal", feature = "cuda", feature = "vulkan")))]
+            {
+                warn!("⚠️  GPU requested but no GPU backend compiled");
+                warn!("💡 Rebuild with appropriate GPU feature:");
+
+                #[cfg(target_os = "macos")]
+                warn!("   cargo build --release --features metal");
+
+                #[cfg(target_os = "linux")]
+                warn!("   cargo build --release --features cuda   # or vulkan");
+
+                #[cfg(target_os = "windows")]
+                warn!("   cargo build --release --features cuda   # or vulkan");
+            }
+        } else {
+            info!("💻 GPU Acceleration: DISABLED");
+            debug!("Using CPU-only mode as configured");
         }
     }
 

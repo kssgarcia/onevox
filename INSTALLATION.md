@@ -53,9 +53,164 @@ OneVox is available in two build configurations:
 - **Memory**: ~250MB
 - **Latency**: Varies by model
 - **Models**: Parakeet, custom ONNX models
-- **Platform Support**: ARM64 macOS, Linux (x86_64 macOS not supported by ONNX Runtime)
+- **Platform Support**: ARM64 macOS, Linux, Windows (Intel macOS not supported by ONNX Runtime)
 
 **Installation**: Build from source with ONNX feature (see [Build from Source](#build-from-source) below)
+
+---
+
+## GPU Acceleration
+
+OneVox supports hardware-accelerated transcription for 2-4x faster performance.
+
+### Quick Check
+
+```bash
+# Check if GPU acceleration is available
+onevox info
+```
+
+### Platform-Specific Setup
+
+#### macOS Apple Silicon (M1/M2/M3/M4)
+
+**Pre-built Binaries:**
+- Metal GPU acceleration is **included by default** in official releases (`onevox-macos-arm64.tar.gz`)
+- No additional setup required - just enable in settings
+
+**From Source:**
+```bash
+# Metal feature is in default features
+cargo build --release
+
+# Or explicitly enable Metal
+cargo build --release --features metal
+```
+
+**Enable GPU:**
+1. Open TUI: `onevox tui`
+2. Navigate to "Model Settings"
+3. Set Device to "gpu"
+4. Save and reload daemon
+
+Or edit config directly:
+```toml
+[model]
+device = "gpu"  # Options: "cpu", "gpu", "auto"
+```
+
+**Performance:** M4 with medium model: ~0.18x RTF (1.7s for 8-9s audio)
+
+#### macOS Intel (Custom Build Only)
+
+**Note:** Pre-built binaries are not provided for Intel Macs. Build from source instead.
+
+**Requirements:**
+- Intel Mac with AMD GPU (for Metal support)
+- Xcode Command Line Tools installed
+
+**Build from Source:**
+```bash
+# Build with Metal support (if AMD GPU)
+cargo build --release --features metal
+
+# Or CPU-only
+cargo build --release --no-default-features --features whisper-cpp,overlay-indicator
+```
+
+**Configuration:** Same as Apple Silicon above - set `device = "gpu"` in config.
+
+#### Linux with NVIDIA GPU (CUDA)
+
+**Requirements:**
+- NVIDIA GPU with CUDA support
+- CUDA Toolkit 11.0+ installed
+- NVIDIA drivers up to date
+
+**Check CUDA:**
+```bash
+nvcc --version
+nvidia-smi
+```
+
+**Build from Source:**
+```bash
+# Clone repository
+git clone https://github.com/kssgarcia/onevox.git
+cd onevox
+
+# Build with CUDA support
+cargo build --release --features cuda
+
+# Install
+./target/release/onevox --version
+```
+
+**Setup:**
+```bash
+# Add user to required groups (run once, then log out and back in)
+sudo usermod -aG audio,input $USER
+
+# Start service
+systemctl --user enable --now onevox
+```
+
+**Configuration:** Set `device = "gpu"` in config to enable GPU.
+
+**Troubleshooting:**
+- If build fails, ensure CUDA is in PATH: `export PATH=/usr/local/cuda/bin:$PATH`
+- Set library path: `export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH`
+
+#### Linux/Windows with AMD/Intel GPU (Vulkan)
+
+**Requirements:**
+- Vulkan-capable GPU
+- Vulkan SDK/runtime installed
+
+**Check Vulkan:**
+```bash
+# Linux
+vulkaninfo | grep deviceName
+
+# Windows (PowerShell)
+Get-Command vulkan-1.dll
+```
+
+**Build with Vulkan:**
+```bash
+cargo build --release --features vulkan
+```
+
+**Configuration:** Set `device = "gpu"` in config as above.
+
+### Automatic Fallback
+
+OneVox includes robust fallback logic:
+
+1. **GPU Not Compiled:** Falls back to CPU automatically
+2. **GPU Hardware Missing:** Detects and falls back to CPU
+3. **GPU Load Failure:** Retries with CPU if GPU initialization fails
+4. **No User Intervention Required:** Graceful degradation ensures reliability
+
+### Performance Comparison
+
+| Hardware | Model | Device | Time | RTF | Speedup |
+|----------|-------|--------|------|-----|---------|
+| M4 24GB | medium | GPU | 1.7s | 0.18x | 2.4x |
+| M4 24GB | medium | CPU | 4.0s | 0.44x | 1.0x |
+| Intel i7 | base | GPU | 0.8s | 0.16x | 3.0x |
+| Intel i7 | base | CPU | 2.4s | 0.48x | 1.0x |
+
+*RTF = Real-Time Factor (lower is better, <1.0 means faster than real-time)*
+
+### Default Configuration
+
+**Out of the box:** CPU mode is enabled by default for maximum compatibility
+
+**To enable GPU:** 
+- Via TUI: `onevox tui` → Model Settings → Device: "gpu"
+- Via config: Edit `config.toml` and set `device = "gpu"`
+- Via CLI: `onevox config set model.device gpu`
 
 ---
 
@@ -323,7 +478,69 @@ start ms-settings:privacy-microphone
 - macOS: Grant Accessibility permission
 - Check logs for errors
 
+**GPU acceleration not working?**
+
+1. **Check GPU availability:**
+   ```bash
+   onevox info
+   ```
+   This shows if GPU is compiled and detected.
+
+2. **macOS Metal issues:**
+   ```bash
+   # Verify Metal is compiled
+   onevox info | grep Metal
+   
+   # Check system Metal support
+   system_profiler SPDisplaysDataType | grep Metal
+   ```
+   - Metal works on all Apple Silicon Macs (M1/M2/M3/M4)
+   - Some Intel Macs with AMD GPUs also support Metal
+   - If Metal fails, it will automatically fall back to CPU
+
+3. **Linux CUDA issues:**
+   ```bash
+   # Check CUDA installation
+   nvcc --version
+   nvidia-smi
+   
+   # Verify CUDA libraries
+   ls -l /usr/local/cuda/lib64/libcudart.so
+   ```
+   - Ensure CUDA Toolkit 11.0+ is installed
+   - Update NVIDIA drivers to latest version
+   - Set environment variables:
+     ```bash
+     export PATH=/usr/local/cuda/bin:$PATH
+     export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+     ```
+
+4. **Linux/Windows Vulkan issues:**
+   ```bash
+   # Linux: Check Vulkan
+   vulkaninfo | head -20
+   
+   # Windows PowerShell: Check Vulkan
+   Get-Command vulkan-1.dll
+   ```
+   - Install Vulkan SDK from https://vulkan.lunarg.com/
+   - Update GPU drivers
+
+5. **Slow transcription even with GPU:**
+   - First transcription is always slower (GPU initialization overhead ~1-2s)
+   - Subsequent transcriptions should be faster
+   - Check actual RTF (Real-Time Factor) in logs - should be <0.3 for GPU
+   - Try a smaller model (base instead of medium) for faster processing
+
+6. **GPU falls back to CPU:**
+   - This is expected if GPU hardware isn't available
+   - Check `onevox info` to see why
+   - System will work fine on CPU, just slower (~2-4x)
+   - Consider using smaller models (tiny/base) for better CPU performance
+
 **Check status:** `onevox status`
+
+**View system info:** `onevox info`
 
 ---
 

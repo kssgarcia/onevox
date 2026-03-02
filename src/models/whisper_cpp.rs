@@ -92,7 +92,7 @@ impl Default for WhisperCpp {
 
 #[cfg(feature = "whisper-cpp")]
 impl ModelRuntime for WhisperCpp {
-    fn load(&mut self, config: ModelConfig) -> crate::Result<()> {
+    fn load(&mut self, mut config: ModelConfig) -> crate::Result<()> {
         info!("Loading Whisper.cpp model: {:?}", config.model_path);
 
         // Resolve model path
@@ -107,17 +107,70 @@ impl ModelRuntime for WhisperCpp {
 
         info!("Loading model from: {:?}", model_path);
 
-        // Create context parameters
-        let ctx_params = WhisperContextParameters::default();
+        // Detect GPU capabilities and apply fallback if needed
+        if config.use_gpu {
+            let gpu_caps = crate::models::GpuCapabilities::detect();
+            if !gpu_caps.available {
+                warn!("⚠️  GPU requested but not available - falling back to CPU");
+                warn!("Reason: {}", gpu_caps.description);
+                if let Some(instructions) = gpu_caps.build_instructions() {
+                    debug!("To enable GPU:\n{}", instructions);
+                }
+                config.use_gpu = false;
+            } else {
+                info!("{}", gpu_caps.status_message());
+            }
+        }
 
-        // Load the model
-        let ctx = WhisperContext::new_with_params(
+        // Create context parameters with GPU control (after fallback check)
+        let ctx_params = WhisperContextParameters {
+            use_gpu: config.use_gpu,
+            ..Default::default()
+        };
+
+        if config.use_gpu {
+            debug!("GPU acceleration enabled for model loading");
+        } else {
+            debug!("CPU-only mode enabled");
+        }
+
+        // Load the model with error handling for GPU failures
+        let ctx = match WhisperContext::new_with_params(
             model_path
                 .to_str()
                 .ok_or_else(|| crate::Error::Model("Invalid UTF-8 in model path".to_string()))?,
             ctx_params,
-        )
-        .map_err(|e| crate::Error::Model(format!("Failed to load whisper.cpp model: {}", e)))?;
+        ) {
+            Ok(ctx) => ctx,
+            Err(e) => {
+                // If GPU loading failed, try falling back to CPU
+                if config.use_gpu {
+                    warn!("⚠️  GPU model loading failed: {} - trying CPU fallback", e);
+                    config.use_gpu = false;
+                    let cpu_params = WhisperContextParameters {
+                        use_gpu: false,
+                        ..Default::default()
+                    };
+                    WhisperContext::new_with_params(
+                        model_path.to_str().ok_or_else(|| {
+                            crate::Error::Model("Invalid UTF-8 in model path".to_string())
+                        })?,
+                        cpu_params,
+                    )
+                    .map_err(|e| {
+                        crate::Error::Model(format!(
+                            "Failed to load whisper.cpp model even with CPU fallback: {}",
+                            e
+                        ))
+                    })?
+                } else {
+                    return Err(crate::Error::Model(format!(
+                        "Failed to load whisper.cpp model: {}",
+                        e
+                    )));
+                }
+            }
+        };
 
         info!("✅ Whisper.cpp model loaded successfully");
 
@@ -189,7 +242,8 @@ impl ModelRuntime for WhisperCpp {
             .map_err(|e| crate::Error::Model(format!("Transcription failed: {}", e)))?;
 
         // Extract results using the new iterator API
-        let mut full_text = String::new();
+        // Pre-allocate with estimated capacity to reduce reallocations
+        let mut full_text = String::with_capacity(256);
         let mut num_segments = 0;
 
         for segment in state.as_iter() {

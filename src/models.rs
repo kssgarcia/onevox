@@ -7,6 +7,7 @@
 //! Optional backend: Candle (pure Rust, experimental)
 
 pub mod downloader;
+pub mod gpu;
 pub mod mock;
 pub mod onnx_runtime;
 pub mod registry;
@@ -19,6 +20,7 @@ pub mod whisper_candle;
 
 // Re-export commonly used types
 pub use downloader::ModelDownloader;
+pub use gpu::{GpuBackend, GpuCapabilities};
 pub use mock::MockModel;
 pub use onnx_runtime::OnnxRuntime;
 pub use registry::{ModelMetadata, ModelRegistry, ModelSize, ModelVariant};

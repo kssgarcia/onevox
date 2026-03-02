@@ -157,8 +157,8 @@ impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             model_path: "ggml-base.en".to_string(), // Model ID, not full filename
-            device: "auto".to_string(),
-            preload: true,
+            device: "cpu".to_string(), // Default to CPU for reliability, user can enable GPU
+            preload: false,            // Don't preload by default to save startup time
         }
     }
 }

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Daemon lifecycle manager
 pub struct Lifecycle {
@@ -104,6 +104,7 @@ impl Lifecycle {
                 let mut retry_count = 0;
                 let max_retries = 3;
 
+                info!("Initializing dictation engine (IPC handler)");
                 loop {
                     match DictationEngine::with_history(config.clone(), Arc::clone(&history_manager)) {
                         Ok(mut engine) => {
@@ -113,9 +114,12 @@ impl Lifecycle {
                             // This engine instance handles hotkey events
                             let config_for_hotkey = config.clone();
                             let history_for_hotkey = Arc::clone(&history_manager);
+
+                            info!("Starting hotkey listener thread");
                             std::thread::spawn(move || {
                                 let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
                                 rt.block_on(async {
+                                    debug!("Initializing dictation engine (hotkey handler)");
                                     match DictationEngine::with_history(config_for_hotkey, history_for_hotkey) {
                                         Ok(mut hotkey_engine) => {
                                             if let Err(e) = hotkey_engine.start().await {

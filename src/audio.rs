@@ -5,11 +5,13 @@
 pub mod buffer;
 pub mod capture;
 pub mod devices;
+pub mod pool;
 
 // Re-export commonly used types
 pub use buffer::{AudioBuffer, AudioChunk, AudioConsumer, AudioProducer};
 pub use capture::{AudioCapture, CaptureConfig};
 pub use devices::{AudioDeviceInfo, AudioDeviceManager};
+pub use pool::BufferPool;
 
 /// Audio engine - main interface for audio system
 pub struct AudioEngine {

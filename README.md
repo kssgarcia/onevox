@@ -33,9 +33,19 @@ Press a hotkey, speak, and your words appear instantly in any application. All p
 
 ### Quick Install
 
-**macOS & Linux**
+**macOS (Apple Silicon M1/M2/M3/M4)**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
+```
+> **Note:** Pre-built binaries include Metal GPU acceleration by default. Intel Macs are not supported in pre-built releases—build from source instead.
+
+**Linux**
+```bash
+# CPU-only (default, works on all systems)
+curl -fsSL https://raw.githubusercontent.com/kssgarcia/onevox/main/install.sh | sh
+
+# For GPU acceleration (NVIDIA, AMD, Intel), build from source
+# See INSTALLATION.md for detailed build instructions
 ```
 
 **Linux Post-Install**
@@ -58,7 +68,58 @@ $env:Path += ";$onevoxDir"
 & "$onevoxDir\onevox.exe" --version
 ```
 
+### Release Artifacts
+
+Each release provides platform-specific binaries:
+
+| Platform | Artifact | GPU Support | Notes |
+|----------|----------|-------------|-------|
+| **macOS** | `onevox-macos-arm64.tar.gz` | ✅ Metal (built-in) | Apple Silicon only (M1/M2/M3/M4) |
+| **Linux** | `onevox-linux-x86_64.tar.gz` | ❌ CPU only | Default, works on all systems |
+| **Windows** | `onevox-windows-x86_64.zip` | ❌ CPU only | GPU support via custom build |
+
+> **GPU on Linux/Windows:** Pre-built binaries are CPU-only. For GPU acceleration, build from source with `--features cuda` (NVIDIA) or `--features vulkan` (AMD/Intel). See [INSTALLATION.md](INSTALLATION.md) for detailed instructions.
+
 See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions, troubleshooting, and service management.
+
+### GPU Acceleration
+
+OneVox supports GPU acceleration for significantly faster transcription (2-4x speedup):
+
+**macOS Apple Silicon (M1/M2/M3/M4)**
+```bash
+# Metal GPU is included in pre-built binaries (onevox-macos-arm64.tar.gz)
+# No additional setup required - just enable in config
+```
+
+**macOS Intel (Custom Build)**
+```bash
+# Intel Macs require building from source with Metal support
+cargo build --release --features metal
+```
+
+**Linux with NVIDIA GPU**
+```bash
+# Build from source with CUDA support
+# Requires: NVIDIA GPU + CUDA Toolkit 11.0+ installed
+cargo build --release --features cuda
+```
+
+**Linux/Windows with AMD/Intel GPU**
+```bash
+cargo build --release --features vulkan
+```
+
+**Configuration:**
+- GPU acceleration is **disabled by default** for maximum compatibility
+- Enable via TUI: `onevox tui` → Model Settings → Device: "gpu"
+- Or edit config: `~/.config/onevox/config.toml` → `[model] device = "gpu"`
+- Check GPU status: `onevox info`
+
+**Automatic Fallback:**
+- If GPU is unavailable or fails, OneVox automatically falls back to CPU
+- No configuration changes needed - it just works
+- Performance: ~50-200ms with GPU, ~200-500ms with CPU (for base/small models)
 
 ### Build Variants
 
@@ -73,7 +134,7 @@ OneVox supports multiple model backends with automatic detection:
 - 50-200ms latency
 
 ```bash
-# Build default (whisper.cpp only on x86_64 macOS, includes ONNX on ARM64 macOS/Linux)
+# Build default (includes whisper.cpp + ONNX on ARM64 macOS/Linux/Windows)
 cargo build --release
 ```
 
@@ -139,7 +200,10 @@ The uninstaller removes:
 ## Usage
 
 ```bash
-# Check status
+# Check system info and GPU capabilities
+onevox info
+
+# Check daemon status
 onevox status
 
 # Open terminal UI

@@ -96,6 +96,9 @@ enum Commands {
     /// Stop dictation (for Wayland/manual triggering)
     StopDictation,
 
+    /// Display system information including GPU capabilities
+    Info,
+
     /// Internal overlay indicator process
     #[command(hide = true)]
     Indicator {
@@ -913,6 +916,72 @@ async fn main() -> Result<()> {
                     std::process::exit(1);
                 }
             }
+        }
+
+        Commands::Info => {
+            println!("🖥️  OneVox System Information\n");
+
+            // Platform info
+            println!(
+                "Platform: {} {}",
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            );
+
+            // GPU capabilities
+            let gpu_caps = onevox::models::GpuCapabilities::detect();
+            println!("\n📊 GPU Capabilities:");
+            println!(
+                "  Status: {}",
+                if gpu_caps.available {
+                    "✅ Available"
+                } else {
+                    "❌ Not Available"
+                }
+            );
+            println!("  Backend: {:?}", gpu_caps.backend);
+            println!("  Description: {}", gpu_caps.description);
+
+            if let Some(instructions) = gpu_caps.build_instructions() {
+                println!("\n💡 To enable GPU acceleration:");
+                println!("{}", instructions);
+            }
+
+            // Binary feature flags
+            println!("\n🔧 Compiled Features:");
+
+            #[cfg(feature = "whisper-cpp")]
+            println!("  ✓ whisper-cpp backend");
+
+            #[cfg(feature = "onnx")]
+            println!("  ✓ ONNX Runtime backend");
+
+            #[cfg(feature = "metal")]
+            println!("  ✓ Metal GPU acceleration");
+
+            #[cfg(feature = "cuda")]
+            println!("  ✓ CUDA GPU acceleration");
+
+            #[cfg(feature = "vulkan")]
+            println!("  ✓ Vulkan GPU acceleration");
+
+            #[cfg(feature = "openblas")]
+            println!("  ✓ OpenBLAS CPU optimization");
+
+            #[cfg(feature = "overlay-indicator")]
+            println!("  ✓ Recording overlay indicator");
+
+            // Config location
+            if let Ok(config_dir) = onevox::platform::paths::config_dir() {
+                println!("\n📁 Paths:");
+                println!("  Config: {}/config.toml", config_dir.display());
+            }
+
+            if let Ok(models_dir) = onevox::platform::paths::models_dir() {
+                println!("  Models: {}", models_dir.display());
+            }
+
+            Ok(())
         }
 
         Commands::Indicator { mode } => {

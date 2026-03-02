@@ -89,12 +89,18 @@ enigo = "0.6"        # Keyboard/mouse simulation for text injection
 libc = "0.2"
 
 [features]
-default = ["whisper-cpp", "onnx", "overlay-indicator"] # Include both backends by default
+default = ["whisper-cpp", "onnx", "overlay-indicator"]
 
 # Model backends
 whisper-cpp = ["whisper-rs"]
 onnx = ["ort", "ort-sys", "ndarray"]
 candle = ["candle-core", "candle-nn", "candle-transformers"]
+
+# GPU acceleration backends (automatically enabled on macOS by default)
+metal = ["whisper-rs/metal"]       # macOS GPU acceleration (M1/M2/M3/M4)
+cuda = ["whisper-rs/cuda"]         # NVIDIA GPU acceleration
+vulkan = ["whisper-rs/vulkan"]     # Cross-platform GPU (AMD, Intel, etc)
+openblas = ["whisper-rs/openblas"] # CPU optimization
 
 # VAD backends
 webrtc-vad = []
@@ -209,4 +215,8 @@ harness = false
 
 [[bench]]
 name = "pipeline_e2e"
+harness = false
+
+[[bench]]
+name = "gpu_comparison"
 harness = false
