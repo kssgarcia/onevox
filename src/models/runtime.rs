@@ -63,10 +63,20 @@ impl Default for ModelConfig {
 }
 
 fn default_thread_count() -> u32 {
-    std::thread::available_parallelism()
+    let cores = std::thread::available_parallelism()
         .map(|n| n.get() as u32)
-        .unwrap_or(1)
-        .clamp(1, 8)
+        .unwrap_or(1);
+
+    // On Windows, use all available cores for better performance
+    // On other platforms, cap at 8 to avoid over-subscription
+    #[cfg(target_os = "windows")]
+    {
+        cores.clamp(1, 16)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        cores.clamp(1, 8)
+    }
 }
 
 /// Model runtime trait

@@ -14,7 +14,9 @@ use std::path::PathBuf;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "whisper-cpp")]
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{
+    FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
+};
 
 /// Whisper.cpp model backend
 #[cfg(feature = "whisper-cpp")]
@@ -22,6 +24,7 @@ pub struct WhisperCpp {
     ctx: Option<WhisperContext>,
     config: Option<ModelConfig>,
     model_path: Option<PathBuf>,
+    cached_state: Option<WhisperState>, // Cache the state to avoid reallocation
 }
 
 #[cfg(feature = "whisper-cpp")]
@@ -34,6 +37,7 @@ impl WhisperCpp {
             ctx: None,
             config: None,
             model_path: None,
+            cached_state: None,
         })
     }
 
@@ -220,8 +224,16 @@ impl ModelRuntime for WhisperCpp {
 
         // Configure parameters from ModelConfig
         params.set_n_threads(config.n_threads as i32);
-        // Auto-detect language (None = auto-detection enabled)
-        params.set_language(None);
+
+        // Windows-specific: Log thread count to verify it's being used correctly
+        #[cfg(target_os = "windows")]
+        info!(
+            "Using {} threads for transcription on Windows",
+            config.n_threads
+        );
+
+        // Set language to English explicitly instead of auto-detect (MUCH faster on Windows)
+        params.set_language(Some("en"));
         params.set_translate(false); // Always transcribe, never translate
         params.set_print_progress(false);
         params.set_print_special(false);
@@ -231,10 +243,23 @@ impl ModelRuntime for WhisperCpp {
         params.set_suppress_blank(true);
         params.set_suppress_nst(true); // Suppress non-speech tokens
 
-        // Create a state for this transcription (whisper-rs 0.14+ API)
-        let mut state = ctx
-            .create_state()
-            .map_err(|e| crate::Error::Model(format!("Failed to create state: {}", e)))?;
+        // Additional performance optimizations for Windows
+        #[cfg(target_os = "windows")]
+        {
+            params.set_max_len(1); // Process in smaller segments for better responsiveness
+            params.set_single_segment(false); // Allow multi-segment processing
+        }
+
+        // Reuse cached state or create a new one if needed
+        // This avoids reallocating 231MB of compute buffers every transcription!
+        let mut state = if let Some(cached) = self.cached_state.take() {
+            debug!("Reusing cached whisper state (avoiding 231MB reallocation)");
+            cached
+        } else {
+            info!("Creating new whisper state (first transcription)");
+            ctx.create_state()
+                .map_err(|e| crate::Error::Model(format!("Failed to create state: {}", e)))?
+        };
 
         // Run transcription
         state
@@ -251,6 +276,9 @@ impl ModelRuntime for WhisperCpp {
             let segment_text = segment.to_string();
             full_text.push_str(&segment_text);
         }
+
+        // Cache the state for next transcription
+        self.cached_state = Some(state);
 
         let processing_time = start.elapsed();
 
