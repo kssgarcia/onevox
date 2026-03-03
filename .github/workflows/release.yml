@@ -115,8 +115,8 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build release binary
-        run: cargo build --release --locked
+      - name: Build release binary with OpenBLAS
+        run: cargo build --release --locked --features openblas
 
       - name: Create zip archive
         shell: pwsh

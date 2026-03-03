@@ -538,6 +538,32 @@ start ms-settings:privacy-microphone
    - System will work fine on CPU, just slower (~2-4x)
    - Consider using smaller models (tiny/base) for better CPU performance
 
+**Slow transcription on Windows (40-60 seconds instead of 2 seconds)?**
+
+This happens when the binary is built **without OpenBLAS optimization**:
+
+1. **Verify your build includes OpenBLAS:**
+   ```bash
+   # If you built from source, ensure you used:
+   cargo build --release --features openblas
+   ```
+
+2. **Use official pre-built releases:**
+   - Download from [Releases](https://github.com/kssgarcia/onevox/releases)
+   - Official releases include OpenBLAS by default (starting from v0.1.2+)
+
+3. **Why OpenBLAS matters:**
+   - Whisper models perform millions of matrix multiplications
+   - Without BLAS, these use slow, unoptimized C loops
+   - With OpenBLAS, they use hardware-accelerated AVX2/FMA instructions
+   - Result: **20-30x faster** transcription (2s vs 60s)
+
+4. **Rebuild with OpenBLAS:**
+   ```bash
+   cargo clean
+   cargo build --release --features openblas
+   ```
+
 **Check status:** `onevox status`
 
 **View system info:** `onevox info`
@@ -592,12 +618,19 @@ CC=clang CXX=clang++ SDKROOT=$(xcrun --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=1
 # Linux - includes ONNX by default
 cargo build --release
 
-# Windows - includes ONNX by default
-cargo build --release
+# Windows - includes ONNX + OpenBLAS (CRITICAL for performance)
+# OpenBLAS provides 20-30x speedup over unoptimized builds
+cargo build --release --features openblas
 
 # Install locally
 ./target/release/onevox --version
 ```
+
+**⚠️ CRITICAL for Windows Performance:**
+- **ALWAYS** build Windows with `--features openblas` flag
+- Without OpenBLAS, transcription will be **20-30x slower** (40-60s vs 2s)
+- OpenBLAS enables optimized BLAS (Basic Linear Algebra Subprograms) for fast matrix operations
+- Pre-built releases automatically include OpenBLAS optimization
 
 **Note**: ONNX Runtime does not provide prebuilt binaries for x86_64 (Intel) macOS. Use whisper.cpp models on Intel Macs.
 

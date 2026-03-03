@@ -76,9 +76,11 @@ Each release provides platform-specific binaries:
 |----------|----------|-------------|-------|
 | **macOS** | `onevox-macos-arm64.tar.gz` | ✅ Metal (built-in) | Apple Silicon only (M1/M2/M3/M4) |
 | **Linux** | `onevox-linux-x86_64.tar.gz` | ❌ CPU only | Default, works on all systems |
-| **Windows** | `onevox-windows-x86_64.zip` | ❌ CPU only | GPU support via custom build |
+| **Windows** | `onevox-windows-x86_64.zip` | ❌ CPU only | Includes OpenBLAS optimization (v0.1.2+) |
 
 > **GPU on Linux/Windows:** Pre-built binaries are CPU-only. For GPU acceleration, build from source with `--features cuda` (NVIDIA) or `--features vulkan` (AMD/Intel). See [INSTALLATION.md](INSTALLATION.md) for detailed instructions.
+
+> **Windows Performance:** Official releases (v0.1.2+) include OpenBLAS optimization for 20-30x faster transcription. If building from source, use `cargo build --release --features openblas` to ensure optimal performance.
 
 See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions, troubleshooting, and service management.
 

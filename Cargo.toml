@@ -100,7 +100,7 @@ candle = ["candle-core", "candle-nn", "candle-transformers"]
 metal = ["whisper-rs/metal"]       # macOS GPU acceleration (M1/M2/M3/M4)
 cuda = ["whisper-rs/cuda"]         # NVIDIA GPU acceleration
 vulkan = ["whisper-rs/vulkan"]     # Cross-platform GPU (AMD, Intel, etc)
-openblas = ["whisper-rs/openblas"] # CPU optimization
+openblas = ["whisper-rs/openblas"] # CPU optimization (CRITICAL for Windows performance - 20-30x speedup)
 
 # VAD backends
 webrtc-vad = []

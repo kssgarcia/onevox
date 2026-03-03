@@ -97,7 +97,19 @@ jobs:
         run: cargo clippy --lib --bins --tests --locked -- -D warnings
 
       - name: Cargo check
-        run: cargo check --locked --all-targets
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cargo check --locked --all-targets --features openblas
+          else
+            cargo check --locked --all-targets
+          fi
+        shell: bash
 
       - name: Cargo test
-        run: cargo test --locked --all-targets
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cargo test --locked --all-targets --features openblas
+          else
+            cargo test --locked --all-targets
+          fi
+        shell: bash
