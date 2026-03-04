@@ -324,6 +324,17 @@
                             <li>Accessibility (Injection)</li>
                             <li>Microphone (Audio)</li>
                         </ul>
+                        <div class="code-wrapper">
+                            <button
+                                class="copy-btn mono"
+                                onclick="copyCode(this)"
+                            >
+                                COPY
+                            </button>
+                            <pre>
+launchctl kickstart -k gui/$(id -u)/com.onevox.daemon</pre
+                            >
+                        </div>
                     </div>
                     <div class="install-box">
                         <h3 class="mono">Linux</h3>
@@ -374,14 +385,11 @@
                             >
                                 COPY
                             </button>
-                            <pre>$onevoxDir = "$env:LOCALAPPDATA\onevox"
-<span class="highlight">Invoke-WebRequest</span> -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/onevox-windows-x86_64.zip" -OutFile onevox-windows-x86_64.zip
-<span class="highlight">Expand-Archive</span> -Path onevox-windows-x86_64.zip -DestinationPath $onevoxDir -Force
-[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$onevoxDir", [EnvironmentVariableTarget]::User)</pre>
+                            <pre>
+$onevoxDir="$env:LOCALAPPDATA\onevox";$asset="onevox-windows-x86_64.zip";Invoke-WebRequest -Uri "https://github.com/kssgarcia/onevox/releases/latest/download/$asset" -OutFile $asset;Expand-Archive -Path $asset -DestinationPath $onevoxDir -Force;[Environment]::SetEnvironmentVariable("Path",$env:Path+";$onevoxDir",[EnvironmentVariableTarget]::User);$env:Path+=";$onevoxDir";& "$onevoxDir\onevox.exe" --version</pre
+                            >
                         </div>
-                        <p style="font-size: 12px; margin-top: 20px">
-                            HOTKEY:
-                        </p>
+                        <p style="font-size: 12px; margin-top: 20px">HOTKEY:</p>
                         <p style="font-size: 14px" class="mono">
                             CTRL + SHIFT + SPACE
                         </p>
@@ -438,7 +446,7 @@
                         </button>
                     </div>
                     <div class="cmd-item">
-                        <code>onevox models download whisper-base.en</code>
+                        <code>onevox models download ggml-base.en</code>
                         <button
                             class="copy-btn mono"
                             style="
@@ -526,14 +534,26 @@
                     <div class="mono" style="color: #fff; margin-bottom: 10px">
                         Build_From_Source
                     </div>
+
                     <p style="margin-bottom: 20px">
-                        Requires Rust (Cargo) and LLVM/Clang.
+                        Requires Rust (Cargo) and LLVM/Clang.<br />
+                        CUDA Toolkit required for Windows (NVIDIA GPUs).
                     </p>
-                    <div class="code-wrapper">
+
+                    <!-- macOS -->
+                    <div class="code-wrapper" style="margin-bottom: 15px">
                         <button class="copy-btn mono" onclick="copyCode(this)">
                             COPY
                         </button>
                         <pre><span class="highlight">cargo</span> build --release --features metal</pre>
+                    </div>
+
+                    <!-- Windows -->
+                    <div class="code-wrapper">
+                        <button class="copy-btn mono" onclick="copyCode(this)">
+                            COPY
+                        </button>
+                        <pre><span class="highlight">cargo</span> build --release --features cuda</pre>
                     </div>
                 </div>
             </section>
