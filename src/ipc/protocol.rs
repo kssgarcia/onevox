@@ -49,6 +49,15 @@ pub enum Command {
     /// Stop dictation mode
     StopDictation,
 
+    /// Start chat mode
+    StartChat,
+
+    /// Stop chat mode
+    StopChat,
+
+    /// Clear chat history
+    ClearChatHistory,
+
     /// List available audio devices
     ListDevices,
 
@@ -122,6 +131,15 @@ pub struct DaemonStatus {
 
     /// Is currently dictating
     pub is_dictating: bool,
+
+    /// Is chat mode enabled
+    pub chat_enabled: bool,
+
+    /// Is currently chatting
+    pub is_chatting: bool,
+
+    /// Chat models loaded (STT, LLM, TTS)
+    pub chat_models_loaded: bool,
 
     /// Memory usage in bytes
     pub memory_usage_bytes: u64,
@@ -215,6 +233,9 @@ impl DaemonStatus {
             model_loaded: false,
             model_name: None,
             is_dictating: false,
+            chat_enabled: false,
+            is_chatting: false,
+            chat_models_loaded: false,
             memory_usage_bytes: 0,
             cpu_usage_percent: 0.0,
         }

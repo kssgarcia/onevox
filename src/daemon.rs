@@ -2,11 +2,13 @@
 //!
 //! Main daemon process and lifecycle management.
 
+pub mod chat_handler;
 pub mod dictation;
 pub mod lifecycle;
 pub mod state;
 
 // Re-export commonly used types
+pub use chat_handler::ChatHandler;
 pub use dictation::DictationEngine;
 pub use lifecycle::Lifecycle;
 pub use state::DaemonState;

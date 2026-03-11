@@ -1,0 +1,66 @@
+# OneVox Test Configuration with Chat Enabled
+
+[daemon]
+auto_start = true
+log_level = "info"
+
+[hotkey]
+trigger = "Cmd+Shift+0"
+mode = "push-to-talk"
+
+[audio]
+device = "default"
+sample_rate = 16000
+chunk_duration_ms = 200
+
+[vad]
+enabled = false
+backend = "energy"
+threshold = 0.02
+pre_roll_ms = 300
+post_roll_ms = 500
+min_speech_chunks = 2
+min_silence_chunks = 3
+adaptive = true
+
+[model]
+model_path = "ggml-base.en"
+device = "auto"
+preload = true
+
+[post_processing]
+auto_punctuation = true
+auto_capitalize = true
+remove_filler_words = false
+
+[injection]
+method = "accessibility"
+paste_delay_ms = 50
+focus_settle_ms = 80
+
+[ui]
+recording_overlay = true
+theme = "dark"
+
+[chat]
+enabled = true
+hotkey = "Cmd+Shift+9"
+mode = "push-to-talk"
+system_prompt = "You are a helpful assistant."
+
+[chat.llm]
+model_path = ""  # Set this to your LLM model path
+device = "auto"
+temperature = 0.7
+max_tokens = 150
+top_p = 0.9
+top_k = 40
+repetition_penalty = 1.1
+
+[chat.tts]
+model_path = ""  # Set this to your TTS model path
+device = "auto"
+voice = "af_heart"
+pitch = 1.0
+volume = 1.0
+speech_rate = 1.0

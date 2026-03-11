@@ -426,6 +426,33 @@ impl IpcServer {
                 }
             }
 
+            Command::StartChat => {
+                info!("Start chat command received");
+                let state = state.read().await;
+                match state.start_chat() {
+                    Ok(()) => Response::Success,
+                    Err(e) => Response::Error(format!("Failed to start chat: {}", e)),
+                }
+            }
+
+            Command::StopChat => {
+                info!("Stop chat command received");
+                let state = state.read().await;
+                match state.stop_chat() {
+                    Ok(()) => Response::Success,
+                    Err(e) => Response::Error(format!("Failed to stop chat: {}", e)),
+                }
+            }
+
+            Command::ClearChatHistory => {
+                info!("Clear chat history command received");
+                let state = state.read().await;
+                match state.clear_chat_history() {
+                    Ok(()) => Response::Success,
+                    Err(e) => Response::Error(format!("Failed to clear chat history: {}", e)),
+                }
+            }
+
             Command::ListDevices => {
                 // TODO: Implement device listing
                 Response::List(vec!["default".to_string()])

@@ -96,6 +96,15 @@ enum Commands {
     /// Stop dictation (for Wayland/manual triggering)
     StopDictation,
 
+    /// Start chat mode (for Wayland/manual triggering)
+    StartChat,
+
+    /// Stop chat mode (for Wayland/manual triggering)
+    StopChat,
+
+    /// Clear chat history
+    ClearChatHistory,
+
     /// Display system information including GPU capabilities
     Info,
 
@@ -259,6 +268,20 @@ async fn main() -> Result<()> {
                 println!(
                     "  Dictating:   {}",
                     if status.is_dictating { "Yes" } else { "No" }
+                );
+                println!(
+                    "  Chat:        {}",
+                    if status.chat_enabled {
+                        if status.is_chatting {
+                            "Active 💬"
+                        } else if status.chat_models_loaded {
+                            "Ready ✅"
+                        } else {
+                            "Enabled (loading models...)"
+                        }
+                    } else {
+                        "Disabled"
+                    }
                 );
                 println!(
                     "  Memory:      {} MB",
@@ -912,6 +935,59 @@ async fn main() -> Result<()> {
                 }
                 Err(e) => {
                     eprintln!("❌ Failed to stop dictation: {}", e);
+                    eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::StartChat => {
+            println!("💬 Starting chat...");
+            let mut client = onevox::ipc::IpcClient::default();
+            match client.start_chat().await {
+                Ok(_) => {
+                    println!("✅ Chat started");
+                    println!("💡 Hold {} to talk to the AI assistant", {
+                        let config = Config::load_default().unwrap_or_default();
+                        config.chat.hotkey
+                    });
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to start chat: {}", e);
+                    eprintln!("💡 Is the daemon running with chat enabled?");
+                    eprintln!("   Try: onevox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::StopChat => {
+            println!("🛑 Stopping chat...");
+            let mut client = onevox::ipc::IpcClient::default();
+            match client.stop_chat().await {
+                Ok(_) => {
+                    println!("✅ Chat stopped");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to stop chat: {}", e);
+                    eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::ClearChatHistory => {
+            println!("🗑️  Clearing chat history...");
+            let mut client = onevox::ipc::IpcClient::default();
+            match client.clear_chat_history().await {
+                Ok(_) => {
+                    println!("✅ Chat history cleared");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to clear chat history: {}", e);
                     eprintln!("💡 Is the daemon running? Try: onevox daemon --foreground");
                     std::process::exit(1);
                 }

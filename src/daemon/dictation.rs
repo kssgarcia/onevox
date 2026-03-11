@@ -160,38 +160,44 @@ impl DictationEngine {
         // List available audio devices for debugging
         self.list_audio_devices();
 
-        let hotkey_manager = self.hotkey_manager.as_mut().ok_or_else(|| {
-            anyhow::anyhow!(
-                "Global hotkey backend unavailable on this system. Use 'onevox start-dictation' and 'onevox stop-dictation' (recommended for some Wayland environments)."
-            )
-        })?;
+        // Try to start hotkey listener if available
+        if let Some(hotkey_manager) = self.hotkey_manager.as_mut() {
+            // Register global hotkey
+            let hotkey_str = self.config.hotkey.trigger.clone();
+            let hotkey_config = PlatformHotkeyConfig::from_string(&hotkey_str)
+                .context("Failed to parse hotkey configuration")?;
 
-        // Register global hotkey
-        let hotkey_str = self.config.hotkey.trigger.clone();
-        let hotkey_config = PlatformHotkeyConfig::from_string(&hotkey_str)
-            .context("Failed to parse hotkey configuration")?;
+            let event_rx = hotkey_manager
+                .register(hotkey_config)
+                .context("Failed to register hotkey")?;
 
-        let event_rx = hotkey_manager
-            .register(hotkey_config)
-            .context("Failed to register hotkey")?;
+            info!("✅ Hotkey registered: {}", hotkey_str);
 
-        info!("✅ Hotkey registered: {}", hotkey_str);
+            // Take ownership of hotkey_manager to start the listener
+            // (it consumes self and moves into the listener thread)
+            let hotkey_manager = self
+                .hotkey_manager
+                .take()
+                .ok_or_else(|| anyhow::anyhow!("Hotkey manager missing after registration"))?;
 
-        // Take ownership of hotkey_manager to start the listener
-        // (it consumes self and moves into the listener thread)
-        let hotkey_manager = self
-            .hotkey_manager
-            .take()
-            .ok_or_else(|| anyhow::anyhow!("Hotkey manager missing after registration"))?;
+            hotkey_manager
+                .start_listener()
+                .context("Failed to start hotkey listener")?;
 
-        hotkey_manager
-            .start_listener()
-            .context("Failed to start hotkey listener")?;
+            info!("✅ Hotkey listener started");
 
-        info!("✅ Hotkey listener started");
-
-        // Start hotkey event loop
-        self.run_event_loop(event_rx).await?;
+            // Start hotkey event loop
+            self.run_event_loop(event_rx).await?;
+        } else {
+            warn!(
+                "Global hotkeys unavailable. Use IPC commands: 'onevox start-dictation' and 'onevox stop-dictation'"
+            );
+            // Keep the engine running but without hotkey support
+            // Just wait for shutdown signal
+            while !self.shutdown_signal.load(Ordering::SeqCst) {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
 
         Ok(())
     }

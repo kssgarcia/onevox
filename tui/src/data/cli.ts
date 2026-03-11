@@ -33,6 +33,9 @@ export interface DaemonStatus {
   modelLoaded: boolean
   modelName: string | null
   isDictating: boolean
+  chatEnabled: boolean
+  isChatting: boolean
+  chatModelsLoaded: boolean
 }
 
 export interface ReloadResult {
@@ -299,6 +302,76 @@ export function getModelRegistry(): ModelInfo[] {
       description: "NVIDIA Parakeet - Fast multilingual ONNX model (ARM64 macOS, Linux, Windows)",
       downloaded: false,
     },
+
+    // ============================================================
+    // LLM Models (for Chat)
+    // ============================================================
+
+    {
+      id: "lfm2-1.2b-tool-q4",
+      name: "Liquid LFM2 1.2B Q4_K_M (fast)",
+      size: "~731 MB",
+      sizeBytes: 731_000_000,
+      speedFactor: 1,
+      memoryMb: 1200,
+      description: "Fast Q4 quantization. Good balance of speed and quality. Recommended for most users.",
+      downloaded: false,
+    },
+    {
+      id: "lfm2-1.2b-tool-q5",
+      name: "Liquid LFM2 1.2B Q5_K_M (balanced)",
+      size: "~843 MB",
+      sizeBytes: 843_000_000,
+      speedFactor: 0.9,
+      memoryMb: 1500,
+      description: "Q5 quantization. Better quality than Q4 with slightly larger size. Good for quality-focused users.",
+      downloaded: false,
+    },
+    {
+      id: "lfm2-1.2b-tool-q8",
+      name: "Liquid LFM2 1.2B Q8_0 (quality)",
+      size: "~1.25 GB",
+      sizeBytes: 1_250_000_000,
+      speedFactor: 0.8,
+      memoryMb: 2000,
+      description: "High quality Q8 quantization. Best quality, larger size. For users who prioritize response quality.",
+      downloaded: false,
+    },
+
+    // ============================================================
+    // TTS Models (for Chat)
+    // ============================================================
+
+    {
+      id: "kokoro-tts-q8f16",
+      name: "Kokoro TTS Q8F16 (recommended)",
+      size: "~86 MB",
+      sizeBytes: 86_000_000,
+      speedFactor: 10,
+      memoryMb: 200,
+      description: "Q8F16 quantization. Best balance of quality and size. Multiple voices available. Recommended for most users.",
+      downloaded: false,
+    },
+    {
+      id: "kokoro-tts-fp16",
+      name: "Kokoro TTS FP16 (quality)",
+      size: "~163 MB",
+      sizeBytes: 163_000_000,
+      speedFactor: 8,
+      memoryMb: 300,
+      description: "Full FP16 precision. Highest quality but larger size. For users who prioritize voice quality.",
+      downloaded: false,
+    },
+    {
+      id: "kokoro-tts-q4f16",
+      name: "Kokoro TTS Q4F16 (fast)",
+      size: "~154 MB",
+      sizeBytes: 154_000_000,
+      speedFactor: 12,
+      memoryMb: 250,
+      description: "Q4F16 quantization. Fastest inference with good quality. For users who need lowest latency.",
+      downloaded: false,
+    },
   ]
 }
 
@@ -367,6 +440,9 @@ export async function getDaemonStatus(): Promise<DaemonStatus | null> {
       modelLoaded: out.includes("model loaded"),
       modelName: null,
       isDictating: out.includes("dictating"),
+      chatEnabled: out.includes("chat enabled") || out.includes("Chat: enabled"),
+      isChatting: out.includes("chatting") || out.includes("Chat status: active"),
+      chatModelsLoaded: out.includes("chat models loaded") || out.includes("LLM loaded") && out.includes("TTS loaded"),
     }
   } catch {
     return null

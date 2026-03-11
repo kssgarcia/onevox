@@ -4,14 +4,20 @@
 
 pub mod buffer;
 pub mod capture;
+pub mod continuous_player;
 pub mod devices;
+pub mod player;
 pub mod pool;
+pub mod streaming_player;
 
 // Re-export commonly used types
 pub use buffer::{AudioBuffer, AudioChunk, AudioConsumer, AudioProducer};
 pub use capture::{AudioCapture, CaptureConfig};
+pub use continuous_player::ContinuousAudioPlayer;
 pub use devices::{AudioDeviceInfo, AudioDeviceManager};
+pub use player::AudioPlayer;
 pub use pool::BufferPool;
+pub use streaming_player::{AudioChunk as StreamingAudioChunk, StreamingAudioPlayer};
 
 /// Audio engine - main interface for audio system
 pub struct AudioEngine {

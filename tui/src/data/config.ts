@@ -25,12 +25,30 @@ function parseTOML(text: string): Record<string, any> {
     const line = rawLine.trim()
     if (line === "" || line.startsWith("#")) continue
 
-    // [section]
+    // [section] or [section.subsection]
     const sectionMatch = line.match(/^\[([^\]]+)\]$/)
     if (sectionMatch) {
       const key = sectionMatch[1]
-      result[key] = result[key] ?? {}
-      currentSection = result[key]
+      // Handle nested sections like [chat.llm]
+      if (key.includes(".")) {
+        const parts = key.split(".")
+        let target = result
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i]
+          if (i === parts.length - 1) {
+            // Last part - this is where we'll add keys
+            target[part] = target[part] ?? {}
+            currentSection = target[part]
+          } else {
+            // Intermediate part - ensure it exists
+            target[part] = target[part] ?? {}
+            target = target[part]
+          }
+        }
+      } else {
+        result[key] = result[key] ?? {}
+        currentSection = result[key]
+      }
       currentKey = key
       continue
     }
@@ -72,7 +90,16 @@ function stringifyTOML(obj: Record<string, any>): string {
     lines.push("")
     lines.push(`[${section}]`)
     for (const [k, v] of Object.entries(table as Record<string, any>)) {
-      lines.push(`${k} = ${formatValue(v)}`)
+      // Handle nested tables (like chat.llm and chat.tts)
+      if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+        lines.push("")
+        lines.push(`[${section}.${k}]`)
+        for (const [nestedKey, nestedVal] of Object.entries(v)) {
+          lines.push(`${nestedKey} = ${formatValue(nestedVal)}`)
+        }
+      } else {
+        lines.push(`${k} = ${formatValue(v)}`)
+      }
     }
   }
   return lines.join("\n") + "\n"
@@ -140,6 +167,33 @@ export interface UiConfig {
   theme: "dark" | "light"
 }
 
+export interface ChatLlmConfig {
+  model_path: string
+  device: string
+  context_length: number
+  temperature: number
+  max_tokens: number
+  system_prompt: string
+  preload: boolean
+}
+
+export interface ChatTtsConfig {
+  model_path: string
+  device: string
+  voice_id: string
+  speech_rate: number
+  preload: boolean
+}
+
+export interface ChatConfig {
+  enabled: boolean
+  hotkey: string
+  mode: string
+  system_prompt: string
+  llm: ChatLlmConfig
+  tts: ChatTtsConfig
+}
+
 export interface VoxConfig {
   daemon: DaemonConfig
   hotkey: HotkeyConfig
@@ -149,6 +203,7 @@ export interface VoxConfig {
   post_processing: PostProcessingConfig
   injection: InjectionConfig
   ui: UiConfig
+  chat?: ChatConfig
 }
 
 // ── Defaults ─────────────────────────────────────────────────────────────
@@ -182,6 +237,28 @@ export const DEFAULT_CONFIG: VoxConfig = {
   },
   injection: { method: "accessibility", paste_delay_ms: 50, focus_settle_ms: 80 },
   ui: { recording_overlay: true, theme: "dark" },
+  chat: {
+    enabled: false,
+    hotkey: process.platform === "darwin" ? "Cmd+Shift+9" : "Ctrl+Shift+9",
+    mode: "toggle",
+    system_prompt: "You are a helpful assistant.",
+    llm: {
+      model_path: "lfm2-1.2b-tool-q4",
+      device: "auto",
+      context_length: 2048,
+      temperature: 0.7,
+      max_tokens: 256,
+      system_prompt: "You are a helpful AI assistant. Be concise and direct.",
+      preload: false,
+    },
+    tts: {
+      model_path: "kokoro-tts-q8f16",
+      device: "auto",
+      voice_id: "af_sarah",
+      speech_rate: 1.0,
+      preload: false,
+    },
+  },
 }
 
 // ── Path resolution ──────────────────────────────────────────────────────

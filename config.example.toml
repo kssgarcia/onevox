@@ -55,7 +55,7 @@ recording_overlay = true
 
 [vad]
 # Voice Activity Detection - automatically detect speech and silence
-# 
+#
 # enabled = false: Manual control (recommended for Wayland/manual commands)
 #   - Use start-dictation/stop-dictation commands to control recording
 #   - Recording continues until you explicitly stop it
@@ -99,7 +99,7 @@ adaptive = true
 #     - ggml-base.en (recommended, ~142MB)
 #     - ggml-small.en (~466MB)
 #     - ggml-medium.en (~1.5GB)
-#   
+#
 #   Multilingual variants (auto-detect language):
 #     - ggml-tiny (~75MB, 99+ languages)
 #     - ggml-base (~142MB, 99+ languages)
@@ -209,3 +209,126 @@ inference_timeout_sec = 30
 
 # Restart daemon on fatal errors
 auto_restart = true
+
+# ============================================================
+# CHAT MODE - Conversational AI (STT→LLM→TTS Pipeline)
+# ============================================================
+# Chat features are now built-in by default!
+# No need for --features chat when building.
+# Just download the models and enable it in the config.
+
+[chat]
+# Enable conversational AI mode
+# When enabled, you can have voice conversations with an AI assistant
+# using a separate hotkey from regular transcription
+# Default: false (enable after downloading models)
+enabled = false
+
+# Chat hotkey (separate from transcription hotkey)
+# macOS: "Cmd+Shift+9"
+# Linux/Windows: "Ctrl+Shift+Alt+Space"
+hotkey = "Cmd+Shift+9"
+
+# Mode: "push-to-talk" (hold to record) or "toggle" (press once to start, again to stop)
+mode = "push-to-talk"
+
+[chat.llm]
+# LLM (Large Language Model) configuration
+
+# Model identifier
+# Available models:
+#   - lfm2-1.2b-tool-q4 (GGUF, ~731MB, fast, recommended)
+#   - lfm2-1.2b-tool-q5 (GGUF, ~843MB, balanced quality/speed)
+#   - lfm2-1.2b-tool-q8 (GGUF, ~1.25GB, best quality)
+model_path = "lfm2-1.2b-tool-q4"
+
+# Compute device: "auto", "cpu", "gpu"
+# "auto" will use GPU if available, otherwise CPU
+device = "auto"
+
+# Context length (max tokens in conversation history)
+# Larger = more conversation memory, but slower
+# Options: 512, 1024, 2048, 4096
+context_length = 2048
+
+# Temperature (0.0 - 2.0)
+# Lower = more focused and deterministic
+# Higher = more creative and random
+# Recommended: 0.7
+temperature = 0.7
+
+# Maximum tokens to generate per response
+# Lower = shorter responses (faster)
+# Higher = longer responses (slower)
+# Recommended: 128-256
+max_tokens = 256
+
+# System prompt (instructions for the AI)
+# This defines the AI's personality and behavior
+system_prompt = "You are a helpful AI assistant. Be concise and direct."
+
+# Preload model at daemon startup
+# true = faster first response, uses more memory
+# false = slower first response, saves memory
+preload = false
+
+[chat.tts]
+# TTS (Text-to-Speech) configuration
+
+# Model identifier
+# Available models:
+#   - kokoro-tts-q8f16 (ONNX, ~86MB, recommended, best balance)
+#   - kokoro-tts-fp16 (ONNX, ~163MB, highest quality)
+#   - kokoro-tts-q4f16 (ONNX, ~154MB, fastest inference)
+model_path = "kokoro-tts-q8f16"
+
+# Compute device: "auto", "cpu", "gpu"
+# Kokoro is CPU-friendly and doesn't benefit much from GPU
+device = "auto"
+
+# Voice selection
+# Available voices:
+#   - af_heart: Female, American, warm and friendly
+#   - af_sky: Female, American, clear and professional
+#   - am_adam: Male, American, deep and authoritative
+#   - am_michael: Male, American, friendly and casual
+#   - bf_emma: Female, British, elegant
+#   - bm_george: Male, British, authoritative
+voice_id = "af_heart"
+
+# Speech rate (0.5 - 2.0)
+# 1.0 = normal speed
+# < 1.0 = slower
+# > 1.0 = faster
+speech_rate = 1.0
+
+# Preload model at daemon startup
+preload = false
+
+# ============================================================
+# CHAT USAGE - Quick Start
+# ============================================================
+#
+# Chat features are built-in! Just follow these steps:
+#
+# 1. Enable chat mode: set `enabled = true` above
+# 2. Download models (only needed once):
+#    onevox models download lfm2-1.2b-tool-q4
+#    onevox models download kokoro-tts-q8f16
+# 3. Restart daemon:
+#    onevox daemon restart
+# 4. Use chat hotkey (Cmd+Shift+9) to talk with AI
+# 5. Use regular hotkey (Cmd+Shift+0) for transcription
+#
+# Pipeline: You speak → STT → LLM generates response → TTS speaks back
+#
+# GPU Acceleration (optional):
+# - Build with Metal: cargo build --release --features metal
+# - Build with CUDA: cargo build --release --features cuda
+#
+# Tips:
+# - Adjust temperature for different conversation styles
+# - Change voice_id to match your preference
+# - Use lower max_tokens for faster responses
+# - Increase context_length for longer conversations
+# ============================================================

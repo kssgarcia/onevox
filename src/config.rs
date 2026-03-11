@@ -24,6 +24,10 @@ pub struct Config {
     pub injection: InjectionConfig,
     #[serde(default)]
     pub history: HistoryConfig,
+    #[serde(default)]
+    pub chat: ChatConfig,
+    #[serde(default)]
+    pub tools: ToolsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +95,62 @@ pub struct HistoryConfig {
     pub auto_save: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatConfig {
+    pub enabled: bool,
+    pub hotkey: String,
+    pub mode: String,
+    pub llm: LlmConfig,
+    pub tts: TtsConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmConfig {
+    pub model_path: String,
+    pub device: String,
+    pub context_length: usize,
+    pub temperature: f32,
+    pub max_tokens: usize,
+    pub system_prompt: String,
+    pub preload: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TtsConfig {
+    pub model_path: String,
+    pub device: String,
+    pub voice_id: String,
+    pub speech_rate: f32,
+    pub preload: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolsConfig {
+    pub enabled: bool,
+    pub obsidian_vault_path: Option<String>,
+    pub memory_storage_path: Option<String>,
+}
+
+impl Default for ToolsConfig {
+    fn default() -> Self {
+        // Try to detect default Obsidian vault path
+        let obsidian_vault_path = std::env::var("HOME")
+            .ok()
+            .map(|home| format!("{}/Documents/Obsidian", home));
+
+        // Default memory storage path
+        let memory_storage_path = std::env::var("HOME")
+            .ok()
+            .map(|home| format!("{}/.onevox/memories.json", home));
+
+        Self {
+            enabled: true,
+            obsidian_vault_path,
+            memory_storage_path,
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         // Platform-specific default hotkey
@@ -126,6 +186,8 @@ impl Default for Config {
             post_processing: PostProcessingConfig::default(),
             injection: InjectionConfig::default(),
             history: HistoryConfig::default(),
+            chat: ChatConfig::default(),
+            tools: ToolsConfig::default(),
         }
     }
 }
@@ -189,6 +251,57 @@ impl Default for HistoryConfig {
             enabled: true,
             max_entries: 1000,
             auto_save: true,
+        }
+    }
+}
+
+impl Default for ChatConfig {
+    fn default() -> Self {
+        // Platform-specific default hotkey
+        #[cfg(target_os = "macos")]
+        let default_hotkey = "Cmd+Shift+9";
+
+        #[cfg(target_os = "linux")]
+        let default_hotkey = "Ctrl+Shift+Alt+Space";
+
+        #[cfg(target_os = "windows")]
+        let default_hotkey = "Ctrl+Shift+Alt+Space";
+
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        let default_hotkey = "Ctrl+Shift+Alt+Space";
+
+        Self {
+            enabled: false,
+            hotkey: default_hotkey.to_string(),
+            mode: "toggle".to_string(),
+            llm: LlmConfig::default(),
+            tts: TtsConfig::default(),
+        }
+    }
+}
+
+impl Default for LlmConfig {
+    fn default() -> Self {
+        Self {
+            model_path: "lfm2-1.2b-tool-q4".to_string(),
+            device: "auto".to_string(),
+            context_length: 2048,
+            temperature: 0.7,
+            max_tokens: 256,
+            system_prompt: "You are a helpful AI assistant. Be concise and direct.".to_string(),
+            preload: false,
+        }
+    }
+}
+
+impl Default for TtsConfig {
+    fn default() -> Self {
+        Self {
+            model_path: "kokoro-tts-q8f16".to_string(),
+            device: "auto".to_string(),
+            voice_id: "af_sarah".to_string(),
+            speech_rate: 1.0,
+            preload: false,
         }
     }
 }

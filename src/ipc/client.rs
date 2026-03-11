@@ -209,4 +209,31 @@ impl IpcClient {
         // The daemon should be restarted by the system service or user
         Ok(())
     }
+
+    /// Start chat mode
+    pub async fn start_chat(&mut self) -> Result<()> {
+        match self.send_command(Command::StartChat).await? {
+            Response::Success | Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
+
+    /// Stop chat mode
+    pub async fn stop_chat(&mut self) -> Result<()> {
+        match self.send_command(Command::StopChat).await? {
+            Response::Success | Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
+
+    /// Clear chat history
+    pub async fn clear_chat_history(&mut self) -> Result<()> {
+        match self.send_command(Command::ClearChatHistory).await? {
+            Response::Success | Response::Ok(_) => Ok(()),
+            Response::Error(e) => Err(anyhow::anyhow!("Error: {}", e)),
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    }
 }

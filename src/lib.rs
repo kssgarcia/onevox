@@ -5,6 +5,7 @@
 #![allow(dead_code, unused_variables)]
 
 pub mod audio;
+pub mod chat;
 pub mod config;
 pub mod daemon;
 pub mod health;
@@ -13,10 +14,12 @@ pub mod indicator;
 pub mod ipc;
 pub mod models;
 pub mod platform;
+pub mod tools;
 pub mod tui;
 pub mod vad;
 
 // Re-export commonly used types
+pub use chat::{ChatEngine, ChatEngineStatus, ChatResponse};
 pub use config::Config;
 pub use daemon::Daemon;
 pub use health::{HealthCheck, HealthChecker, HealthMonitor, HealthStatus};

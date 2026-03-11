@@ -58,7 +58,10 @@ tracing-appender = "0.2"
 # CLI and utilities
 clap = { version = "4.5", features = ["derive"] }
 directories = "5.0"                               # Professional cross-platform directory discovery
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+walkdir = "2.5"
+regex = "1.11"
 
 # HTTP client for model downloads
 reqwest = { version = "0.12", features = [
@@ -83,33 +86,36 @@ sysinfo = "0.33"
 # Platform integration
 handy-keys = "0.2.1" # Cross-platform global keyboard shortcuts
 enigo = "0.6"        # Keyboard/mouse simulation for text injection
+llama-cpp-2 = { version = "0.1.138", default-features = false, optional = true }
 
 # Unix-specific dependencies
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [features]
-default = ["whisper-cpp", "onnx", "overlay-indicator"]
+default = ["whisper-cpp", "onnx", "llama-cpp", "overlay-indicator"]
 
-# Model backends
+# Model backends (all default now)
 whisper-cpp = ["whisper-rs"]
 onnx = ["ort", "ort-sys", "ndarray"]
 candle = ["candle-core", "candle-nn", "candle-transformers"]
+llama-cpp = ["llama-cpp-2"]
 
-# GPU acceleration backends (automatically enabled on macOS by default)
-metal = ["whisper-rs/metal"]       # macOS GPU acceleration (M1/M2/M3/M4)
-cuda = ["whisper-rs/cuda"]         # NVIDIA GPU acceleration
+# GPU acceleration backends (optional - use --features metal or --features cuda)
+metal = ["whisper-rs/metal", "llama-cpp-2?/metal"]       # macOS GPU acceleration (M1/M2/M3/M4)
+cuda = ["whisper-rs/cuda", "llama-cpp-2?/cuda"]         # NVIDIA GPU acceleration
 vulkan = ["whisper-rs/vulkan"]     # Cross-platform GPU (AMD, Intel, etc)
-openblas = ["whisper-rs/openblas"] # CPU optimization
+openblas = ["whisper-rs/openblas", "llama-cpp-2?/openmp"] # CPU optimization
 
 # VAD backends
 webrtc-vad = []
 cargo-clippy = []
 
-# Features
+# UI features
 tui = ["ratatui", "crossterm"]
 gpu = []
 overlay-indicator = ["eframe", "winit"]
+
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"
@@ -146,7 +152,7 @@ features = ["copy-dylibs"]  # Copy ONNX Runtime binaries to target directory
 version = "2.0.0-rc.11"
 optional = true
 default-features = false
-features = ["download-binaries", "tls-rustls"]  # Download and use rustls for TLS
+features = ["download-binaries", "tls-rustls", "coreml"]  # Added coreml for macOS GPU acceleration
 
 [dependencies.ndarray]
 version = "0.16"

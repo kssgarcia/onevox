@@ -187,10 +187,59 @@ export function createConfigPanel(
   // ── 2. Model Selection ─────────────────────────────────────────────
   const modelContent = createSection("sec-model", "Model Selection")
 
-  const models = getModelRegistry()
+  // Ensure chat config exists
+  if (!config.chat) {
+    config.chat = {
+      enabled: false,
+      hotkey: process.platform === "darwin" ? "Cmd+Shift+9" : "Ctrl+Shift+9",
+      system_prompt: "You are a helpful assistant.",
+      llm: {
+        model_path: "lfm2-1.2b-tool-q4",
+        device: "auto",
+        context_length: 2048,
+        temperature: 0.7,
+        max_tokens: 256,
+        system_prompt: "You are a helpful AI assistant. Be concise and direct.",
+        preload: false,
+      },
+      tts: {
+        model_path: "kokoro-tts-q8f16",
+        device: "auto",
+        voice_id: "af_sarah",
+        speech_rate: 1.0,
+        preload: false,
+      },
+    }
+  }
+  // Ensure nested llm and tts objects exist
+  if (!config.chat.llm) {
+    config.chat.llm = {
+      model_path: "lfm2-1.2b-tool-q4",
+      device: "auto",
+      context_length: 2048,
+      temperature: 0.7,
+      max_tokens: 256,
+      system_prompt: "You are a helpful AI assistant. Be concise and direct.",
+      preload: false,
+    }
+  }
+  if (!config.chat.tts) {
+    config.chat.tts = {
+      model_path: "kokoro-tts-q8f16",
+      device: "auto",
+      voice_id: "af_sarah",
+      speech_rate: 1.0,
+      preload: false,
+    }
+  }
 
-  // Pre-select current model
-  const currentModelIdx = models.findIndex((m) => {
+  const models = getModelRegistry()
+  const sttModels = models.filter(m => m.id.startsWith("ggml-") || m.id.includes("parakeet"))
+  const llmModels = models.filter(m => m.id.includes("lfm"))
+  const ttsModels = models.filter(m => m.id.includes("kokoro"))
+
+  // ── STT Model (for dictation) ──
+  const currentSttIdx = sttModels.findIndex((m) => {
     const current = config.model.model_path
     return (
       current === m.id ||
@@ -199,22 +248,22 @@ export function createConfigPanel(
       current.includes(`${m.id}.bin`)
     )
   })
-  const modelField = createSelectField(renderer, {
-    id: "model-select",
-    label: "Model:",
-    options: models.map((m) => ({
+  const sttModelField = createSelectField(renderer, {
+    id: "stt-model-select",
+    label: "STT Model (Dictation):",
+    options: sttModels.map((m) => ({
       name: `${m.name}  (${m.size})`,
       description: `${m.speedFactor}x speed  •  ${m.memoryMb}MB RAM  •  ${m.description}`,
     })),
-    selectedIndex: currentModelIdx >= 0 ? currentModelIdx : 0,
+    selectedIndex: currentSttIdx >= 0 ? currentSttIdx : 0,
     theme,
     onChange: async (index) => {
-      const selectedModel = models[index]
+      const selectedModel = sttModels[index]
       const modelId = selectedModel.id
       
       config.model.model_path = modelId
       markDirty()
-      callbacks.onStatusMessage(`Model → ${selectedModel.name}`)
+      callbacks.onStatusMessage(`STT Model → ${selectedModel.name}`)
       
       // Auto-download if not present
       const isDownloaded = await isModelDownloaded(modelId)
@@ -234,68 +283,138 @@ export function createConfigPanel(
     },
   })
 
-  modelContent.add(modelField.root)
+  modelContent.add(sttModelField.root)
 
-  const modelDeviceIdx = ["auto", "cpu", "gpu"].indexOf(config.model.device)
-  const modelDeviceField = createSelectField(renderer, {
-    id: "model-device-select",
-    label: "Model Device:",
-    options: [
-      { name: "auto", description: "Automatic device selection" },
-      { name: "cpu", description: "CPU only" },
-      { name: "gpu", description: "GPU acceleration if available" },
-    ],
-    selectedIndex: modelDeviceIdx >= 0 ? modelDeviceIdx : 0,
+  // ── LLM Model (for chat) ──
+  const currentLlmIdx = llmModels.findIndex((m) => {
+    const current = config.chat?.llm?.model_path || ""
+    return (
+      current === m.id ||
+      current.includes(m.id)
+    )
+  })
+  const llmModelField = createSelectField(renderer, {
+    id: "llm-model-select",
+    label: "LLM Model (Chat):",
+    options: llmModels.map((m) => ({
+      name: `${m.name}  (${m.size})`,
+      description: m.description,
+    })),
+    selectedIndex: currentLlmIdx >= 0 ? currentLlmIdx : 0,
+    theme,
+    onChange: async (index) => {
+      const selectedModel = llmModels[index]
+      const modelId = selectedModel.id
+      
+      config.chat!.llm.model_path = modelId
+      markDirty()
+      callbacks.onStatusMessage(`LLM Model → ${selectedModel.name}`)
+      
+      // Auto-download if not present
+      const isDownloaded = await isModelDownloaded(modelId)
+      if (!isDownloaded) {
+        callbacks.onStatusMessage(`📥 Downloading ${selectedModel.name}...`)
+        try {
+          await downloadModel(modelId)
+          callbacks.onStatusMessage(`✅ ${selectedModel.name} downloaded`)
+          setTimeout(() => callbacks.onStatusMessage(""), 2000)
+        } catch (err) {
+          callbacks.onStatusMessage(`❌ Download failed: ${err}`)
+          setTimeout(() => callbacks.onStatusMessage(""), 3000)
+        }
+      } else {
+        setTimeout(() => callbacks.onStatusMessage(""), 1500)
+      }
+    },
+  })
+
+  modelContent.add(llmModelField.root)
+
+  // ── TTS Model (for chat) ──
+  const currentTtsIdx = ttsModels.findIndex((m) => {
+    const current = config.chat?.tts?.model_path || ""
+    return (
+      current === m.id ||
+      current.includes(m.id)
+    )
+  })
+  const ttsModelField = createSelectField(renderer, {
+    id: "tts-model-select",
+    label: "TTS Model (Chat):",
+    options: ttsModels.map((m) => ({
+      name: `${m.name}  (${m.size})`,
+      description: m.description,
+    })),
+    selectedIndex: currentTtsIdx >= 0 ? currentTtsIdx : 0,
+    theme,
+    onChange: async (index) => {
+      const selectedModel = ttsModels[index]
+      const modelId = selectedModel.id
+      
+      config.chat!.tts.model_path = modelId
+      markDirty()
+      callbacks.onStatusMessage(`TTS Model → ${selectedModel.name}`)
+      
+      // Auto-download if not present
+      const isDownloaded = await isModelDownloaded(modelId)
+      if (!isDownloaded) {
+        callbacks.onStatusMessage(`📥 Downloading ${selectedModel.name}...`)
+        try {
+          await downloadModel(modelId)
+          callbacks.onStatusMessage(`✅ ${selectedModel.name} downloaded`)
+          setTimeout(() => callbacks.onStatusMessage(""), 2000)
+        } catch (err) {
+          callbacks.onStatusMessage(`❌ Download failed: ${err}`)
+          setTimeout(() => callbacks.onStatusMessage(""), 3000)
+        }
+      } else {
+        setTimeout(() => callbacks.onStatusMessage(""), 1500)
+      }
+    },
+  })
+
+  modelContent.add(ttsModelField.root)
+
+  // ── TTS Voice ──
+  const ttsVoices = [
+    { name: "af", description: "Default (Female, American) - Warm, friendly" },
+    { name: "af_bella", description: "Bella (Female, American) - Clear, professional" },
+    { name: "af_nicole", description: "Nicole (Female, American) - Energetic, youthful" },
+    { name: "af_sarah", description: "Sarah (Female, American) - Calm, soothing" },
+    { name: "af_sky", description: "Sky (Female, American) - Bright, clear" },
+    { name: "am_adam", description: "Adam (Male, American) - Deep, authoritative" },
+    { name: "am_michael", description: "Michael (Male, American) - Friendly, conversational" },
+    { name: "bf_emma", description: "Emma (Female, British) - Elegant, sophisticated" },
+    { name: "bf_isabella", description: "Isabella (Female, British) - Refined, articulate" },
+    { name: "bm_george", description: "George (Male, British) - Distinguished, commanding" },
+    { name: "bm_lewis", description: "Lewis (Male, British) - Warm, approachable" },
+  ]
+  const ttsVoiceIdx = ttsVoices.findIndex(v => v.name === config.chat?.tts.voice_id)
+  const ttsVoiceField = createSelectField(renderer, {
+    id: "tts-voice-select",
+    label: "TTS Voice:",
+    options: ttsVoices,
+    selectedIndex: ttsVoiceIdx >= 0 ? ttsVoiceIdx : 0,
     theme,
     onChange: (index) => {
-      config.model.device = ["auto", "cpu", "gpu"][index]
+      config.chat!.tts.voice_id = ttsVoices[index].name
       markDirty()
     },
   })
 
+  modelContent.add(ttsVoiceField.root)
+
   const modelPreload = createToggle(renderer, {
     id: "model-preload",
-    label: "Preload model at startup",
+    label: "Preload STT model at startup",
     value: config.model.preload,
     theme,
     onChange: (v) => { config.model.preload = v; markDirty() },
   })
 
-  modelContent.add(modelDeviceField.root)
   modelContent.add(modelPreload.root)
 
-  // ── 3. Key Bindings ────────────────────────────────────────────────
-  const hotkeyContent = createSection("sec-hotkey", "Key Bindings")
-
-  // Push-to-talk trigger
-  const triggerCapture = createKeyCapture(renderer, {
-    id: "trigger-capture",
-    label: "Push-to-talk trigger:",
-    value: config.hotkey.trigger,
-    theme,
-    onChange: (combo) => { config.hotkey.trigger = combo; markDirty() },
-  })
-
-  const modeIdx = config.hotkey.mode === "toggle" ? 1 : 0
-  const modeField = createSelectField(renderer, {
-    id: "mode-select",
-    label: "Hotkey Mode:",
-    options: [
-      { name: "push-to-talk", description: "Hold key to dictate" },
-      { name: "toggle", description: "Press to start/stop" },
-    ],
-    selectedIndex: modeIdx,
-    theme,
-    onChange: (index) => {
-      config.hotkey.mode = index === 0 ? "push-to-talk" : "toggle"
-      markDirty()
-    },
-  })
-
-  hotkeyContent.add(triggerCapture.root)
-  hotkeyContent.add(modeField.root)
-
-  // ── 4. Device Selection ────────────────────────────────────────
+  // ── 3. Device Selection ────────────────────────────────────────
   const deviceContent = createSection("sec-device", "Device Selection")
 
   const deviceLoading = new TextRenderable(renderer, {
@@ -335,7 +454,7 @@ export function createConfigPanel(
     )
     const deviceField = createSelectField(renderer, {
       id: "device-select",
-      label: "Input Device:",
+      label: "Audio Input Device:",
       options: devices.map((d) => ({
         name: `${d.name}${d.isDefault ? " (default)" : ""}`,
         description: `${d.sampleRate}Hz, ${d.channels}ch`,
@@ -352,10 +471,131 @@ export function createConfigPanel(
     deviceFieldRef = deviceField
 
     deviceContent.add(deviceField.root)
-    // Register in keyboard focus navigation (inserted after modeField, before srStepper)
-    focusables.splice(7, 0, { type: "selectfield", instance: deviceField, scrollHint: 18 })
+    // Register in keyboard focus navigation (inserted after key bindings, before sttDeviceField)
+    focusables.splice(10, 0, { type: "selectfield", instance: deviceField, scrollHint: 20 })
     bindMouseFocusHandlers()
   })
+
+  // STT Device
+  const sttDeviceOptions = [
+    { name: "auto", description: "Auto-detect best device" },
+    { name: "cpu", description: "Use CPU" },
+    { name: "gpu", description: "Use GPU if available" },
+  ]
+  const sttDeviceIdx = sttDeviceOptions.findIndex(o => o.name === config.model.device)
+  const sttDeviceField = createSelectField(renderer, {
+    id: "stt-device-select",
+    label: "STT Device (Dictation):",
+    options: sttDeviceOptions,
+    selectedIndex: sttDeviceIdx >= 0 ? sttDeviceIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.model.device = sttDeviceOptions[index].name
+      markDirty()
+    },
+  })
+
+  deviceContent.add(sttDeviceField.root)
+
+  // LLM Device
+  const llmDeviceOptions = [
+    { name: "auto", description: "Auto-detect best device" },
+    { name: "cpu", description: "Use CPU" },
+    { name: "gpu", description: "Use GPU if available" },
+  ]
+  const llmDeviceIdx = llmDeviceOptions.findIndex(o => o.name === config.chat?.llm.device)
+  const llmDeviceField = createSelectField(renderer, {
+    id: "llm-device-select",
+    label: "LLM Device (Chat):",
+    options: llmDeviceOptions,
+    selectedIndex: llmDeviceIdx >= 0 ? llmDeviceIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.chat!.llm.device = llmDeviceOptions[index].name
+      markDirty()
+    },
+  })
+
+  deviceContent.add(llmDeviceField.root)
+
+  // TTS Device
+  const ttsDeviceOptions = [
+    { name: "auto", description: "Auto-detect best device" },
+    { name: "cpu", description: "Use CPU" },
+    { name: "gpu", description: "Use GPU if available" },
+  ]
+  const ttsDeviceIdx = ttsDeviceOptions.findIndex(o => o.name === config.chat?.tts.device)
+  const ttsDeviceField = createSelectField(renderer, {
+    id: "tts-device-select",
+    label: "TTS Device (Chat):",
+    options: ttsDeviceOptions,
+    selectedIndex: ttsDeviceIdx >= 0 ? ttsDeviceIdx : 0,
+    theme,
+    onChange: (index) => {
+      config.chat!.tts.device = ttsDeviceOptions[index].name
+      markDirty()
+    },
+  })
+
+  deviceContent.add(ttsDeviceField.root)
+
+  // ── 4. Key Bindings ────────────────────────────────────────────────
+  const hotkeyContent = createSection("sec-hotkey", "Key Bindings")
+
+  // Dictation hotkey
+  const triggerCapture = createKeyCapture(renderer, {
+    id: "trigger-capture",
+    label: "Dictation Hotkey:",
+    value: config.hotkey.trigger,
+    theme,
+    onChange: (combo) => { config.hotkey.trigger = combo; markDirty() },
+  })
+
+  const modeIdx = config.hotkey.mode === "toggle" ? 1 : 0
+  const modeField = createSelectField(renderer, {
+    id: "mode-select",
+    label: "Dictation Mode:",
+    options: [
+      { name: "push-to-talk", description: "Hold key to dictate" },
+      { name: "toggle", description: "Press to start/stop" },
+    ],
+    selectedIndex: modeIdx,
+    theme,
+    onChange: (index) => {
+      config.hotkey.mode = index === 0 ? "push-to-talk" : "toggle"
+      markDirty()
+    },
+  })
+
+  // Chat hotkey
+  const chatHotkeyCapture = createKeyCapture(renderer, {
+    id: "chat-hotkey-capture",
+    label: "Chat Hotkey:",
+    value: config.chat.hotkey,
+    theme,
+    onChange: (combo) => { config.chat!.hotkey = combo; markDirty() },
+  })
+
+  const chatModeIdx = config.chat.mode === "toggle" ? 1 : 0
+  const chatModeField = createSelectField(renderer, {
+    id: "chat-mode-select",
+    label: "Chat Mode:",
+    options: [
+      { name: "push-to-talk", description: "Hold key to record" },
+      { name: "toggle", description: "Press to start/stop" },
+    ],
+    selectedIndex: chatModeIdx,
+    theme,
+    onChange: (index) => {
+      config.chat.mode = index === 0 ? "push-to-talk" : "toggle"
+      markDirty()
+    },
+  })
+
+  hotkeyContent.add(triggerCapture.root)
+  hotkeyContent.add(modeField.root)
+  hotkeyContent.add(chatHotkeyCapture.root)
+  hotkeyContent.add(chatModeField.root)
 
   // ── 5. Audio Settings ──────────────────────────────────────────
   const audioContent = createSection("sec-audio", "Audio Settings")
@@ -581,31 +821,42 @@ export function createConfigPanel(
   // Populated after all widget declarations; deviceSelect spliced in async
   // scrollHints are approximate terminal-row offsets for each widget
   let focusables: FocusItem[] = [
+    // 1. Daemon
     { type: "toggle",      instance: daemonAutoStart,         scrollHint: 0 },
     { type: "selectfield", instance: daemonLogLevelField,     scrollHint: 2 },
-    { type: "selectfield", instance: modelField,              scrollHint: 6 },
-    { type: "selectfield", instance: modelDeviceField,        scrollHint: 7 },
-    { type: "toggle",      instance: modelPreload,            scrollHint: 8 },
-    { type: "keycapture",  instance: triggerCapture,          scrollHint: 12 },
-    { type: "selectfield", instance: modeField,               scrollHint: 13 },
-    // deviceSelect inserted here at index 7 asynchronously → scrollHint 18
-    { type: "stepper",     instance: srStepper,               scrollHint: 22 },
-    { type: "stepper",     instance: chunkStepper,            scrollHint: 23 },
-    { type: "toggle",      instance: vadEnabled,              scrollHint: 28 },
-    { type: "selectfield", instance: vadBackendField,         scrollHint: 29 },
-    { type: "stepper",     instance: vadThresholdStepper,     scrollHint: 30 },
-    { type: "toggle",      instance: vadAdaptive,             scrollHint: 31 },
-    { type: "stepper",     instance: vadPreRollStepper,       scrollHint: 32 },
-    { type: "stepper",     instance: vadPostRollStepper,      scrollHint: 33 },
-    { type: "stepper",     instance: vadMinSpeechStepper,     scrollHint: 34 },
-    { type: "stepper",     instance: vadMinSilenceStepper,    scrollHint: 35 },
-    { type: "toggle",      instance: ppPunctuation,           scrollHint: 40 },
-    { type: "toggle",      instance: ppCapitalize,            scrollHint: 41 },
-    { type: "toggle",      instance: ppFiller,                scrollHint: 42 },
-    { type: "selectfield", instance: injMethodField,          scrollHint: 47 },
-    { type: "stepper",     instance: injDelayStepper,         scrollHint: 48 },
-    { type: "stepper",     instance: injFocusSettleStepper,   scrollHint: 49 },
-    { type: "toggle",      instance: uiOverlayToggle,         scrollHint: 54 },
+    // 2. Model Selection
+    { type: "selectfield", instance: sttModelField,           scrollHint: 6 },
+    { type: "selectfield", instance: llmModelField,           scrollHint: 7 },
+    { type: "selectfield", instance: ttsModelField,           scrollHint: 8 },
+    { type: "selectfield", instance: ttsVoiceField,           scrollHint: 9 },
+    { type: "toggle",      instance: modelPreload,            scrollHint: 10 },
+    // 3. Device Selection (deviceSelect inserted here asynchronously → scrollHint 20)
+    { type: "selectfield", instance: sttDeviceField,          scrollHint: 21 },
+    { type: "selectfield", instance: llmDeviceField,          scrollHint: 22 },
+    { type: "selectfield", instance: ttsDeviceField,          scrollHint: 23 },
+    // 4. Key Bindings
+    { type: "keycapture",  instance: triggerCapture,          scrollHint: 14 },
+    { type: "selectfield", instance: modeField,               scrollHint: 15 },
+    { type: "keycapture",  instance: chatHotkeyCapture,       scrollHint: 16 },
+    { type: "selectfield", instance: chatModeField,           scrollHint: 17 },
+    // 5. Audio Settings
+    { type: "stepper",     instance: srStepper,               scrollHint: 28 },
+    { type: "stepper",     instance: chunkStepper,            scrollHint: 29 },
+    { type: "toggle",      instance: vadEnabled,              scrollHint: 34 },
+    { type: "selectfield", instance: vadBackendField,         scrollHint: 35 },
+    { type: "stepper",     instance: vadThresholdStepper,     scrollHint: 36 },
+    { type: "toggle",      instance: vadAdaptive,             scrollHint: 37 },
+    { type: "stepper",     instance: vadPreRollStepper,       scrollHint: 38 },
+    { type: "stepper",     instance: vadPostRollStepper,      scrollHint: 39 },
+    { type: "stepper",     instance: vadMinSpeechStepper,     scrollHint: 40 },
+    { type: "stepper",     instance: vadMinSilenceStepper,    scrollHint: 41 },
+    { type: "toggle",      instance: ppPunctuation,           scrollHint: 46 },
+    { type: "toggle",      instance: ppCapitalize,            scrollHint: 47 },
+    { type: "toggle",      instance: ppFiller,                scrollHint: 48 },
+    { type: "selectfield", instance: injMethodField,          scrollHint: 53 },
+    { type: "stepper",     instance: injDelayStepper,         scrollHint: 54 },
+    { type: "stepper",     instance: injFocusSettleStepper,   scrollHint: 55 },
+    { type: "toggle",      instance: uiOverlayToggle,         scrollHint: 60 },
   ]
 
   let focusedIdx = -1
@@ -775,13 +1026,20 @@ export function createConfigPanel(
     blurAll()
     renderer.removeInputHandler(configInputHandler)
     daemonLogLevelField.destroy()
-    modelField.destroy()
-    modelDeviceField.destroy()
+    sttModelField.destroy()
+    llmModelField.destroy()
+    ttsModelField.destroy()
+    ttsVoiceField.destroy()
+    sttDeviceField.destroy()
+    llmDeviceField.destroy()
+    ttsDeviceField.destroy()
     modeField.destroy()
     vadBackendField.destroy()
     injMethodField.destroy()
     deviceFieldRef?.destroy()
     triggerCapture.destroy()
+    chatHotkeyCapture.destroy()
+    chatModeField.destroy()
   }
 
   return { root, save, focusFirst, blurAll, hasFocus, destroy }
