@@ -31,6 +31,24 @@ pub struct LlmGguf {
     // This avoids the self-referential lifetime issues
     config: Option<LlmRuntimeConfig>,
     model_path: Option<PathBuf>,
+    /// Detected prompt template family (resolved once during load)
+    prompt_template: PromptTemplate,
+}
+
+/// Supported prompt template families.
+///
+/// The correct template is detected from the model filename/path at load time.
+/// Defaulting to ChatML keeps backwards compatibility with most instruction models.
+#[cfg(feature = "llama-cpp")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PromptTemplate {
+    /// ChatML — used by Mistral, Phi, LFM-2, Qwen, etc.
+    /// `<|im_start|>role\ncontent<|im_end|>\n`
+    ChatMl,
+
+    /// Llama-3 — used by Meta Llama-3.x family.
+    /// `<|begin_of_text|><|start_header_id|>role<|end_header_id|>\n\ncontent<|eot_id|>`
+    Llama3,
 }
 
 #[cfg(feature = "llama-cpp")]
@@ -44,7 +62,28 @@ impl LlmGguf {
             model: None,
             config: None,
             model_path: None,
+            prompt_template: PromptTemplate::ChatMl,
         })
+    }
+
+    /// Detect the prompt template from the model filename.
+    ///
+    /// We match well-known substrings in the model path/id (case-insensitive).
+    /// This keeps detection simple and avoids needing to parse model metadata.
+    fn detect_prompt_template(model_id: &str) -> PromptTemplate {
+        let lower = model_id.to_lowercase();
+
+        if lower.contains("llama-3") || lower.contains("llama3") || lower.contains("meta-llama-3") {
+            debug!(
+                "🗂️  Detected Llama-3 prompt template for model: {}",
+                model_id
+            );
+            PromptTemplate::Llama3
+        } else {
+            // Default: ChatML works for Mistral, Phi-3, LFM-2, Qwen, Hermes, etc.
+            debug!("🗂️  Using ChatML prompt template for model: {}", model_id);
+            PromptTemplate::ChatMl
+        }
     }
 
     /// Resolve model path from cache
@@ -110,36 +149,79 @@ impl LlmGguf {
         Ok(expected)
     }
 
-    /// Format chat messages into a prompt string
+    /// Format chat messages into a prompt string using the detected template.
     fn format_prompt(&self, messages: &[ChatMessage]) -> String {
-        // Use ChatML format (used by many instruction models)
-        // For production, you'd want to detect the model's chat template
+        match self.prompt_template {
+            PromptTemplate::ChatMl => self.format_prompt_chatml(messages),
+            PromptTemplate::Llama3 => self.format_prompt_llama3(messages),
+        }
+    }
+
+    /// ChatML format — default for most instruction-tuned models.
+    ///
+    /// ```text
+    /// <|im_start|>system
+    /// {content}<|im_end|>
+    /// <|im_start|>user
+    /// {content}<|im_end|>
+    /// <|im_start|>assistant
+    /// ```
+    fn format_prompt_chatml(&self, messages: &[ChatMessage]) -> String {
         let mut prompt = String::new();
 
         for message in messages {
-            match message.role {
-                MessageRole::System => {
-                    prompt.push_str("<|im_start|>system\n");
-                    prompt.push_str(&message.content);
-                    prompt.push_str("<|im_end|>\n");
-                }
-                MessageRole::User => {
-                    prompt.push_str("<|im_start|>user\n");
-                    prompt.push_str(&message.content);
-                    prompt.push_str("<|im_end|>\n");
-                }
-                MessageRole::Assistant => {
-                    prompt.push_str("<|im_start|>assistant\n");
-                    prompt.push_str(&message.content);
-                    prompt.push_str("<|im_end|>\n");
-                }
-            }
+            let role = match message.role {
+                MessageRole::System => "system",
+                MessageRole::User => "user",
+                MessageRole::Assistant => "assistant",
+                // Tool results are presented as user turns in ChatML so the model
+                // can process the tool output and produce a follow-up response.
+                MessageRole::Tool => "user",
+            };
+            prompt.push_str(&format!("<|im_start|>{}\n", role));
+            prompt.push_str(&message.content);
+            prompt.push_str("<|im_end|>\n");
         }
 
-        // Add assistant prompt to start generation
+        // Add assistant opening to steer generation
         prompt.push_str("<|im_start|>assistant\n");
 
-        debug!("Formatted prompt ({} chars)", prompt.len());
+        debug!("Formatted ChatML prompt ({} chars)", prompt.len());
+        prompt
+    }
+
+    /// Llama-3 format — used by Meta Llama-3.x family.
+    ///
+    /// ```text
+    /// <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+    ///
+    /// {content}<|eot_id|><|start_header_id|>user<|end_header_id|>
+    ///
+    /// {content}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    ///
+    /// ```
+    fn format_prompt_llama3(&self, messages: &[ChatMessage]) -> String {
+        let mut prompt = String::from("<|begin_of_text|>");
+
+        for message in messages {
+            let role = match message.role {
+                MessageRole::System => "system",
+                MessageRole::User => "user",
+                MessageRole::Assistant => "assistant",
+                // Tool results are modelled as user turns in the Llama-3 template.
+                MessageRole::Tool => "user",
+            };
+            prompt.push_str(&format!(
+                "<|start_header_id|>{}<|end_header_id|>\n\n{}",
+                role, message.content
+            ));
+            prompt.push_str("<|eot_id|>");
+        }
+
+        // Add assistant header to begin generation
+        prompt.push_str("<|start_header_id|>assistant<|end_header_id|>\n\n");
+
+        debug!("Formatted Llama-3 prompt ({} chars)", prompt.len());
         prompt
     }
 }
@@ -150,7 +232,6 @@ impl Default for LlmGguf {
         Self::new().expect("Failed to create LlmGguf")
     }
 }
-
 // Safety: LlmGguf is used behind Arc<RwLock<>> which ensures exclusive access
 // The underlying LlamaContext contains FFI pointers that are safe to use from
 // any thread as long as they're accessed exclusively, which our locks guarantee.
@@ -163,6 +244,9 @@ unsafe impl Sync for LlmGguf {}
 impl LlmRuntime for LlmGguf {
     fn load(&mut self, config: LlmRuntimeConfig) -> crate::Result<()> {
         info!("Loading GGUF model: {}", config.model_path);
+
+        // Detect prompt template from model identifier before anything else (W7)
+        self.prompt_template = Self::detect_prompt_template(&config.model_path);
 
         // Initialize llama.cpp backend
         let backend = LlamaBackend::init().map_err(|e| {
@@ -250,7 +334,7 @@ impl LlmRuntime for LlmGguf {
         info!("Generating response for prompt ({} chars)", prompt.len());
 
         // Extract config values to avoid holding borrow
-        let (max_tokens, temperature, top_p, top_k) = {
+        let (max_tokens, temperature, top_p, top_k, repetition_penalty) = {
             let config = self
                 .config
                 .as_ref()
@@ -260,6 +344,7 @@ impl LlmRuntime for LlmGguf {
                 config.temperature,
                 config.top_p,
                 config.top_k,
+                config.repetition_penalty,
             )
         };
 
@@ -326,9 +411,21 @@ impl LlmRuntime for LlmGguf {
         // Get EOS token
         let eos_token = model.token_eos();
 
-        // Create sampler with temperature, top-k, top-p
+        // Create sampler with temperature, top-k, top-p, repetition penalty
         let mut sampler = {
             let mut samplers = vec![];
+
+            // Add repetition penalty sampler (W4: was configured but never applied)
+            // A value of 1.0 means no penalty; >1.0 penalises repeated tokens.
+            if repetition_penalty > 1.0 {
+                // last_n = 64 tokens of context to consider for penalty (standard default)
+                samplers.push(LlamaSampler::penalties(
+                    64,                 // last_n tokens to consider
+                    repetition_penalty, // repeat penalty
+                    0.0,                // frequency penalty (disabled)
+                    0.0,                // presence penalty (disabled)
+                ));
+            }
 
             // Add top-k sampler
             if top_k > 0 {
@@ -412,11 +509,12 @@ impl LlmRuntime for LlmGguf {
             generated_tokens, generation_time_ms, tokens_per_second
         );
 
-        // Clean up generated text (remove trailing stop sequences)
+        // Clean up generated text (remove trailing stop sequences for all supported templates)
         let final_text = generated_text
-            .trim_end_matches("<|im_end|>")
-            .trim_end_matches("<|endoftext|>")
-            .trim_end_matches("</s>")
+            .trim_end_matches("<|im_end|>") // ChatML EOM
+            .trim_end_matches("<|eot_id|>") // Llama-3 EOM
+            .trim_end_matches("<|endoftext|>") // GPT-style EOS
+            .trim_end_matches("</s>") // SentencePiece EOS
             .trim()
             .to_string();
 
@@ -522,6 +620,7 @@ mod tests {
             ChatMessage::user("Hello!".to_string()),
         ];
 
+        // Default template is ChatML
         let prompt = backend.format_prompt(&messages);
         assert!(prompt.contains("<|im_start|>system"));
         assert!(prompt.contains("<|im_start|>user"));
@@ -530,10 +629,48 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_prompt_template_llama3() {
+        assert_eq!(
+            LlmGguf::detect_prompt_template("meta-llama-3-8b-q4"),
+            PromptTemplate::Llama3
+        );
+        assert_eq!(
+            LlmGguf::detect_prompt_template("llama3-70b"),
+            PromptTemplate::Llama3
+        );
+    }
+
+    #[test]
+    fn test_detect_prompt_template_chatml() {
+        assert_eq!(
+            LlmGguf::detect_prompt_template("lfm2-1.2b-tool-q4"),
+            PromptTemplate::ChatMl
+        );
+        assert_eq!(
+            LlmGguf::detect_prompt_template("mistral-7b-instruct"),
+            PromptTemplate::ChatMl
+        );
+    }
+
+    #[test]
+    fn test_format_prompt_llama3() {
+        let mut backend = LlmGguf::new().unwrap();
+        backend.prompt_template = PromptTemplate::Llama3;
+        let messages = vec![
+            ChatMessage::system("You are helpful.".to_string()),
+            ChatMessage::user("Hi".to_string()),
+        ];
+        let prompt = backend.format_prompt(&messages);
+        assert!(prompt.contains("<|begin_of_text|>"));
+        assert!(prompt.contains("<|start_header_id|>system<|end_header_id|>"));
+        assert!(prompt.contains("<|start_header_id|>user<|end_header_id|>"));
+        assert!(prompt.contains("<|eot_id|>"));
+    }
+
+    #[test]
     fn test_empty_messages_error() {
-        let backend = LlmGguf::new().unwrap();
-        // Can't test without loaded model, but structure validates
-        let messages: Vec<ChatMessage> = vec![];
+        // Can't test without loaded model, but we verify the struct compiles
+        let _backend = LlmGguf::new().unwrap();
         // Would fail at runtime with "No messages provided"
     }
 }

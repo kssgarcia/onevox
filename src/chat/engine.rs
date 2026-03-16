@@ -97,6 +97,22 @@ impl ChatEngine {
         // Initialize tool registry
         let tool_registry = Self::init_tool_registry(&config)?;
 
+        // W2: Read system_prompt from config instead of hardcoding it.
+        // Fall back to a sensible default only when the configured value is empty.
+        let system_prompt = {
+            let cfg = config.try_read().map_err(|_| {
+                crate::Error::Other("Failed to read config for system prompt".to_string())
+            })?;
+            let prompt = cfg.chat.llm.system_prompt.trim().to_string();
+            if prompt.is_empty() {
+                "You are a helpful voice assistant. Be conversational, friendly, and concise. \
+                 Only use tools when the user explicitly asks you to perform an action. \
+                 For questions about your capabilities or general conversation, just respond naturally.".to_string()
+            } else {
+                prompt
+            }
+        };
+
         Ok(Self {
             config,
             stt_model,
@@ -104,11 +120,7 @@ impl ChatEngine {
             tts_runtime,
             audio_player: Arc::new(RwLock::new(audio_player)),
             history: Arc::new(RwLock::new(Vec::new())),
-            system_prompt: Arc::new(RwLock::new(
-                "You are a helpful voice assistant. Be conversational, friendly, and concise. \
-                 Only use tools when the user explicitly asks you to perform an action. \
-                 For questions about your capabilities or general conversation, just respond naturally.".to_string(),
-            )),
+            system_prompt: Arc::new(RwLock::new(system_prompt)),
             tool_registry: Arc::new(RwLock::new(tool_registry)),
         })
     }
@@ -189,7 +201,7 @@ impl ChatEngine {
             transcription.text, stt_duration_ms
         );
 
-        // Step 2: Generate LLM response
+        // Step 2: Generate LLM response (includes agentic tool-call loop)
         info!("🧠 Step 2/4: Generating response...");
         let llm_start = Instant::now();
         debug!("About to call generate_response");
@@ -206,59 +218,9 @@ impl ChatEngine {
         );
         debug!("Finished logging LLM response");
 
-        // Step 2.5: Check for and execute tool calls
-        debug!(
-            "Parsing tool calls from LLM response: {}",
-            llm_response.text
-        );
-        let tool_calls = parse_tool_calls(&llm_response.text);
-        debug!("Parsed {} tool calls", tool_calls.len());
-        let final_response_text = if !tool_calls.is_empty() {
-            info!(
-                "🔧 Detected {} tool call(s), executing...",
-                tool_calls.len()
-            );
-
-            let mut successes = Vec::new();
-            let mut failures = Vec::new();
-            let tool_registry = self.tool_registry.read().await;
-
-            for call in &tool_calls {
-                info!("  → Executing tool: {}", call.name);
-                match tool_registry.execute(call).await {
-                    Ok(result) => {
-                        info!("  ✓ Tool {} succeeded: {}", call.name, result);
-                        successes.push(result.message);
-                    }
-                    Err(e) => {
-                        warn!("  ✗ Tool {} failed: {}", call.name, e.message);
-                        failures.push(e.message.to_string());
-                    }
-                }
-            }
-            drop(tool_registry);
-
-            // Format results conversationally
-            if !failures.is_empty() {
-                // If there were failures, report them
-                format!(
-                    "I tried to help, but encountered an issue: {}",
-                    failures.join(". ")
-                )
-            } else if !successes.is_empty() {
-                // Success! Give a friendly confirmation
-                if successes.len() == 1 {
-                    format!("Done! {}", successes[0])
-                } else {
-                    format!("Done! I completed {} actions for you.", successes.len())
-                }
-            } else {
-                "I executed the requested actions.".to_string()
-            }
-        } else {
-            // No tool calls, use the LLM response directly
-            llm_response.text.clone()
-        };
+        // generate_response now handles the full agentic loop internally, so the
+        // final text ready for TTS is already in llm_response.text.
+        let final_response_text = llm_response.text.clone();
 
         // Step 3: Synthesize speech
         info!("🔊 Step 3/4: Synthesizing speech...");
@@ -353,7 +315,7 @@ impl ChatEngine {
         let playback_task = tokio::task::spawn_blocking({
             move || {
                 let playback_start = Instant::now();
-                // Create a tokio runtime for the blocking thread
+                // Reuse the current Tokio runtime handle — do NOT create a new Runtime here.
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(async move {
                     if let Err(e) = continuous_player.play_stream(audio_rx, 24000).await {
@@ -419,16 +381,67 @@ impl ChatEngine {
             (tts_count, total_tts_ms)
         });
 
-        // Generate LLM response with streaming
+        // W5 FIX: Use a std::sync::mpsc channel for the synchronous LLM callback instead of
+        // spawning a new OS thread + full Tokio Runtime per token (~20-50/sec).
+        // The channel is a FIFO queue; the async side drains it in a dedicated tokio task.
+        let (token_tx, token_rx) = std::sync::mpsc::channel::<String>();
+
+        // Spawn an async task that owns the sentence splitter and sentence channel.
+        // It reads tokens from the std mpsc channel (non-blocking poll) and feeds
+        // them to the SentenceSplitter, forwarding complete sentences to TTS.
         let splitter_clone = Arc::clone(&splitter);
-        let sentence_tx_clone = sentence_tx.clone();
-
+        let sentence_tx_for_task = sentence_tx.clone();
         let full_response_text = Arc::new(tokio::sync::Mutex::new(String::new()));
-        let full_response_clone = Arc::clone(&full_response_text);
+        let full_response_for_task = Arc::clone(&full_response_text);
 
-        let llm_response = {
-            // Build message history
-            let mut messages = Vec::new();
+        let token_drain_task = tokio::spawn(async move {
+            // We drive this task by yielding in a tight loop so we can process
+            // tokens promptly without burning a dedicated OS thread.
+            loop {
+                // Drain all currently available tokens in one burst.
+                let mut got_any = false;
+                loop {
+                    match token_rx.try_recv() {
+                        Ok(token) => {
+                            got_any = true;
+
+                            // Accumulate full response text
+                            {
+                                let mut text = full_response_for_task.lock().await;
+                                text.push_str(&token);
+                            }
+
+                            // Feed to sentence splitter
+                            let sentences = {
+                                let mut splitter = splitter_clone.lock().await;
+                                splitter.add_chunk(&token)
+                            };
+
+                            // Forward complete sentences to TTS
+                            for sentence in sentences {
+                                if let Err(e) = sentence_tx_for_task.send(sentence).await {
+                                    debug!("Failed to send sentence to TTS: {}", e);
+                                }
+                            }
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                            // Sender dropped — LLM generation is done.
+                            return;
+                        }
+                    }
+                }
+
+                if !got_any {
+                    // Nothing to do this iteration; yield so other tasks can run.
+                    tokio::task::yield_now().await;
+                }
+            }
+        });
+
+        // Build message history for streaming LLM call
+        let streaming_messages: Vec<ChatMessage> = {
+            let mut msgs = Vec::new();
 
             let base_system_prompt = self.system_prompt.read().await;
             let mut system_prompt = base_system_prompt.clone();
@@ -442,70 +455,70 @@ impl ChatEngine {
             }
             drop(tool_registry);
 
-            messages.push(ChatMessage::system(system_prompt));
+            msgs.push(ChatMessage::system(system_prompt));
 
             let history = self.history.read().await;
-            messages.extend(history.iter().cloned());
+            msgs.extend(history.iter().cloned());
             drop(history);
 
-            messages.push(ChatMessage::user(transcription.text.clone()));
+            msgs.push(ChatMessage::user(transcription.text.clone()));
+            msgs
+        };
 
-            // Generate with streaming callback
+        // Generate with streaming callback.
+        // The callback simply sends each token over the std mpsc channel — no
+        // thread spawn, no runtime creation, just a cheap non-blocking send.
+        let llm_response = {
             let mut llm = self.llm_runtime.write().await;
 
-            let response = llm.generate_stream(
-                &messages,
+            llm.generate_stream(
+                &streaming_messages,
                 Box::new(move |token: &str| {
-                    let token_owned = token.to_string();
-                    let text_clone = Arc::clone(&full_response_clone);
-                    let splitter = splitter_clone.clone();
-                    let tx = sentence_tx_clone.clone();
-
-                    // Spawn async task to handle the token
-                    let _ = std::thread::spawn(move || {
-                        let rt = tokio::runtime::Runtime::new().unwrap();
-                        rt.block_on(async move {
-                            // Add to full response
-                            {
-                                let mut text = text_clone.lock().await;
-                                text.push_str(&token_owned);
-                            }
-
-                            // Feed token to sentence splitter
-                            let mut splitter = splitter.lock().await;
-                            let sentences = splitter.add_chunk(&token_owned);
-                            drop(splitter);
-
-                            // Send complete sentences to TTS
-                            for sentence in sentences {
-                                if let Err(e) = tx.send(sentence).await {
-                                    debug!("Failed to send sentence to TTS: {}", e);
-                                }
-                            }
-                        });
-                    });
+                    // This closure is called synchronously inside generate_stream.
+                    // Sending over std::sync::mpsc is non-blocking when the channel has
+                    // capacity, so it's safe to call here without spawning anything.
+                    let _ = token_tx.send(token.to_string());
                 }),
-            )?;
-
-            drop(llm);
-            response
+            )?
         };
 
         let llm_duration_ms = llm_start.elapsed().as_millis() as u64;
 
-        // Extract final response text
-        let final_response_text = {
+        // Wait for the token drain task to finish (it exits when token_tx is dropped,
+        // which happens when generate_stream returns above — the capture closes it).
+        let _ = token_drain_task.await;
+
+        // Extract final response text accumulated by the drain task
+        let streaming_text = {
             let text = full_response_text.lock().await;
             text.clone()
         };
 
+        // Use the streaming-accumulated text as the authoritative response.
+        // Fall back to llm_response.text if the accumulator is somehow empty.
+        let raw_text = if streaming_text.is_empty() {
+            llm_response.text.clone()
+        } else {
+            streaming_text
+        };
+
         info!(
             "✅ LLM generation complete: \"{}\" ({} tokens, {:.2} tok/s, {}ms)",
-            final_response_text.chars().take(50).collect::<String>(),
+            raw_text.chars().take(50).collect::<String>(),
             llm_response.tokens,
             llm_response.tokens_per_second,
             llm_duration_ms
         );
+
+        // W1 FIX: After streaming is done, run the complete text through the tool-call
+        // parser and execute any tool calls found. This mirrors the agentic loop in
+        // `generate_response` but is applied to the streaming path.
+        //
+        // We also implement the feedback loop (W8) here: if tools were called we
+        // append a Tool message and call generate() again for a natural follow-up.
+        let final_response_text = self
+            .run_tool_calls_and_get_final_text(raw_text.clone(), &streaming_messages)
+            .await?;
 
         // Flush any remaining text from sentence splitter
         {
@@ -515,6 +528,7 @@ impl ChatEngine {
                     "🔊 Flushing remaining text to TTS: \"{}\"",
                     remaining.chars().take(50).collect::<String>()
                 );
+                // Only send the plain TTS portion (non-tool text from the first pass)
                 let _ = sentence_tx.send(remaining).await;
             }
         }
@@ -541,7 +555,7 @@ impl ChatEngine {
             .await
             .map_err(|e| crate::Error::Other(format!("Playback task failed: {}", e)))?;
 
-        // Update history
+        // Update history with user turn and the final assistant response
         self.update_history(transcription.text.clone(), final_response_text.clone())
             .await;
 
@@ -566,6 +580,94 @@ impl ChatEngine {
         })
     }
 
+    /// Execute any tool calls found in `raw_text` and return the text that should
+    /// be spoken and stored in history.
+    ///
+    /// If no tool calls are found, returns `raw_text` unchanged.
+    /// If tool calls are found, executes them and performs up to
+    /// `MAX_AGENTIC_ITERATIONS` additional LLM generate() passes to produce a
+    /// natural follow-up response (W8 / W1 fix for streaming path).
+    async fn run_tool_calls_and_get_final_text(
+        &self,
+        raw_text: String,
+        base_messages: &[ChatMessage],
+    ) -> crate::Result<String> {
+        /// Hard cap matching the non-streaming agentic loop.
+        const MAX_AGENTIC_ITERATIONS: usize = 5;
+
+        let tool_calls = parse_tool_calls(&raw_text);
+
+        if tool_calls.is_empty() {
+            // Nothing to do — return the LLM text as-is.
+            return Ok(raw_text);
+        }
+
+        info!(
+            "🔧 [streaming] Detected {} tool call(s), executing agentic loop...",
+            tool_calls.len()
+        );
+
+        // Build a mutable copy of the message list that we can extend with
+        // Tool result messages for subsequent generate() passes.
+        let mut messages: Vec<ChatMessage> = base_messages.to_vec();
+
+        // Append the assistant turn that contained the tool call JSON.
+        messages.push(ChatMessage::assistant(raw_text.clone()));
+
+        let mut last_text = raw_text;
+
+        for iteration in 0..MAX_AGENTIC_ITERATIONS {
+            let calls = parse_tool_calls(&last_text);
+            if calls.is_empty() {
+                break;
+            }
+
+            debug!(
+                "run_tool_calls: iteration {}/{}, {} call(s)",
+                iteration + 1,
+                MAX_AGENTIC_ITERATIONS,
+                calls.len()
+            );
+
+            // Execute tools and collect results.
+            let tool_registry = self.tool_registry.read().await;
+            let mut result_parts: Vec<String> = Vec::new();
+
+            for call in &calls {
+                info!("  → [streaming] Executing tool: {}", call.name);
+                match tool_registry.execute(call).await {
+                    Ok(output) => {
+                        info!(
+                            "  ✓ [streaming] Tool {} succeeded: {}",
+                            call.name, output.message
+                        );
+                        result_parts
+                            .push(format!("Tool `{}` result: {}", call.name, output.message));
+                    }
+                    Err(e) => {
+                        warn!("  ✗ [streaming] Tool {} failed: {}", call.name, e.message);
+                        result_parts.push(format!("Tool `{}` error: {}", call.name, e.message));
+                    }
+                }
+            }
+            drop(tool_registry);
+
+            // Append Tool result message and generate a follow-up.
+            messages.push(ChatMessage::tool(result_parts.join("\n")));
+
+            let follow_up = {
+                let mut llm = self.llm_runtime.write().await;
+                llm.generate(&messages)
+                    .map_err(|e| crate::Error::Model(format!("LLM follow-up failed: {}", e)))?
+            };
+
+            last_text = follow_up.text.clone();
+            messages.push(ChatMessage::assistant(last_text.clone()));
+        }
+
+        Ok(last_text)
+    }
+
     /// Transcribe audio using STT model
     async fn transcribe_audio(&self, audio_data: Vec<f32>) -> crate::Result<Transcription> {
         // We need to handle the sync API in an async context
@@ -579,10 +681,21 @@ impl ChatEngine {
         Ok(result)
     }
 
-    /// Generate LLM response with conversation history
+    /// Generate LLM response with conversation history.
+    ///
+    /// Implements a full agentic loop (W8):
+    /// 1. Generate LLM response.
+    /// 2. Parse tool calls from the response.
+    /// 3. Execute every tool call found.
+    /// 4. Append the tool result as a `Tool` role message and generate again.
+    /// 5. Repeat up to `MAX_AGENTIC_ITERATIONS` times to prevent infinite loops.
     async fn generate_response(&self, user_text: &str) -> crate::Result<LlmResponse> {
         debug!("generate_response: Starting");
-        // Build message history
+
+        /// Hard cap on how many tool→LLM round-trips we allow per user turn.
+        const MAX_AGENTIC_ITERATIONS: usize = 5;
+
+        // Build initial message list once; we'll push Tool messages into it each iteration.
         let mut messages = Vec::new();
 
         // Build system prompt with tool definitions
@@ -622,24 +735,86 @@ impl ChatEngine {
 
         debug!("💬 Generating with {} messages in context", messages.len());
 
-        // Generate response
-        debug!("generate_response: Acquiring LLM write lock");
-        let mut llm = self.llm_runtime.write().await;
-        debug!("generate_response: LLM lock acquired, calling generate");
-        let response = llm
-            .generate(&messages)
-            .map_err(|e| crate::Error::Model(format!("LLM generation failed: {}", e)))?;
-        debug!("generate_response: LLM generate returned");
+        let mut final_response = LlmResponse::new(String::new());
 
-        // Update history
-        drop(llm); // Release lock before updating history
+        for iteration in 0..MAX_AGENTIC_ITERATIONS {
+            debug!(
+                "generate_response: Agentic iteration {}/{}",
+                iteration + 1,
+                MAX_AGENTIC_ITERATIONS
+            );
+
+            // Generate response
+            debug!("generate_response: Acquiring LLM write lock");
+            let response = {
+                let mut llm = self.llm_runtime.write().await;
+                debug!("generate_response: LLM lock acquired, calling generate");
+                llm.generate(&messages)
+                    .map_err(|e| crate::Error::Model(format!("LLM generation failed: {}", e)))?
+            };
+            debug!("generate_response: LLM generate returned");
+
+            // Check for tool calls in the response (W1 companion — also done in non-streaming path)
+            let tool_calls = parse_tool_calls(&response.text);
+            debug!("generate_response: Parsed {} tool calls", tool_calls.len());
+
+            if tool_calls.is_empty() {
+                // No tools requested — this is the final answer.
+                debug!("generate_response: No tool calls, returning final response");
+                final_response = response;
+                break;
+            }
+
+            // Execute all requested tool calls and collect results (W8)
+            info!(
+                "🔧 Agentic iteration {}: executing {} tool call(s)",
+                iteration + 1,
+                tool_calls.len()
+            );
+
+            let tool_registry = self.tool_registry.read().await;
+            let mut result_parts: Vec<String> = Vec::new();
+
+            for call in &tool_calls {
+                info!("  → Executing tool: {}", call.name);
+                match tool_registry.execute(call).await {
+                    Ok(output) => {
+                        info!("  ✓ Tool {} succeeded: {}", call.name, output.message);
+                        result_parts
+                            .push(format!("Tool `{}` result: {}", call.name, output.message));
+                    }
+                    Err(e) => {
+                        warn!("  ✗ Tool {} failed: {}", call.name, e.message);
+                        result_parts.push(format!("Tool `{}` error: {}", call.name, e.message));
+                    }
+                }
+            }
+            drop(tool_registry);
+
+            // Append the assistant turn (which contained the tool call JSON) so the LLM
+            // has a coherent view of what it said, then append the tool results as a
+            // `Tool` role message so the LLM can generate a natural follow-up.
+            messages.push(ChatMessage::assistant(response.text.clone()));
+            messages.push(ChatMessage::tool(result_parts.join("\n")));
+
+            // Remember the last response in case this was the last allowed iteration.
+            final_response = response;
+        }
+
+        // If we hit the iteration limit without a clean exit, use whatever was generated last.
+        if final_response.text.is_empty() {
+            warn!("⚠️  Agentic loop produced no usable response");
+        }
+
+        // Update history with the final user→assistant pair
+        drop(messages); // release borrow before mutating history
         debug!("generate_response: LLM lock dropped, calling update_history");
-        self.update_history(user_text.to_string(), response.text.clone())
+        self.update_history(user_text.to_string(), final_response.text.clone())
             .await;
         debug!("generate_response: update_history returned");
 
         debug!("generate_response: Returning response");
-        Ok(response)
+        Ok(final_response)
     }
 
     /// Synthesize speech from text
@@ -679,11 +854,19 @@ impl ChatEngine {
         // Add assistant message
         history.push(ChatMessage::assistant(assistant_text));
 
-        // Trim history if too long (keep recent messages)
-        if history.len() > MAX_HISTORY_LENGTH {
-            let remove_count = history.len() - MAX_HISTORY_LENGTH;
-            history.drain(0..remove_count);
-            debug!("🗑️  Trimmed {} old messages from history", remove_count);
+        // W6: Trim history without splitting user/assistant pairs.
+        // We always remove the oldest complete pair (2 messages) at once so the
+        // history stays coherent (every User turn has a matching Assistant reply).
+        // We use saturating arithmetic so this is safe even with an odd count.
+        while history.len() > MAX_HISTORY_LENGTH {
+            // Remove the oldest two messages (one pair).  If somehow only one
+            // message is over the limit, remove just that one to avoid a panic.
+            let remove = if history.len() > 1 { 2 } else { 1 };
+            history.drain(0..remove);
+            debug!(
+                "🗑️  Trimmed {} old message(s) from history (pair trim)",
+                remove
+            );
         }
 
         debug!("📚 History now has {} messages", history.len());

@@ -126,6 +126,11 @@ impl ChatMessage {
     pub fn assistant(content: String) -> Self {
         Self::new(MessageRole::Assistant, content)
     }
+
+    /// Create a tool result message (used to feed tool output back to the LLM)
+    pub fn tool(content: String) -> Self {
+        Self::new(MessageRole::Tool, content)
+    }
 }
 
 /// Message role in conversation
@@ -139,6 +144,9 @@ pub enum MessageRole {
 
     /// Assistant message (AI response)
     Assistant,
+
+    /// Tool result message (fed back to LLM after tool execution)
+    Tool,
 }
 
 impl MessageRole {
@@ -148,6 +156,7 @@ impl MessageRole {
             MessageRole::System => "system",
             MessageRole::User => "user",
             MessageRole::Assistant => "assistant",
+            MessageRole::Tool => "tool",
         }
     }
 }
@@ -243,6 +252,7 @@ mod tests {
         assert_eq!(MessageRole::System.as_str(), "system");
         assert_eq!(MessageRole::User.as_str(), "user");
         assert_eq!(MessageRole::Assistant.as_str(), "assistant");
+        assert_eq!(MessageRole::Tool.as_str(), "tool");
     }
 
     #[test]
