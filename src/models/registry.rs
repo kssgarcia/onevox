@@ -420,6 +420,27 @@ impl ModelRegistry {
                 },
 
                 // ============================================================
+                // Llama 3.2 3B Instruct - Q4_K_M
+                // ============================================================
+
+                ModelMetadata {
+                    id: "llama-3.2-3b-instruct-q4km".to_string(),
+                    name: "Llama 3.2 3B Instruct Q4_K_M".to_string(),
+                    model_type: ModelType::LLM,
+                    size: ModelSize::Small,
+                    variant: ModelVariant::Multilingual,
+                    format: ModelFormat::GGUF,
+                    size_bytes: 2020 * 1024 * 1024, // ~2.02 GB
+                    hf_repo: "bartowski/Llama-3.2-3B-Instruct-GGUF".to_string(),
+                    files: vec!["Llama-3.2-3B-Instruct-Q4_K_M.gguf".to_string()],
+                    file_sha256: HashMap::new(),
+                    speed_factor: 25.0, // ~25 tokens/sec on CPU
+                    memory_mb: 3000,
+                    gpu_recommended: false,
+                    description: "Llama 3.2 3B Instruct with Q4_K_M quantization. Good balance of quality and size. Suitable for general-purpose conversation and instruction following.".to_string(),
+                },
+
+                // ============================================================
                 // TTS Models
                 // ============================================================
 

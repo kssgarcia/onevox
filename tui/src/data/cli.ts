@@ -338,6 +338,17 @@ export function getModelRegistry(): ModelInfo[] {
       downloaded: false,
     },
 
+    {
+      id: "llama-3.2-3b-instruct-q4km",
+      name: "Llama 3.2 3B Instruct Q4_K_M",
+      size: "~2.02 GB",
+      sizeBytes: 2_020_000_000,
+      speedFactor: 0.7,
+      memoryMb: 3000,
+      description: "Llama 3.2 3B Instruct with Q4_K_M quantization. Good balance of quality and size. Suitable for general-purpose conversation and instruction following.",
+      downloaded: false,
+    },
+
     // ============================================================
     // TTS Models (for Chat)
     // ============================================================

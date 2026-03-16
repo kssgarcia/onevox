@@ -235,7 +235,7 @@ export function createConfigPanel(
 
   const models = getModelRegistry()
   const sttModels = models.filter(m => m.id.startsWith("ggml-") || m.id.includes("parakeet"))
-  const llmModels = models.filter(m => m.id.includes("lfm"))
+  const llmModels = models.filter(m => m.id.includes("lfm") || m.id.includes("llama"))
   const ttsModels = models.filter(m => m.id.includes("kokoro"))
 
   // ── STT Model (for dictation) ──
